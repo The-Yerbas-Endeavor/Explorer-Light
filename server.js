@@ -179,7 +179,86 @@ async function recentBlocks(limit) {
 
 function assetKind(name) {
   if (name.endsWith('!')) return 'Owner';
-  if (name.startsWith('
+  if (name.startsWith('$')) return 'Restricted';
+  if (name.startsWith('#')) return 'Qualifier';
+  if (name.includes('#')) return 'Unique';
+  if (name.includes('/')) return 'Sub-asset';
+  return 'Root';
+}
+
+function assetMetadataRef(metadata = {}) {
+  const ipfs = metadata.ipfs_hash || null;
+  const txid = metadata.txid_hash || metadata.txid || null;
+  if (ipfs) return { type: 'ipfs', value: ipfs };
+  if (txid) return { type: 'txid', value: txid };
+  return null;
+}
+
+async function loadAssetDirectory() {
+  return cached('assets:directory:all', 60000, async () => {
+    const assets = await rpc.call('listassets', ['*', true, 50000, 0]);
+    if (typeof assets === 'string') {
+      throw new RpcError(assets.replace(/^_/, ''), { method: 'listassets' });
+    }
+
+    return Object.entries(assets || {}).map(([name, metadata]) => ({
+      name,
+      type: assetKind(name),
+      metadataRef: assetMetadataRef(metadata),
+      ...metadata
+    }));
+  });
+}
+
+async function loadHolderCounts(names) {
+  if (!names.length) return [];
+  const calls = names.map((name) => ({
+    method: 'listaddressesbyasset',
+    params: [name, true]
+  }));
+
+  try {
+    return await rpc.batch(calls);
+  } catch {
+    const values = [];
+    for (const name of names) {
+      try {
+        values.push(await rpc.call('listaddressesbyasset', [name, true]));
+      } catch {
+        values.push(null);
+      }
+    }
+    return values;
+  }
+}
+
+async function loadAssetIndexStats() {
+  return cached('assets:index-stats', 300000, async () => {
+    const assets = await loadAssetDirectory();
+    const holderCounts = [];
+    const chunkSize = 50;
+
+    for (let offset = 0; offset < assets.length; offset += chunkSize) {
+      const chunk = assets.slice(offset, offset + chunkSize);
+      const counts = await loadHolderCounts(chunk.map((asset) => asset.name));
+      holderCounts.push(...counts);
+    }
+
+    const indexedHolders = holderCounts.reduce((sum, value) => {
+      const count = Number(value);
+      return sum + (Number.isFinite(count) ? count : 0);
+    }, 0);
+
+    return {
+      ready: true,
+      indexedAssets: assets.length,
+      indexedHolders,
+      generatedAt: new Date().toISOString()
+    };
+  });
+}
+
+async function handleAi(req, res, url) {
   if (!config.ai.enabled) {
     return sendJson(res, 404, { error: 'Not found.' });
   }
