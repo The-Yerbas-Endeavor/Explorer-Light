@@ -1583,11 +1583,13 @@ tbody tr:hover {
 }
 
 .smartnode-toolbar {
-  grid-template-columns: minmax(220px, .5fr) minmax(0, 1.5fr);
+  grid-template-columns: 1fr;
+  align-items: start;
 }
 
 .smartnode-filter {
-  grid-template-columns: minmax(210px, 1.7fr) repeat(3, minmax(130px, .8fr)) auto;
+  width: 100%;
+  grid-template-columns: minmax(260px, 1.8fr) minmax(150px, .9fr) minmax(160px, .9fr) minmax(190px, 1fr) auto;
 }
 
 .smartnode-note {
@@ -1604,11 +1606,71 @@ tbody tr:hover {
 }
 
 .smartnode-table {
-  min-width: 1420px;
+  min-width: 0;
+  table-layout: fixed;
 }
 
+.smartnode-table th,
 .smartnode-table td {
+  padding-left: 14px;
+  padding-right: 14px;
   vertical-align: top;
+}
+
+.smartnode-table th:nth-child(1),
+.smartnode-table td:nth-child(1) { width: 6%; }
+
+.smartnode-table th:nth-child(2),
+.smartnode-table td:nth-child(2) { width: 18%; }
+
+.smartnode-table th:nth-child(3),
+.smartnode-table td:nth-child(3) { width: 16%; }
+
+.smartnode-table th:nth-child(4),
+.smartnode-table td:nth-child(4) { width: 10%; }
+
+.smartnode-table th:nth-child(5),
+.smartnode-table td:nth-child(5) { width: 17%; }
+
+.smartnode-table th:nth-child(6),
+.smartnode-table td:nth-child(6) { width: 11%; }
+
+.smartnode-table th:nth-child(7),
+.smartnode-table td:nth-child(7) { width: 14%; }
+
+.smartnode-table th:nth-child(8),
+.smartnode-table td:nth-child(8) { width: 8%; }
+
+.smartnode-table td {
+  overflow-wrap: anywhere;
+}
+
+.pay-age-cell {
+  color: var(--green-hot);
+  font-family: var(--mono);
+  font-weight: 700;
+}
+
+.service-value,
+.smartnode-address {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.smartnode-address {
+  color: var(--green-hot);
+}
+
+.cell-primary {
+  color: var(--text-soft);
+}
+
+.collateral-value {
+  color: var(--text);
+  font-weight: 700;
 }
 
 .row-sub {
@@ -1646,16 +1708,16 @@ tbody tr:hover {
 }
 
 @media (max-width: 1120px) {
-  .smartnode-toolbar {
-    grid-template-columns: 1fr;
-  }
-
   .smartnode-filter {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .smartnode-filter input {
     grid-column: span 2;
+  }
+
+  .smartnode-table {
+    min-width: 1050px;
   }
 }
 
