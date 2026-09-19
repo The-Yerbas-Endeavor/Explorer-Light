@@ -261,6 +261,25 @@ async function handleApi(req, res, url) {
     }
   }
 
+  if (url.pathname.startsWith('/api/address/')) {
+    const address = decodeURIComponent(url.pathname.slice('/api/address/'.length)).trim();
+    if (!address || address.length > 128) {
+      return sendJson(res, 400, { error: 'Invalid Yerbas address.' });
+    }
+
+    const result = await ai.invoke('get_address', {
+      address,
+      tx_limit: 100,
+      utxo_limit: 100
+    });
+
+    if (!result.data?.isValid) {
+      return sendJson(res, 404, { error: 'Invalid Yerbas address.' });
+    }
+
+    return sendJson(res, 200, result.data);
+  }
+
   if (url.pathname === '/api/search') {
     const query = url.searchParams.get('q') || '';
     const classified = classifySearchInput(query);
@@ -291,8 +310,7 @@ async function handleApi(req, res, url) {
         return sendJson(res, 200, {
           type: 'address',
           target: classified.value,
-          supported: false,
-          message: 'This is a valid Yerbas address. Enable Core addressindex=1 to expose address history through the AI gateway without an explorer database.'
+          supported: true
         });
       }
     } catch {
@@ -338,7 +356,10 @@ async function requestHandler(req, res) {
     const staticFile = staticFiles.get(url.pathname);
     if (staticFile) return await sendFile(req, res, staticFile[0], staticFile[1]);
 
-    if (url.pathname === '/' || url.pathname.startsWith('/block/') || url.pathname.startsWith('/tx/')) {
+    if (url.pathname === '/'
+      || url.pathname.startsWith('/block/')
+      || url.pathname.startsWith('/tx/')
+      || url.pathname.startsWith('/address/')) {
       return await sendFile(req, res, 'index.html', 'text/html; charset=utf-8', 'no-cache');
     }
 
