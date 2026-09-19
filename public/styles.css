@@ -1734,3 +1734,44 @@ tbody tr:hover {
     display: none;
   }
 }
+
+
+.sort-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #6f8876;
+  font: 700 9px/1.2 var(--mono);
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sort-header:hover {
+  color: var(--green-hot);
+}
+
+.sort-header.active {
+  color: var(--green-hot);
+}
+
+.sort-arrow {
+  display: inline-grid;
+  place-items: center;
+  min-width: 12px;
+  color: var(--green-dim);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+.sort-header.active .sort-arrow {
+  color: var(--green-hot);
+}
+
+.smartnode-table th {
+  background: rgba(4, 11, 7, .34);
+}
+
+.smartnode-table th:hover {
+  background: rgba(141, 241, 158, .035);
+}
