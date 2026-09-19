@@ -340,3 +340,14 @@ Database-dependent legacy routes that cannot be reproduced faithfully without re
 - Filters include status, collateral amount, search text, and sorting.
 - The public API is `/api/v1/smartnodes`.
 - The displayed pay-age rank is based on oldest last-paid block among enabled nodes and is informational only; it is not a prediction of the next payment winner.
+
+
+### Network map
+
+- `/node-map` provides a global map with **Network Nodes** and **Smartnodes** views.
+- Network Nodes are the peers currently connected to this Explorer-Light Core node through `getpeerinfo`.
+- Smartnodes are read from the deterministic Smartnode set already exposed by Core.
+- Node locations are approximate IP-geolocation results only; exact operator locations are not exposed.
+- IP geolocation runs server-side, is cached, and is never requested directly from visitors' browsers.
+- The public API is `/api/v1/network-map?view=smartnodes` or `?view=peers`.
+- Explorer-Light remains database-free; the geolocation cache is ephemeral runtime cache rather than a blockchain/explorer database.
