@@ -608,16 +608,46 @@ function smartnodeListHref(params, page) {
   const q = (params.get('q') || '').trim();
   const status = params.get('status') || 'ENABLED';
   const collateral = params.get('collateral') || '';
-  const sort = params.get('sort') || 'last-paid';
+  const sort = params.get('sort') || 'pay-age-asc';
 
   if (q) next.set('q', q);
   if (status && status !== 'ENABLED') next.set('status', status);
   if (collateral) next.set('collateral', collateral);
-  if (sort && sort !== 'last-paid') next.set('sort', sort);
+  if (sort && sort !== 'pay-age-asc') next.set('sort', sort);
   if (page > 1) next.set('page', String(page));
 
   const query = next.toString();
   return '/smartnodes' + (query ? '?' + query : '');
+}
+
+function smartnodeSortHref(params, key) {
+  const current = params.get('sort') || 'pay-age-asc';
+  const nextSort = current === key + '-asc' ? key + '-desc' : key + '-asc';
+  const next = new URLSearchParams();
+
+  const q = (params.get('q') || '').trim();
+  const status = params.get('status') || 'ENABLED';
+  const collateral = params.get('collateral') || '';
+
+  if (q) next.set('q', q);
+  if (status && status !== 'ENABLED') next.set('status', status);
+  if (collateral) next.set('collateral', collateral);
+  next.set('sort', nextSort);
+
+  return '/smartnodes?' + next.toString();
+}
+
+function smartnodeSortHeader(label, key, currentSort) {
+  const activeAsc = currentSort === key + '-asc';
+  const activeDesc = currentSort === key + '-desc';
+  const arrow = activeAsc ? '↑' : (activeDesc ? '↓' : '↕');
+  const activeClass = activeAsc || activeDesc ? ' active' : '';
+
+  return '<a class="sort-header' + activeClass + '" href="' +
+    smartnodeSortHref(new URLSearchParams(location.search), key) +
+    '" title="Sort by ' + esc(label) + '">' +
+    '<span>' + esc(label) + '</span><span class="sort-arrow" aria-hidden="true">' + arrow + '</span>' +
+    '</a>';
 }
 
 async function renderSmartnodes() {
@@ -628,7 +658,7 @@ async function renderSmartnodes() {
     q: (params.get('q') || '').trim(),
     status: params.get('status') || 'ENABLED',
     collateral: params.get('collateral') || '',
-    sort: params.get('sort') || 'last-paid',
+    sort: params.get('sort') || 'pay-age-asc',
     page: String(Math.max(1, Number.parseInt(params.get('page') || '1', 10) || 1)),
     count: '50'
   });
@@ -734,10 +764,22 @@ async function renderSmartnodes() {
             '<option value="">All collateral</option>' + collateralOptions +
           '</select>' +
           '<select name="sort" aria-label="Sort">' +
-            '<option value="last-paid"' + (request.get('sort') === 'last-paid' ? ' selected' : '') + '>Oldest last-paid first</option>' +
-            '<option value="registered"' + (request.get('sort') === 'registered' ? ' selected' : '') + '>Registration height</option>' +
-            '<option value="collateral-desc"' + (request.get('sort') === 'collateral-desc' ? ' selected' : '') + '>Collateral: high to low</option>' +
-            '<option value="service"' + (request.get('sort') === 'service' ? ' selected' : '') + '>Service / IP</option>' +
+            '<option value="pay-age-asc"' + (request.get('sort') === 'pay-age-asc' ? ' selected' : '') + '>Pay age: oldest first</option>' +
+            '<option value="pay-age-desc"' + (request.get('sort') === 'pay-age-desc' ? ' selected' : '') + '>Pay age: newest first</option>' +
+            '<option value="service-asc"' + (request.get('sort') === 'service-asc' ? ' selected' : '') + '>Service: A → Z</option>' +
+            '<option value="service-desc"' + (request.get('sort') === 'service-desc' ? ' selected' : '') + '>Service: Z → A</option>' +
+            '<option value="payout-asc"' + (request.get('sort') === 'payout-asc' ? ' selected' : '') + '>Payout: A → Z</option>' +
+            '<option value="payout-desc"' + (request.get('sort') === 'payout-desc' ? ' selected' : '') + '>Payout: Z → A</option>' +
+            '<option value="collateral-asc"' + (request.get('sort') === 'collateral-asc' ? ' selected' : '') + '>Collateral: low → high</option>' +
+            '<option value="collateral-desc"' + (request.get('sort') === 'collateral-desc' ? ' selected' : '') + '>Collateral: high → low</option>' +
+            '<option value="last-paid-asc"' + (request.get('sort') === 'last-paid-asc' ? ' selected' : '') + '>Last paid: oldest first</option>' +
+            '<option value="last-paid-desc"' + (request.get('sort') === 'last-paid-desc' ? ' selected' : '') + '>Last paid: newest first</option>' +
+            '<option value="pose-asc"' + (request.get('sort') === 'pose-asc' ? ' selected' : '') + '>PoSe: low → high</option>' +
+            '<option value="pose-desc"' + (request.get('sort') === 'pose-desc' ? ' selected' : '') + '>PoSe: high → low</option>' +
+            '<option value="registered-asc"' + (request.get('sort') === 'registered-asc' ? ' selected' : '') + '>Registered: oldest first</option>' +
+            '<option value="registered-desc"' + (request.get('sort') === 'registered-desc' ? ' selected' : '') + '>Registered: newest first</option>' +
+            '<option value="status-asc"' + (request.get('sort') === 'status-asc' ? ' selected' : '') + '>Status: A → Z</option>' +
+            '<option value="status-desc"' + (request.get('sort') === 'status-desc' ? ' selected' : '') + '>Status: Z → A</option>' +
           '</select>' +
           '<button type="submit">Filter</button>' +
         '</form>' +
@@ -751,8 +793,14 @@ async function renderSmartnodes() {
       '<div class="table-wrap">' +
         '<table class="smartnode-table">' +
           '<thead><tr>' +
-            '<th>Pay age</th><th>Service / ProTx</th><th>Payout address</th><th>Collateral</th>' +
-            '<th>Last paid / block</th><th>PoSe / ban</th><th>Registered</th><th>Status</th>' +
+            '<th>' + smartnodeSortHeader('Pay age', 'pay-age', request.get('sort')) + '</th>' +
+            '<th>' + smartnodeSortHeader('Service / ProTx', 'service', request.get('sort')) + '</th>' +
+            '<th>' + smartnodeSortHeader('Payout address', 'payout', request.get('sort')) + '</th>' +
+            '<th>' + smartnodeSortHeader('Collateral', 'collateral', request.get('sort')) + '</th>' +
+            '<th>' + smartnodeSortHeader('Last paid / block', 'last-paid', request.get('sort')) + '</th>' +
+            '<th>' + smartnodeSortHeader('PoSe / ban', 'pose', request.get('sort')) + '</th>' +
+            '<th>' + smartnodeSortHeader('Registered', 'registered', request.get('sort')) + '</th>' +
+            '<th>' + smartnodeSortHeader('Status', 'status', request.get('sort')) + '</th>' +
           '</tr></thead>' +
           '<tbody>' + rows + '</tbody>' +
         '</table>' +
