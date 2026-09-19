@@ -295,14 +295,14 @@ The included \`deploy/\` examples provide a local systemd service and nginx reve
 2. Home page shows current height, difficulty, peer count, mempool count, and recent blocks.
 3. Block and transaction pages resolve against the live Yerbas node.
 4. \`/.well-known/yerbas-ai.json\` returns the AI manifest.
-5. \`/api/ai/status\` reports a synced, read-only gateway.
-6. \`get_network_summary\` returns live Core data.
-7. \`get_emission\` returns the Core block subsidy.
-8. \`get_smartnodes_by_collateral\` returns public Smartnode data without wallet metadata.
-9. With \`addressindex=1\`, \`get_address\` returns address history without an Explorer database.
-10. With \`assetindex=1\`, address asset balances become available.
-11. Unknown AI tool names such as \`sendrawtransaction\` are rejected.
-12. Stop \`yerbasd\` and confirm the explorer reports RPC unavailable without crashing.
+6. \`/api/ai/status\` reports a synced, read-only gateway.
+7. \`get_network_summary\` returns live Core data.
+8. \`get_emission\` returns the Core block subsidy.
+9. \`get_smartnodes_by_collateral\` returns public Smartnode data without wallet metadata.
+10. With \`addressindex=1\`, \`get_address\` returns address history without an Explorer database.
+11. With \`assetindex=1\`, address asset balances become available.
+12. Unknown AI tool names such as \`sendrawtransaction\` are rejected.
+13. Stop \`yerbasd\` and confirm the explorer reports RPC unavailable without crashing.
 
 ## Next AI layers
 
