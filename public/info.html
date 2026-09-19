@@ -75,7 +75,8 @@
         <article class="api-row"><div><code>GET /api/v1/block/:height-or-hash</code><p>Block details by height or block hash.</p></div><span>path parameter</span></article>
         <article class="api-row"><div><code>GET /api/v1/tx/:txid</code><p>Decoded transaction from Core txindex.</p></div><span>path parameter</span></article>
         <article class="api-row"><div><code>GET /api/v1/address/:address</code><p>Address balance, total received, transaction IDs, UTXOs, and asset balances.</p></div><span>path parameter</span></article>
-        <article class="api-row"><div><code>GET /api/v1/assets?q=&amp;count=50&amp;start=0</code><p>Browse/search the native Core asset directory.</p></div><a href="/api/v1/assets?count=20&start=0">Try</a></article>
+        <article class="api-row"><div><code>GET /api/v1/assets?q=&amp;page=1&amp;count=25&amp;type=&amp;metadata=&amp;reissuable=</code><p>Browse/search/filter the native Core asset directory with live holder counts.</p></div><a href="/api/v1/assets?count=25&page=1">Try</a></article>
+        <article class="api-row"><div><code>GET /api/v1/assets/stats</code><p>Aggregate native asset-index counts used by the Assets dashboard.</p></div><a href="/api/v1/assets/stats">Try</a></article>
         <article class="api-row"><div><code>GET /api/v1/asset/:asset-name</code><p>Asset metadata, issuance block, holder count, and indexed holder balances.</p></div><span>path parameter</span></article>
         <article class="api-row"><div><code>GET /api/v1/supply</code><p>UTXO-set supply data from <code>gettxoutsetinfo</code>.</p></div><a href="/api/v1/supply">Try</a></article>
         <article class="api-row"><div><code>GET /api/v1/emission?height=</code><p>Block subsidy/emission details; defaults to the current tip.</p></div><a href="/api/v1/emission">Try</a></article>
