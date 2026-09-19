@@ -591,6 +591,12 @@ function shortService(value) {
   return value || '—';
 }
 
+function compactMiddle(value, lead = 9, tail = 7) {
+  const text = String(value || '');
+  if (text.length <= lead + tail + 1) return text;
+  return text.slice(0, lead) + '…' + text.slice(-tail);
+}
+
 function smartnodeStatusClass(status) {
   if (status === 'ENABLED') return 'status-enabled';
   if (status === 'POSE_BANNED') return 'status-banned';
@@ -645,26 +651,46 @@ async function renderSmartnodes() {
         const paid = Number(node.lastPaidTime || 0);
         const registered = Number(node.registeredTime || 0);
         const payout = node.payoutAddress
-          ? '<a class="mono" href="/address/' + encodeURIComponent(node.payoutAddress) + '">' + esc(node.payoutAddress) + '</a>'
+          ? '<a class="mono smartnode-address" title="' + esc(node.payoutAddress) + '" href="/address/' +
+              encodeURIComponent(node.payoutAddress) + '">' + esc(compactMiddle(node.payoutAddress, 10, 7)) + '</a>'
           : '<span class="muted">—</span>';
 
+        const lastPaidCell =
+          '<div class="cell-primary">' + (paid > 0 ? esc(isoTime(paid)) : 'Never') + '</div>' +
+          '<div class="row-sub">Block ' + number(node.lastPaidBlock) + '</div>';
+
+        const poseCell =
+          '<div class="cell-primary">Penalty ' + number(node.PoSePenalty) + '</div>' +
+          '<div class="row-sub">Ban ' +
+            (Number(node.PoSeBanHeight) >= 0 ? number(node.PoSeBanHeight) : '—') + '</div>';
+
+        const registeredCell =
+          '<div class="cell-primary">' +
+            (registered > 0
+              ? esc(isoTime(registered))
+              : (node.registeredHeight !== null ? 'Block ' + number(node.registeredHeight) : '—')) +
+          '</div>' +
+          (registered > 0 && node.registeredHeight !== null
+            ? '<div class="row-sub">Block ' + number(node.registeredHeight) + '</div>'
+            : '');
+
         return '<tr>' +
-          '<td>' + (node.paymentAgeRank === null ? '—' : number(node.paymentAgeRank)) + '</td>' +
-          '<td><span class="mono">' + esc(shortService(node.service)) + '</span>' +
-            '<div class="row-sub mono">' + esc(compactHash(node.proTxHash || node.outpoint)) + '</div></td>' +
+          '<td class="pay-age-cell">' + (node.paymentAgeRank === null ? '—' : number(node.paymentAgeRank)) + '</td>' +
+          '<td><span class="mono service-value" title="' + esc(shortService(node.service)) + '">' +
+              esc(shortService(node.service)) + '</span>' +
+            '<div class="row-sub mono" title="' + esc(node.proTxHash || node.outpoint || '') + '">' +
+              esc(compactHash(node.proTxHash || node.outpoint)) + '</div></td>' +
           '<td>' + payout + '</td>' +
-          '<td>' + (node.collateralAmount === null ? '—' : number(node.collateralAmount) + ' YERB') + '</td>' +
-          '<td>' + (paid > 0 ? esc(isoTime(paid)) : 'Never') + '</td>' +
-          '<td>' + number(node.lastPaidBlock) + '</td>' +
-          '<td>' + number(node.PoSePenalty) + '</td>' +
-          '<td>' + (Number(node.PoSeBanHeight) >= 0 ? number(node.PoSeBanHeight) : '—') + '</td>' +
-          '<td>' + (registered > 0
-            ? esc(isoTime(registered))
-            : (node.registeredHeight !== null ? 'Block ' + number(node.registeredHeight) : '—')) + '</td>' +
+          '<td><span class="collateral-value">' +
+            (node.collateralAmount === null ? '—' : number(node.collateralAmount)) +
+            '</span><div class="row-sub">YERB</div></td>' +
+          '<td>' + lastPaidCell + '</td>' +
+          '<td>' + poseCell + '</td>' +
+          '<td>' + registeredCell + '</td>' +
           '<td><span class="smartnode-status ' + smartnodeStatusClass(node.status) + '">' + esc(node.status) + '</span></td>' +
         '</tr>';
       }).join('')
-    : '<tr><td colspan="10" class="muted">No smartnodes matched these filters.</td></tr>';
+    : '<tr><td colspan="8" class="muted">No smartnodes matched these filters.</td></tr>';
 
   const pageLinks =
     '<div class="asset-pagination">' +
@@ -726,7 +752,7 @@ async function renderSmartnodes() {
         '<table class="smartnode-table">' +
           '<thead><tr>' +
             '<th>Pay age</th><th>Service / ProTx</th><th>Payout address</th><th>Collateral</th>' +
-            '<th>Last paid</th><th>Paid block</th><th>PoSe</th><th>Ban height</th><th>Registered</th><th>Status</th>' +
+            '<th>Last paid / block</th><th>PoSe / ban</th><th>Registered</th><th>Status</th>' +
           '</tr></thead>' +
           '<tbody>' + rows + '</tbody>' +
         '</table>' +
