@@ -122,7 +122,7 @@ fi
 node_ok=0
 if command -v node >/dev/null 2>&1; then
   NODE_VERSION="$(node -p 'process.versions.node' 2>/dev/null || true)"
-  if [[ -n "$NODE_VERSION" ]] && dpkg --compare-versions "$NODE_VERSION" ge "18.18.0"; then
+  if [[ -n "$NODE_VERSION" ]] && dpkg --compare-versions "$NODE_VERSION" ge "24.0.0"; then
     node_ok=1
   fi
 fi
