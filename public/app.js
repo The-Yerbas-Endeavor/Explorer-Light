@@ -16,8 +16,17 @@ function esc(value) {
 async function api(path) {
   const response = await fetch(path, { headers: { accept: 'application/json' } });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'Request failed with HTTP ' + response.status + '.');
+  if (!response.ok) {
+    throw new Error(data.error || 'Request failed with HTTP ' + response.status + '.');
+  }
   return data;
+}
+
+function setRpcState(state, label) {
+  rpcState.className = 'rpc-state ' + state;
+  rpcState.innerHTML =
+    '<span class="rpc-dot" aria-hidden="true"></span>' +
+    '<span>' + esc(label) + '</span>';
 }
 
 function showNotice(message, kind = 'info') {
@@ -64,117 +73,250 @@ function isoTime(epoch) {
 
 function hashLink(type, value, label = null) {
   if (!value) return '—';
-  return '<a class="mono" href="/' + type + '/' + encodeURIComponent(value) + '">' + esc(label || compactHash(value)) + '</a>';
+  return '<a class="mono" href="/' + type + '/' + encodeURIComponent(value) + '">' +
+    esc(label || compactHash(value)) +
+    '</a>';
 }
 
-function statCard(label, value, foot = '') {
-  return '<article class="stat-card"><span>' + esc(label) + '</span><strong>' + esc(value) + '</strong><small>' + esc(foot) + '</small></article>';
+function metricCard(index, label, value, foot = '') {
+  return '<article class="metric-card" data-index="' + esc(index) + '">' +
+    '<span>' + esc(label) + '</span>' +
+    '<strong>' + esc(value) + '</strong>' +
+    '<small>' + esc(foot) + '</small>' +
+    '</article>';
+}
+
+function panelHeading(index, eyebrow, title, meta = '') {
+  return '<div class="panel-head">' +
+    '<div class="panel-title">' +
+      '<span class="panel-index">' + esc(index) + '</span>' +
+      '<div><p class="eyebrow">' + esc(eyebrow) + '</p><h2>' + esc(title) + '</h2></div>' +
+    '</div>' +
+    (meta ? '<span class="panel-meta">' + esc(meta) + '</span>' : '') +
+    '</div>';
+}
+
+function renderLoading(label) {
+  app.innerHTML =
+    '<section class="loading-card">' +
+      '<span class="loading-scan" aria-hidden="true"></span>' +
+      '<span>' + esc(label) + '</span>' +
+    '</section>';
 }
 
 async function renderHome() {
-  app.innerHTML = '<section class="loading-card">Loading live blockchain data…</section>';
-  const [status, blocks] = await Promise.all([api('/api/status'), api('/api/blocks')]);
-  rpcState.textContent = 'RPC connected';
-  rpcState.className = 'status-pill online';
+  document.title = 'Yerbas Explorer Light';
+  renderLoading('Reading live blockchain state');
+
+  const [status, blocks] = await Promise.all([
+    api('/api/status'),
+    api('/api/blocks')
+  ]);
+
+  setRpcState('online', 'Core online');
 
   const cards = [
-    statCard('Block height', number(status.blocks), status.chain || 'main'),
-    statCard('Difficulty', number(status.difficulty, 4), 'current network'),
-    statCard('Connections', number(status.network?.connections), 'Yerbas peers'),
-    statCard('Mempool', number(status.mempool?.transactions), bytes(status.mempool?.bytes))
+    metricCard('01', 'Block height', number(status.blocks), status.chain || 'mainnet'),
+    metricCard('02', 'Difficulty', number(status.difficulty, 4), 'network target'),
+    metricCard('03', 'Connections', number(status.network?.connections), 'active peers'),
+    metricCard('04', 'Mempool', number(status.mempool?.transactions), bytes(status.mempool?.bytes))
   ].join('');
 
-  const rows = blocks.map((block) => '<tr>' +
-    '<td><a class="height-link" href="/block/' + block.height + '">' + number(block.height) + '</a></td>' +
-    '<td>' + esc(timeAgo(block.time)) + '</td>' +
-    '<td>' + number(block.transactions) + '</td>' +
-    '<td>' + bytes(block.size) + '</td>' +
-    '<td>' + hashLink('block', block.hash) + '</td>' +
-    '</tr>').join('');
+  const rows = blocks.map((block) =>
+    '<tr>' +
+      '<td><a class="height-link" href="/block/' + block.height + '">' + number(block.height) + '</a></td>' +
+      '<td>' + esc(timeAgo(block.time)) + '</td>' +
+      '<td>' + number(block.transactions) + '</td>' +
+      '<td>' + bytes(block.size) + '</td>' +
+      '<td>' + hashLink('block', block.hash) + '</td>' +
+    '</tr>'
+  ).join('');
 
-  app.innerHTML = '<section class="stats-grid">' + cards + '</section>' +
-    '<section class="panel"><div class="panel-head"><div><p class="eyebrow">LIVE FROM YERBAS CORE</p><h2>Recent blocks</h2></div><span class="muted">No explorer database</span></div>' +
-    '<div class="table-wrap"><table><thead><tr><th>Height</th><th>Age</th><th>Tx</th><th>Size</th><th>Hash</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
+  app.innerHTML =
+    '<section class="metric-strip">' + cards + '</section>' +
+    '<section class="panel">' +
+      panelHeading('A1', 'Live block stream', 'Recent blocks', 'Yerbas Core · direct') +
+      '<div class="table-wrap">' +
+        '<table>' +
+          '<thead><tr><th>Height</th><th>Age</th><th>Transactions</th><th>Size</th><th>Block hash</th></tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
+      '</div>' +
+    '</section>';
 }
 
 async function renderBlock(identifier) {
-  app.innerHTML = '<section class="loading-card">Loading block…</section>';
+  renderLoading('Resolving block from Yerbas Core');
   const block = await api('/api/block/' + encodeURIComponent(identifier));
+  setRpcState('online', 'Core online');
   document.title = 'Block ' + block.height + ' · Yerbas Explorer Light';
 
-  const txRows = (block.tx || []).map((txid, index) => '<tr><td>' + (index + 1) + '</td><td><a class="mono" href="/tx/' + encodeURIComponent(txid) + '?block=' + encodeURIComponent(block.hash) + '">' + esc(txid) + '</a></td></tr>').join('');
-  app.innerHTML = '<section class="panel detail"><div class="panel-head"><div><p class="eyebrow">BLOCK</p><h2>#' + number(block.height) + '</h2></div><a href="/">← Recent blocks</a></div>' +
-    '<dl class="detail-grid">' +
-      '<dt>Hash</dt><dd class="mono break">' + esc(block.hash) + '</dd>' +
-      '<dt>Confirmations</dt><dd>' + number(block.confirmations) + '</dd>' +
-      '<dt>Timestamp</dt><dd>' + esc(isoTime(block.time)) + '</dd>' +
-      '<dt>Transactions</dt><dd>' + number(block.tx?.length) + '</dd>' +
-      '<dt>Size</dt><dd>' + bytes(block.size) + '</dd>' +
-      '<dt>Difficulty</dt><dd>' + number(block.difficulty, 8) + '</dd>' +
-      '<dt>Previous block</dt><dd>' + (block.previousblockhash ? hashLink('block', block.previousblockhash, block.previousblockhash) : 'Genesis') + '</dd>' +
-      '<dt>Next block</dt><dd>' + (block.nextblockhash ? hashLink('block', block.nextblockhash, block.nextblockhash) : 'Tip') + '</dd>' +
-    '</dl></section>' +
-    '<section class="panel"><div class="panel-head"><h2>Transactions</h2><span class="muted">' + number(block.tx?.length) + ' total</span></div>' +
-    '<div class="table-wrap"><table><thead><tr><th>#</th><th>Transaction ID</th></tr></thead><tbody>' + txRows + '</tbody></table></div></section>';
+  const txRows = (block.tx || []).map((txid, index) =>
+    '<tr>' +
+      '<td>' + number(index + 1) + '</td>' +
+      '<td><a class="mono break" href="/tx/' + encodeURIComponent(txid) +
+        '?block=' + encodeURIComponent(block.hash) + '">' + esc(txid) + '</a></td>' +
+    '</tr>'
+  ).join('');
+
+  app.innerHTML =
+    '<section class="detail-hero">' +
+      '<div class="detail-kicker">Block record / confirmed ledger entry</div>' +
+      '<h2>#' + number(block.height) + '</h2>' +
+      '<div class="detail-hash">' + esc(block.hash) + '</div>' +
+      '<div class="detail-actions"><a class="text-link" href="/">← Back to live chain</a></div>' +
+    '</section>' +
+
+    '<section class="panel">' +
+      panelHeading('B1', 'Block anatomy', 'Chain data', number(block.confirmations) + ' confirmations') +
+      '<dl class="detail-grid">' +
+        '<dt>Block hash</dt><dd class="mono break">' + esc(block.hash) + '</dd>' +
+        '<dt>Confirmations</dt><dd>' + number(block.confirmations) + '</dd>' +
+        '<dt>Timestamp</dt><dd>' + esc(isoTime(block.time)) + '</dd>' +
+        '<dt>Transactions</dt><dd>' + number(block.tx?.length) + '</dd>' +
+        '<dt>Size</dt><dd>' + bytes(block.size) + '</dd>' +
+        '<dt>Difficulty</dt><dd>' + number(block.difficulty, 8) + '</dd>' +
+        '<dt>Previous block</dt><dd>' +
+          (block.previousblockhash ? hashLink('block', block.previousblockhash, block.previousblockhash) : 'Genesis') +
+        '</dd>' +
+        '<dt>Next block</dt><dd>' +
+          (block.nextblockhash ? hashLink('block', block.nextblockhash, block.nextblockhash) : 'Current tip') +
+        '</dd>' +
+      '</dl>' +
+    '</section>' +
+
+    '<section class="panel">' +
+      panelHeading('B2', 'Block contents', 'Transactions', number(block.tx?.length) + ' total') +
+      '<div class="table-wrap">' +
+        '<table>' +
+          '<thead><tr><th>#</th><th>Transaction ID</th></tr></thead>' +
+          '<tbody>' + txRows + '</tbody>' +
+        '</table>' +
+      '</div>' +
+    '</section>';
 }
 
 function outputAddresses(vout) {
   const script = vout?.scriptPubKey || {};
   const addresses = script.addresses || (script.address ? [script.address] : []);
-  return addresses.length ? addresses.map(esc).join('<br>') : '<span class="muted">' + esc(script.type || 'script') + '</span>';
+
+  if (addresses.length) {
+    return addresses.map(esc).join('<br>');
+  }
+
+  return '<span class="muted">' + esc(script.type || 'script') + '</span>';
 }
 
 async function renderTransaction(txid) {
-  app.innerHTML = '<section class="loading-card">Loading transaction…</section>';
+  renderLoading('Resolving transaction from Yerbas Core');
+
   const knownBlock = new URLSearchParams(location.search).get('block');
   const query = knownBlock ? '?block=' + encodeURIComponent(knownBlock) : '';
   const tx = await api('/api/tx/' + encodeURIComponent(txid) + query);
+
+  setRpcState('online', 'Core online');
   document.title = 'Transaction · Yerbas Explorer Light';
 
-  const outputs = (tx.vout || []).map((vout) => '<tr><td>' + number(vout.n) + '</td><td>' + number(vout.value, 8) + ' YERB</td><td class="mono">' + outputAddresses(vout) + '</td></tr>').join('');
+  const outputs = (tx.vout || []).map((vout) =>
+    '<tr>' +
+      '<td>' + number(vout.n) + '</td>' +
+      '<td>' + number(vout.value, 8) + ' YERB</td>' +
+      '<td class="mono">' + outputAddresses(vout) + '</td>' +
+    '</tr>'
+  ).join('');
+
   const inputCount = Array.isArray(tx.vin) ? tx.vin.length : 0;
 
-  app.innerHTML = '<section class="panel detail"><div class="panel-head"><div><p class="eyebrow">TRANSACTION</p><h2>Transaction details</h2></div><a href="/">← Explorer</a></div>' +
-    '<dl class="detail-grid">' +
-      '<dt>TXID</dt><dd class="mono break">' + esc(tx.txid) + '</dd>' +
-      '<dt>Block</dt><dd>' + (tx.blockhash ? hashLink('block', tx.blockhash, tx.blockhash) : '<span class="pending">Mempool / unconfirmed</span>') + '</dd>' +
-      '<dt>Confirmations</dt><dd>' + number(tx.confirmations) + '</dd>' +
-      '<dt>Size</dt><dd>' + bytes(tx.size) + '</dd>' +
-      '<dt>Inputs</dt><dd>' + number(inputCount) + '</dd>' +
-      '<dt>Outputs</dt><dd>' + number(tx.vout?.length) + '</dd>' +
-      '<dt>Time</dt><dd>' + esc(isoTime(tx.blocktime || tx.time)) + '</dd>' +
-    '</dl></section>' +
-    '<section class="panel"><div class="panel-head"><h2>Outputs</h2><span class="muted">Values reported by Yerbas Core</span></div>' +
-    '<div class="table-wrap"><table><thead><tr><th>#</th><th>Value</th><th>Address / script</th></tr></thead><tbody>' + outputs + '</tbody></table></div></section>' +
-    '<details class="panel raw"><summary>Raw RPC response</summary><pre id="raw-json"></pre></details>';
+  app.innerHTML =
+    '<section class="detail-hero">' +
+      '<div class="detail-kicker">Transaction record / Yerbas Core</div>' +
+      '<h2>Transaction</h2>' +
+      '<div class="detail-hash">' + esc(tx.txid) + '</div>' +
+      '<div class="detail-actions"><a class="text-link" href="/">← Back to live chain</a></div>' +
+    '</section>' +
+
+    '<section class="panel">' +
+      panelHeading('T1', 'Transaction anatomy', 'Ledger data',
+        tx.confirmations ? number(tx.confirmations) + ' confirmations' : 'unconfirmed') +
+      '<dl class="detail-grid">' +
+        '<dt>Transaction ID</dt><dd class="mono break">' + esc(tx.txid) + '</dd>' +
+        '<dt>Block</dt><dd>' +
+          (tx.blockhash
+            ? hashLink('block', tx.blockhash, tx.blockhash)
+            : '<span class="pending">Mempool / unconfirmed</span>') +
+        '</dd>' +
+        '<dt>Confirmations</dt><dd>' + number(tx.confirmations) + '</dd>' +
+        '<dt>Size</dt><dd>' + bytes(tx.size) + '</dd>' +
+        '<dt>Inputs</dt><dd>' + number(inputCount) + '</dd>' +
+        '<dt>Outputs</dt><dd>' + number(tx.vout?.length) + '</dd>' +
+        '<dt>Time</dt><dd>' + esc(isoTime(tx.blocktime || tx.time)) + '</dd>' +
+      '</dl>' +
+    '</section>' +
+
+    '<section class="panel">' +
+      panelHeading('T2', 'Value distribution', 'Outputs', 'reported by Core') +
+      '<div class="table-wrap">' +
+        '<table>' +
+          '<thead><tr><th>#</th><th>Value</th><th>Address / script</th></tr></thead>' +
+          '<tbody>' + outputs + '</tbody>' +
+        '</table>' +
+      '</div>' +
+    '</section>' +
+
+    '<details class="panel raw">' +
+      '<summary>Raw RPC response</summary>' +
+      '<pre id="raw-json"></pre>' +
+    '</details>';
+
   document.querySelector('#raw-json').textContent = JSON.stringify(tx, null, 2);
 }
 
 async function route() {
   clearNotice();
   const parts = location.pathname.split('/').filter(Boolean);
+
   try {
-    if (parts[0] === 'block' && parts[1]) return await renderBlock(decodeURIComponent(parts[1]));
-    if (parts[0] === 'tx' && parts[1]) return await renderTransaction(decodeURIComponent(parts[1]));
+    if (parts[0] === 'block' && parts[1]) {
+      return await renderBlock(decodeURIComponent(parts[1]));
+    }
+
+    if (parts[0] === 'tx' && parts[1]) {
+      return await renderTransaction(decodeURIComponent(parts[1]));
+    }
+
     return await renderHome();
   } catch (error) {
-    rpcState.textContent = 'RPC unavailable';
-    rpcState.className = 'status-pill offline';
-    app.innerHTML = '<section class="error-card"><h2>Explorer request failed</h2><p>' + esc(error.message) + '</p><a class="button-link" href="/">Return home</a></section>';
+    setRpcState('offline', 'Core unavailable');
+    app.innerHTML =
+      '<section class="error-card">' +
+        '<p class="eyebrow">RPC connection error</p>' +
+        '<h2>Explorer request failed</h2>' +
+        '<p>' + esc(error.message) + '</p>' +
+        '<a class="button-link" href="/">Retry explorer</a>' +
+      '</section>';
   }
 }
 
 searchForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   clearNotice();
+
   const query = searchInput.value.trim();
-  if (!query) return showNotice('Enter something to search for.', 'error');
+  if (!query) {
+    showNotice('Enter a block height, block hash, transaction ID, or Yerbas address.', 'error');
+    return;
+  }
 
   try {
     const result = await api('/api/search?q=' + encodeURIComponent(query));
-    if (result.type === 'block') location.href = '/block/' + encodeURIComponent(result.target);
-    else if (result.type === 'tx') location.href = '/tx/' + encodeURIComponent(result.target);
-    else if (result.type === 'address') showNotice(result.message, 'info');
+
+    if (result.type === 'block') {
+      location.href = '/block/' + encodeURIComponent(result.target);
+    } else if (result.type === 'tx') {
+      location.href = '/tx/' + encodeURIComponent(result.target);
+    } else if (result.type === 'address') {
+      showNotice(result.message, 'info');
+    }
   } catch (error) {
     showNotice(error.message, 'error');
   }
