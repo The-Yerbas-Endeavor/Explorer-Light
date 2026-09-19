@@ -645,9 +645,12 @@ export function createAiGateway({ rpc, cached, marketPriceUrl = '' }) {
       sourceOfTruth: 'Yerbas Core / Yerbas blockchain',
       endpoints: {
         manifest: '/.well-known/yerbas-ai.json',
-        status: '/api/ai/status',
-        tools: '/api/ai/tools',
-        query: '/api/ai/query',
+        status: '/api/ai/v1/status',
+        tools: '/api/ai/v1/tools',
+        query: '/api/ai/v1/query',
+        compatibilityStatus: '/api/ai/status',
+        compatibilityTools: '/api/ai/tools',
+        compatibilityQuery: '/api/ai/query',
         legacyStatus: '/ext/ai/status',
         legacyQuery: '/ext/ai/query'
       },
