@@ -3,39 +3,126 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Lightweight Yerbas blockchain explorer">
+  <meta name="description" content="Yerbas Explorer Light — direct, database-free access to the Yerbas blockchain">
+  <meta name="theme-color" content="#07110b">
   <title>Yerbas Explorer Light</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="/" aria-label="Yerbas Explorer Light home">
-      <span class="leaf">🌿</span>
-      <span><strong>YERBAS</strong><small>EXPLORER LIGHT</small></span>
-    </a>
-    <span id="rpc-state" class="status-pill">Connecting…</span>
+  <div class="page-noise" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="/" aria-label="Yerbas Explorer Light home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" role="img">
+            <path d="M24 40V22" class="mark-stem"/>
+            <path d="M23.8 24.5C17.5 23.8 12.8 19.4 12 12c6.7.3 11.2 3.7 12 10.5" class="mark-leaf"/>
+            <path d="M24.2 20.5C29 19.9 33.2 16.7 35 11c-6.2-.1-10.2 2.8-11 8.6" class="mark-leaf mark-leaf-alt"/>
+            <circle cx="24" cy="40" r="2.4" class="mark-node"/>
+          </svg>
+        </span>
+        <span class="brand-copy">
+          <strong>YERBAS</strong>
+          <small>EXPLORER LIGHT</small>
+        </span>
+      </a>
+
+      <div class="header-actions">
+        <a class="header-link" href="/.well-known/yerbas-ai.json">AI manifest</a>
+        <span id="rpc-state" class="rpc-state">
+          <span class="rpc-dot" aria-hidden="true"></span>
+          <span>Connecting</span>
+        </span>
+      </div>
+    </div>
   </header>
 
   <main class="shell">
     <section class="hero">
-      <p class="eyebrow">RPC-FIRST · DATABASE-FREE</p>
-      <h1>Explore the Yerbas blockchain.</h1>
-      <p class="subhead">Blocks and transactions come directly from Yerbas Core. No MongoDB required.</p>
+      <div class="hero-copy">
+        <div class="signal-line">
+          <span class="signal-pulse" aria-hidden="true"></span>
+          <span>YERBAS MAINNET</span>
+          <span class="signal-separator">/</span>
+          <span>LIVE LEDGER</span>
+        </div>
+
+        <h1>
+          <span>See the chain.</span>
+          <em>Nothing in between.</em>
+        </h1>
+
+        <p class="hero-summary">
+          Direct blockchain data from Yerbas Core. No explorer database, no stale mirror,
+          no unnecessary layer between you and the network.
+        </p>
+
+        <div class="hero-facts" aria-label="Explorer architecture">
+          <span>RPC DIRECT</span>
+          <span>DATABASE 0</span>
+          <span>READ ONLY</span>
+        </div>
+      </div>
+
+      <div class="chain-art" aria-hidden="true">
+        <div class="orbit orbit-a"></div>
+        <div class="orbit orbit-b"></div>
+        <div class="chain-core">
+          <span class="core-label">YERB</span>
+          <strong>LIVE</strong>
+        </div>
+        <span class="chain-node node-1">01</span>
+        <span class="chain-node node-2">02</span>
+        <span class="chain-node node-3">03</span>
+        <span class="chain-node node-4">04</span>
+        <span class="chain-node node-5">05</span>
+      </div>
+    </section>
+
+    <section class="search-zone" aria-label="Blockchain search">
+      <div class="search-label">
+        <span>CHAIN QUERY</span>
+        <small>HEIGHT / HASH / TXID / ADDRESS</small>
+      </div>
       <form id="search-form" class="search" role="search">
-        <input id="search-input" autocomplete="off" spellcheck="false" placeholder="Block height, block hash, transaction ID, or Yerbas address" aria-label="Search Yerbas blockchain">
-        <button type="submit">Search</button>
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input
+          id="search-input"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Search the Yerbas blockchain"
+          aria-label="Search Yerbas blockchain"
+        >
+        <button type="submit">
+          <span>Explore</span>
+          <span aria-hidden="true">↗</span>
+        </button>
       </form>
       <div id="notice" class="notice hidden" role="status"></div>
     </section>
 
     <div id="app" aria-live="polite">
-      <section class="loading-card">Loading Yerbas blockchain data…</section>
+      <section class="loading-card">
+        <span class="loading-scan" aria-hidden="true"></span>
+        <span>Reading Yerbas Core…</span>
+      </section>
     </div>
   </main>
 
-  <footer>
-    <span>Yerbas Explorer Light</span>
-    <span>Blockchain = source of truth · Explorer DB = none</span>
+  <footer class="site-footer">
+    <div class="footer-brand">
+      <span class="footer-mark">Y</span>
+      <span>
+        <strong>Yerbas Explorer Light</strong>
+        <small>RPC-first blockchain visibility</small>
+      </span>
+    </div>
+    <div class="footer-meta">
+      <span>CORE → EXPLORER</span>
+      <span>NO DATABASE</span>
+      <span>READ ONLY</span>
+    </div>
   </footer>
 
   <script type="module" src="/app.js"></script>
