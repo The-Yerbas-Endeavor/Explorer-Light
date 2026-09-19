@@ -255,6 +255,8 @@ server=1
 txindex=1
 addressindex=1
 assetindex=1
+spentindex=1
+timestampindex=1
 rpcbind=127.0.0.1
 rpcallowip=127.0.0.1
 \`\`\`
