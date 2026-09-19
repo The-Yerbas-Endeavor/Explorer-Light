@@ -201,10 +201,102 @@ function outputAddresses(vout) {
   const addresses = script.addresses || (script.address ? [script.address] : []);
 
   if (addresses.length) {
-    return addresses.map(esc).join('<br>');
+    return addresses.map((address) =>
+      '<a class="mono" href="/address/' + encodeURIComponent(address) + '">' + esc(address) + '</a>'
+    ).join('<br>');
   }
 
   return '<span class="muted">' + esc(script.type || 'script') + '</span>';
+}
+
+function yerb(value) {
+  if (value === null || value === undefined || value === '') return '0.00000000';
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return esc(value);
+  return parsed.toLocaleString(undefined, {
+    minimumFractionDigits: 8,
+    maximumFractionDigits: 8
+  });
+}
+
+async function renderAddress(address) {
+  renderLoading('Reading address index from Yerbas Core');
+
+  const data = await api('/api/address/' + encodeURIComponent(address));
+  setRpcState('online', 'Core online');
+  document.title = 'Address ' + data.address + ' · Yerbas Explorer Light';
+
+  const balance = data.history?.balance;
+  const txids = Array.isArray(data.history?.txids) ? data.history.txids : [];
+  const utxos = Array.isArray(data.history?.utxos) ? data.history.utxos : [];
+  const assetBalances = data.assets?.available && data.assets?.balances && typeof data.assets.balances === 'object'
+    ? Object.entries(data.assets.balances)
+    : [];
+
+  const cards = [
+    metricCard('01', 'Balance', yerb(balance?.balanceYerb) + ' YERB', 'current spendable index balance'),
+    metricCard('02', 'Total received', yerb(balance?.receivedYerb) + ' YERB', 'including change'),
+    metricCard('03', 'Transactions', number(txids.length), 'latest indexed transactions'),
+    metricCard('04', 'UTXOs', number(utxos.length), 'unspent outputs returned')
+  ].join('');
+
+  const txRows = txids.length
+    ? txids.map((txid, index) =>
+        '<tr>' +
+          '<td>' + number(index + 1) + '</td>' +
+          '<td><a class="mono break" href="/tx/' + encodeURIComponent(txid) + '">' + esc(txid) + '</a></td>' +
+        '</tr>'
+      ).join('')
+    : '<tr><td colspan="2" class="muted">No indexed transactions returned for this address.</td></tr>';
+
+  const utxoRows = utxos.length
+    ? utxos.map((utxo) =>
+        '<tr>' +
+          '<td><a class="mono" href="/tx/' + encodeURIComponent(utxo.txid) + '">' + esc(compactHash(utxo.txid)) + '</a></td>' +
+          '<td>' + number(utxo.outputIndex) + '</td>' +
+          '<td>' + yerb(Number(utxo.satoshis || 0) / 100000000) + ' YERB</td>' +
+          '<td>' + number(utxo.height) + '</td>' +
+        '</tr>'
+      ).join('')
+    : '<tr><td colspan="4" class="muted">No unspent outputs returned for this address.</td></tr>';
+
+  const assetRows = assetBalances.length
+    ? assetBalances.map(([name, amount]) =>
+        '<tr><td class="mono">' + esc(name) + '</td><td>' + esc(amount) + '</td></tr>'
+      ).join('')
+    : '<tr><td colspan="2" class="muted">No asset balances returned for this address.</td></tr>';
+
+  const historyNotice = data.history?.available
+    ? ''
+    : '<section class="notice error">Core recognized this address, but address history is not currently available from the address index.</section>';
+
+  app.innerHTML =
+    '<section class="detail-hero">' +
+      '<div class="detail-kicker">Address record / native Core address index</div>' +
+      '<h2>Yerbas address</h2>' +
+      '<div class="detail-hash">' + esc(data.address) + '</div>' +
+      '<div class="detail-actions"><a class="text-link" href="/">← Back to live chain</a></div>' +
+    '</section>' +
+    historyNotice +
+    '<section class="metric-strip">' + cards + '</section>' +
+    '<section class="panel">' +
+      panelHeading('A1', 'Address history', 'Transactions', txids.length + ' shown') +
+      '<div class="table-wrap">' +
+        '<table><thead><tr><th>#</th><th>Transaction ID</th></tr></thead><tbody>' + txRows + '</tbody></table>' +
+      '</div>' +
+    '</section>' +
+    '<section class="panel">' +
+      panelHeading('A2', 'Unspent outputs', 'UTXOs', utxos.length + ' shown') +
+      '<div class="table-wrap">' +
+        '<table><thead><tr><th>Transaction</th><th>Output</th><th>Value</th><th>Height</th></tr></thead><tbody>' + utxoRows + '</tbody></table>' +
+      '</div>' +
+    '</section>' +
+    '<section class="panel">' +
+      panelHeading('A3', 'Asset index', 'Asset balances', assetBalances.length + ' assets') +
+      '<div class="table-wrap">' +
+        '<table><thead><tr><th>Asset</th><th>Balance</th></tr></thead><tbody>' + assetRows + '</tbody></table>' +
+      '</div>' +
+    '</section>';
 }
 
 async function renderTransaction(txid) {
@@ -284,6 +376,10 @@ async function route() {
       return await renderTransaction(decodeURIComponent(parts[1]));
     }
 
+    if (parts[0] === 'address' && parts[1]) {
+      return await renderAddress(decodeURIComponent(parts.slice(1).join('/')));
+    }
+
     return await renderHome();
   } catch (error) {
     setRpcState('offline', 'Core unavailable');
@@ -315,7 +411,7 @@ searchForm.addEventListener('submit', async (event) => {
     } else if (result.type === 'tx') {
       location.href = '/tx/' + encodeURIComponent(result.target);
     } else if (result.type === 'address') {
-      showNotice(result.message, 'info');
+      location.href = '/address/' + encodeURIComponent(result.target);
     }
   } catch (error) {
     showNotice(error.message, 'error');
