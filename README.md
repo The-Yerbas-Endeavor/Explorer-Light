@@ -62,8 +62,18 @@ sudo /tmp/install-fresh-server.sh \
   --domain explorer2.yerbas.org
 ```
 
-The default installation now performs the **entire explorer-node bootstrap**:
+The default installation performs the **entire explorer-node bootstrap and host hardening**:
 
+- Creates a dedicated sudo/build administrator named `yerbasadmin` by default; override it with `--admin-user NAME`.
+- Copies the invoking user's authorized SSH keys, or root's authorized keys when run directly as root.
+- Uses that non-root administrator for source builds and Explorer validation.
+- Enables UFW with inbound deny-by-default.
+- Opens only SSH, HTTP, HTTPS, and Yerbas mainnet P2P `15420/tcp`; Core RPC `9998` is never opened publicly.
+- Enables Fail2ban SSH protection.
+- Enables unattended security upgrades.
+- Applies conservative kernel/network sysctl hardening.
+- If SSH key migration is verified, disables root SSH login, password login, keyboard-interactive login, and restricts SSH access to the new administrator.
+- If no usable authorized key is found, SSH login policy is deliberately left unchanged to avoid locking the operator out.
 - Downloads the latest matching official Yerbas Core Linux release for Ubuntu 22.04, 24.04, or 26.04. If no matching binary exists, it falls back to a headless source build.
 - Creates the dedicated `yerbas` Core service user and `explorer-light` web service user.
 - Generates localhost-only Core RPC credentials.
@@ -75,13 +85,21 @@ The default installation now performs the **entire explorer-node bootstrap**:
 - Extracts the indexed blockchain snapshot into `/home/yerbas/.yerbascore` **before Core starts**.
 - Starts Core and waits until its RPC interface is actually responding.
 - Clones Explorer Light to `/opt/yerbas-explorer-light`.
-- Writes the matching RPC host, port, username, and generated password to `/opt/yerbas-explorer-light/.env`. This is the runtime configuration read by `src/config.js`.
-- Runs `npm test` and `npm run check`.
+- Writes the matching RPC host, port, username, and generated password to `/opt/yerbas-explorer-light/.env`.
+- Runs `npm test` and `npm run check` as the non-root build administrator, then locks the deployed tree down for the service account.
 - Installs and starts the Explorer Light systemd service.
 - Configures nginx as the only public HTTP entry point.
 - Optionally requests a Let's Encrypt certificate.
 
-The explorer does **not** need a separate MongoDB or SQLite blockchain database. The indexes used by the explorer live in Yerbas Core and are included in the indexed bootstrap snapshot.
+The new administrator account is created as **SSH-key-only** with passwordless sudo so the installer never needs to create, print, or persist a reusable administrator password.
+
+For a custom administrator name:
+
+```bash
+sudo /tmp/install-fresh-server.sh \
+  --domain explorer2.yerbas.org \
+  --admin-user chuck
+```
 
 For HTTPS once DNS for `explorer2.yerbas.org` resolves to the server:
 
@@ -98,6 +116,7 @@ Useful installer options:
 --domain NAME
 --https
 --email ADDRESS
+--admin-user NAME
 --branch REF
 --core-ref REF
 --source-build
