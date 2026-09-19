@@ -317,3 +317,16 @@ Future layers can be separate services:
 - Explicitly authorized payment agents with strict wallet policy.
 
 Signing keys and spending authority do **not** belong in Explorer Light.
+
+
+## Public API
+
+Explorer Light exposes a read-only public API backed directly by Yerbas Core and native indexes.
+
+- Documentation: `/info`
+- Versioned API index: `/api/v1`
+- Recommended integrations: `/api/v1/...`
+- Legacy compatibility: selected `/api/get...` and `/ext/...` routes from the older explorer
+- CORS: public API responses allow `Access-Control-Allow-Origin: *`
+
+Database-dependent legacy routes that cannot be reproduced faithfully without restoring a separate explorer database return HTTP 501 instead of fabricated data.
