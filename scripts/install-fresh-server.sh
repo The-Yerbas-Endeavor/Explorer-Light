@@ -433,11 +433,12 @@ install_core_from_release() {
   pattern="^yerbas-ubuntu-$VERSION_ID-$arch-release-.*\\.tar\\.gz$"
 
   url="$(printf '%s' "$release_json" | jq -r --arg p "$pattern" \
-    '.assets[] | select(.name | test($p)) | .browser_download_url' | head -n 1)"
+    'first(.assets[] | select(.name | test($p)) | .browser_download_url) // empty')"
   digest="$(printf '%s' "$release_json" | jq -r --arg p "$pattern" \
-    '.assets[] | select(.name | test($p)) | (.digest // "")' | head -n 1 | sed 's/^sha256://')"
+    'first(.assets[] | select(.name | test($p)) | (.digest // "")) // empty')"
+  digest="${digest#sha256:}"
   asset_name="$(printf '%s' "$release_json" | jq -r --arg p "$pattern" \
-    '.assets[] | select(.name | test($p)) | .name' | head -n 1)"
+    'first(.assets[] | select(.name | test($p)) | .name) // empty')"
 
   [[ -n "$url" && "$url" != "null" ]] || return 1
 
@@ -451,8 +452,8 @@ install_core_from_release() {
 
   tar -xzf "$archive" -C "$extract_dir"
 
-  yerbasd_bin="$(find "$extract_dir" -type f -name yerbasd | head -n 1)"
-  yerbas_cli_bin="$(find "$extract_dir" -type f -name yerbas-cli | head -n 1)"
+  yerbasd_bin="$(find "$extract_dir" -type f -name yerbasd -print -quit)"
+  yerbas_cli_bin="$(find "$extract_dir" -type f -name yerbas-cli -print -quit)"
 
   [[ -n "$yerbasd_bin" && -f "$yerbasd_bin" ]] || die "Official Core archive did not contain yerbasd."
   [[ -n "$yerbas_cli_bin" && -f "$yerbas_cli_bin" ]] || die "Official Core archive did not contain yerbas-cli."
@@ -580,12 +581,14 @@ if (( ! SKIP_BOOTSTRAP )); then
   BOOT_NAME="$(printf '%s' "$BOOT_JSON" | jq -r '.name // empty')"
   BOOT_BODY="$(printf '%s' "$BOOT_JSON" | jq -r '.body // empty')"
 
-  BOOT_URL="$(printf '%s' "$BOOT_JSON" | jq -r '.assets[] | select(.name == "bootstrap-index.zip") | .browser_download_url' | head -n 1)"
-  BOOT_DIGEST="$(printf '%s' "$BOOT_JSON" | jq -r '.assets[] | select(.name == "bootstrap-index.zip") | (.digest // "")' | head -n 1 | sed 's/^sha256://')"
-  BOOT_SIZE="$(printf '%s' "$BOOT_JSON" | jq -r '.assets[] | select(.name == "bootstrap-index.zip") | .size' | head -n 1)"
+  BOOT_URL="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "bootstrap-index.zip") | .browser_download_url) // empty')"
+  BOOT_DIGEST="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "bootstrap-index.zip") | (.digest // "")) // empty')"
+  BOOT_DIGEST="${BOOT_DIGEST#sha256:}"
+  BOOT_SIZE="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "bootstrap-index.zip") | .size) // empty')"
 
-  POW_URL="$(printf '%s' "$BOOT_JSON" | jq -r '.assets[] | select(.name == "powcache.dat") | .browser_download_url' | head -n 1)"
-  POW_DIGEST="$(printf '%s' "$BOOT_JSON" | jq -r '.assets[] | select(.name == "powcache.dat") | (.digest // "")' | head -n 1 | sed 's/^sha256://')"
+  POW_URL="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "powcache.dat") | .browser_download_url) // empty')"
+  POW_DIGEST="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "powcache.dat") | (.digest // "")) // empty')"
+  POW_DIGEST="${POW_DIGEST#sha256:}"
 
   [[ -n "$BOOT_URL" && "$BOOT_URL" != "null" ]] || die "Latest bootstrap release has no bootstrap-index.zip."
   [[ -n "$POW_URL" && "$POW_URL" != "null" ]] || die "Latest bootstrap release has no powcache.dat."
