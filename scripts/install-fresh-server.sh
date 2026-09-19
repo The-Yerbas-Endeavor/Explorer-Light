@@ -1,29 +1,45 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Yerbas Explorer Light fresh-server installer.
-# Supported: fresh Ubuntu/Debian server.
+# Yerbas Explorer Light fresh-server installer
 #
-# Default install:
-#   - headless/wallet-disabled Yerbas Core
-#   - txindex=1, addressindex=1, assetindex=1
-#   - Node.js 24
+# Supported:
+#   Ubuntu 22.04 / 24.04 / 26.04 (official Core release binaries)
+#   Debian/other Ubuntu versions (source-build fallback)
+#
+# Installs:
+#   - Yerbas Core
+#   - official Explorer bootstrap-index blockchain snapshot
+#   - powcache.dat
+#   - Core indexes used by explorer/AI
 #   - Explorer Light
+#   - generated RPC credentials
 #   - systemd services
-#   - nginx reverse proxy
+#   - nginx
+#   - optional Let's Encrypt HTTPS
 #
-# Examples:
-#   sudo bash install-fresh-server.sh
-#   sudo bash install-fresh-server.sh --domain explorer.example.org
-#   sudo bash install-fresh-server.sh --domain explorer.example.org --https --email admin@example.org
+# Example:
+#   sudo ./install-fresh-server.sh --domain explorer2.yerbas.org
+#
+# HTTPS, once DNS points at this server:
+#   sudo ./install-fresh-server.sh \
+#     --domain explorer2.yerbas.org \
+#     --https \
+#     --email admin@example.org
 
 DOMAIN="_"
 EMAIL=""
 HTTPS=0
-CORE_REF="main"
 EXPLORER_BRANCH="feature/rpc-first-test-build"
+CORE_REF="main"
+FORCE_SOURCE_BUILD=0
+SKIP_BOOTSTRAP=0
+KEEP_DOWNLOADS=0
 JOBS=""
+
 CORE_REPO="https://github.com/The-Yerbas-Endeavor/yerbas.git"
+CORE_RELEASE_API="https://api.github.com/repos/The-Yerbas-Endeavor/yerbas/releases/latest"
+BOOTSTRAP_RELEASE_API="https://api.github.com/repos/The-Yerbas-Endeavor/YERB-Bootstrap/releases/latest"
 EXPLORER_REPO="https://github.com/The-Yerbas-Endeavor/Explorer-Light.git"
 
 CORE_USER="yerbas"
@@ -35,38 +51,104 @@ EXPLORER_DIR="/opt/yerbas-explorer-light"
 RPC_PORT="9998"
 APP_PORT="3001"
 
-log() { printf '\n[Explorer-Light] %s\n' "$*"; }
-die() { printf '\n[Explorer-Light ERROR] %s\n' "$*" >&2; exit 1; }
+WORKDIR=""
+
+log() {
+  printf '\n\033[1;32m[Explorer-Light]\033[0m %s\n' "$*"
+}
+
+warn() {
+  printf '\n\033[1;33m[Explorer-Light WARNING]\033[0m %s\n' "$*" >&2
+}
+
+die() {
+  printf '\n\033[1;31m[Explorer-Light ERROR]\033[0m %s\n' "$*" >&2
+  exit 1
+}
+
+cleanup() {
+  if [[ -n "$WORKDIR" && -d "$WORKDIR" && "$KEEP_DOWNLOADS" -eq 0 ]]; then
+    rm -rf "$WORKDIR"
+  fi
+}
+trap cleanup EXIT
 
 usage() {
   cat <<EOF
 Usage: sudo bash install-fresh-server.sh [options]
 
 Options:
-  --domain NAME       Public domain. Default: server IP / nginx catch-all.
-  --https             Configure Let's Encrypt HTTPS with certbot.
-  --email ADDRESS     Required with --https.
-  --core-ref REF      Yerbas Core branch/tag. Default: main
-  --branch REF        Explorer-Light branch. Default: feature/rpc-first-test-build
-  --jobs N            Core build jobs. Default: based on CPU/RAM.
-  -h, --help          Show help.
+  --domain NAME          Public domain. Default: nginx catch-all / server IP.
+  --https                Configure Let's Encrypt HTTPS.
+  --email ADDRESS        Required with --https.
+  --branch REF           Explorer-Light branch.
+                         Default: feature/rpc-first-test-build
+  --core-ref REF         Core source fallback branch/tag. Default: main
+  --source-build         Force Core to build from source.
+  --skip-bootstrap       Do not download bootstrap-index.zip / powcache.dat.
+  --keep-downloads       Keep installer downloads under /var/tmp.
+  --jobs N               Source-build parallel jobs.
+  -h, --help             Show help.
+
+The default path uses the latest matching official Yerbas Core Ubuntu release
+and the latest YERB-Bootstrap bootstrap-index.zip release.
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --domain) [[ $# -ge 2 ]] || die "Missing domain"; DOMAIN="$2"; shift 2 ;;
-    --https) HTTPS=1; shift ;;
-    --email) [[ $# -ge 2 ]] || die "Missing email"; EMAIL="$2"; shift 2 ;;
-    --core-ref) [[ $# -ge 2 ]] || die "Missing Core ref"; CORE_REF="$2"; shift 2 ;;
-    --branch) [[ $# -ge 2 ]] || die "Missing explorer branch"; EXPLORER_BRANCH="$2"; shift 2 ;;
-    --jobs) [[ $# -ge 2 ]] || die "Missing jobs value"; JOBS="$2"; shift 2 ;;
-    -h|--help) usage; exit 0 ;;
-    *) die "Unknown option: $1" ;;
+    --domain)
+      [[ $# -ge 2 ]] || die "Missing domain."
+      DOMAIN="$2"
+      shift 2
+      ;;
+    --https)
+      HTTPS=1
+      shift
+      ;;
+    --email)
+      [[ $# -ge 2 ]] || die "Missing email."
+      EMAIL="$2"
+      shift 2
+      ;;
+    --branch)
+      [[ $# -ge 2 ]] || die "Missing Explorer branch."
+      EXPLORER_BRANCH="$2"
+      shift 2
+      ;;
+    --core-ref)
+      [[ $# -ge 2 ]] || die "Missing Core ref."
+      CORE_REF="$2"
+      shift 2
+      ;;
+    --source-build)
+      FORCE_SOURCE_BUILD=1
+      shift
+      ;;
+    --skip-bootstrap)
+      SKIP_BOOTSTRAP=1
+      shift
+      ;;
+    --keep-downloads)
+      KEEP_DOWNLOADS=1
+      shift
+      ;;
+    --jobs)
+      [[ $# -ge 2 ]] || die "Missing jobs value."
+      JOBS="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      die "Unknown option: $1"
+      ;;
   esac
 done
 
-[[ "$EUID" -eq 0 ]] || die "Run with sudo/root."
+[[ "$EUID" -eq 0 ]] || die "Run this installer with sudo/root."
 
 if (( HTTPS )); then
   [[ "$DOMAIN" != "_" ]] || die "--https requires --domain."
@@ -75,14 +157,23 @@ fi
 
 [[ -r /etc/os-release ]] || die "Cannot identify operating system."
 source /etc/os-release
+
 case "$ID" in
   ubuntu|debian) ;;
   *) die "This installer currently supports Ubuntu and Debian." ;;
 esac
 
 export DEBIAN_FRONTEND=noninteractive
+WORKDIR="$(mktemp -d /var/tmp/yerbas-explorer-install.XXXXXX)"
 
 MEM_MB="$(awk '/MemTotal:/ {print int($2/1024)}' /proc/meminfo)"
+FREE_KB="$(df -Pk / | awk 'NR==2 {print $4}')"
+FREE_GB=$(( FREE_KB / 1024 / 1024 ))
+
+if (( FREE_GB < 15 )); then
+  warn "Only about $FREE_GB GiB is free. A full Explorer Core node and indexed blockchain require substantial disk space."
+fi
+
 if [[ -z "$JOBS" ]]; then
   JOBS="$(nproc)"
   MEM_JOBS=$(( MEM_MB / 1400 ))
@@ -90,34 +181,20 @@ if [[ -z "$JOBS" ]]; then
   (( JOBS > MEM_JOBS )) && JOBS="$MEM_JOBS"
   (( JOBS > 4 )) && JOBS=4
 fi
-[[ "$JOBS" =~ ^[0-9]+$ ]] || die "--jobs must be a number."
+[[ "$JOBS" =~ ^[0-9]+$ ]] || die "--jobs must be numeric."
 
-FREE_KB="$(df -Pk / | awk 'NR==2 {print $4}')"
-if (( FREE_KB < 20 * 1024 * 1024 )); then
-  log "WARNING: less than 20 GiB is free. Core + blockchain needs substantial disk space."
-fi
-
-SWAP_MB="$(awk '/SwapTotal:/ {print int($2/1024)}' /proc/meminfo)"
-if (( MEM_MB < 4096 && SWAP_MB < 512 )) && [[ ! -e /swapfile ]]; then
-  log "Creating 2 GiB swap for the Core build"
-  fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
-  chmod 600 /swapfile
-  mkswap /swapfile >/dev/null
-  swapon /swapfile
-  echo '/swapfile none swap sw 0 0' >> /etc/fstab
-fi
-
-log "Installing packages"
+log "Installing operating-system packages"
 apt-get update
 apt-get install -y \
-  ca-certificates curl git jq nginx openssl python3 \
-  autoconf automake build-essential cmake libtool pkg-config patch
-
-if apt-cache show bsdmainutils >/dev/null 2>&1; then
-  apt-get install -y bsdmainutils
-elif apt-cache show bsdextrautils >/dev/null 2>&1; then
-  apt-get install -y bsdextrautils
-fi
+  ca-certificates \
+  curl \
+  git \
+  jq \
+  nginx \
+  openssl \
+  python3 \
+  tar \
+  unzip
 
 node_ok=0
 if command -v node >/dev/null 2>&1; then
@@ -129,75 +206,261 @@ fi
 
 if (( ! node_ok )); then
   log "Installing Node.js 24"
-  curl -fsSL https://deb.nodesource.com/setup_24.x -o /tmp/nodesource.sh
-  bash /tmp/nodesource.sh
-  rm -f /tmp/nodesource.sh
+  curl -fsSL https://deb.nodesource.com/setup_24.x -o "$WORKDIR/nodesource.sh"
+  bash "$WORKDIR/nodesource.sh"
   apt-get install -y nodejs
 fi
 
-command -v node >/dev/null || die "Node.js install failed."
-log "Node: $(node --version)"
+command -v node >/dev/null || die "Node.js installation failed."
+log "Using Node.js $(node --version)"
 
 if ! id -u "$CORE_USER" >/dev/null 2>&1; then
-  useradd --system --create-home --home-dir "$CORE_HOME" --shell /usr/sbin/nologin "$CORE_USER"
+  useradd \
+    --system \
+    --create-home \
+    --home-dir "$CORE_HOME" \
+    --shell /usr/sbin/nologin \
+    "$CORE_USER"
 fi
+
 if ! id -u "$EXPLORER_USER" >/dev/null 2>&1; then
-  useradd --system --create-home --home-dir "/var/lib/$EXPLORER_USER" --shell /usr/sbin/nologin "$EXPLORER_USER"
+  useradd \
+    --system \
+    --create-home \
+    --home-dir "/var/lib/$EXPLORER_USER" \
+    --shell /usr/sbin/nologin \
+    "$EXPLORER_USER"
 fi
 
-log "Cloning Yerbas Core: $CORE_REF"
-rm -rf "$CORE_SRC"
-git clone --depth 1 --branch "$CORE_REF" "$CORE_REPO" "$CORE_SRC"
-cd "$CORE_SRC"
+verify_sha256() {
+  local file="$1"
+  local expected="$2"
+  local actual
 
-if [[ -x ./build-aux/config.guess ]]; then
-  HOST_TRIPLE="$(./build-aux/config.guess)"
-else
+  [[ "$expected" =~ ^[0-9a-fA-F]{64}$ ]] || die "Missing/invalid SHA-256 digest for $(basename "$file")."
+  actual="$(sha256sum "$file" | awk '{print $1}')"
+  [[ "$actual" == "$expected" ]] || die "SHA-256 verification failed for $(basename "$file")."
+}
+
+install_core_from_release() {
+  local release_json
+  local arch
+  local pattern
+  local url
+  local digest
+  local asset_name
+  local archive
+  local extract_dir
+  local yerbasd_bin
+  local yerbas_cli_bin
+  local tag
+
+  [[ "$ID" == "ubuntu" ]] || return 1
+
   case "$(uname -m)" in
-    x86_64) HOST_TRIPLE="x86_64-pc-linux-gnu" ;;
-    aarch64|arm64) HOST_TRIPLE="aarch64-linux-gnu" ;;
-    *) die "Unsupported architecture: $(uname -m)" ;;
+    x86_64)
+      arch="x86"
+      ;;
+    aarch64|arm64)
+      arch="arm64"
+      ;;
+    *)
+      return 1
+      ;;
   esac
+
+  release_json="$(curl -fsSL "$CORE_RELEASE_API")" || return 1
+  tag="$(printf '%s' "$release_json" | jq -r '.tag_name // empty')"
+  pattern="^yerbas-ubuntu-$VERSION_ID-$arch-release-.*\\.tar\\.gz$"
+
+  url="$(printf '%s' "$release_json" | jq -r --arg p "$pattern" \
+    '.assets[] | select(.name | test($p)) | .browser_download_url' | head -n 1)"
+  digest="$(printf '%s' "$release_json" | jq -r --arg p "$pattern" \
+    '.assets[] | select(.name | test($p)) | (.digest // "")' | head -n 1 | sed 's/^sha256://')"
+  asset_name="$(printf '%s' "$release_json" | jq -r --arg p "$pattern" \
+    '.assets[] | select(.name | test($p)) | .name' | head -n 1)"
+
+  [[ -n "$url" && "$url" != "null" ]] || return 1
+
+  archive="$WORKDIR/$asset_name"
+  extract_dir="$WORKDIR/core-release"
+  mkdir -p "$extract_dir"
+
+  log "Downloading official Yerbas Core $tag for Ubuntu $VERSION_ID / $arch"
+  curl -fL --retry 3 --retry-delay 2 --progress-bar "$url" -o "$archive"
+  verify_sha256 "$archive" "$digest"
+
+  tar -xzf "$archive" -C "$extract_dir"
+
+  yerbasd_bin="$(find "$extract_dir" -type f -name yerbasd | head -n 1)"
+  yerbas_cli_bin="$(find "$extract_dir" -type f -name yerbas-cli | head -n 1)"
+
+  [[ -n "$yerbasd_bin" && -f "$yerbasd_bin" ]] || die "Official Core archive did not contain yerbasd."
+  [[ -n "$yerbas_cli_bin" && -f "$yerbas_cli_bin" ]] || die "Official Core archive did not contain yerbas-cli."
+
+  install -m 0755 "$yerbasd_bin" /usr/local/bin/yerbasd
+  install -m 0755 "$yerbas_cli_bin" /usr/local/bin/yerbas-cli
+
+  log "Installed official Yerbas Core release $tag"
+  return 0
+}
+
+install_core_from_source() {
+  log "No matching official binary selected/found; building Core from source"
+
+  apt-get install -y \
+    autoconf \
+    automake \
+    build-essential \
+    cmake \
+    libtool \
+    pkg-config \
+    patch
+
+  if apt-cache show bsdmainutils >/dev/null 2>&1; then
+    apt-get install -y bsdmainutils
+  elif apt-cache show bsdextrautils >/dev/null 2>&1; then
+    apt-get install -y bsdextrautils
+  fi
+
+  SWAP_MB="$(awk '/SwapTotal:/ {print int($2/1024)}' /proc/meminfo)"
+  if (( MEM_MB < 4096 && SWAP_MB < 512 )) && [[ ! -e /swapfile ]]; then
+    log "Creating 2 GiB swap for the Core source build"
+    fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
+    chmod 600 /swapfile
+    mkswap /swapfile >/dev/null
+    swapon /swapfile
+    grep -qE '^/swapfile[[:space:]]' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  fi
+
+  rm -rf "$CORE_SRC"
+  git clone --depth 1 --branch "$CORE_REF" "$CORE_REPO" "$CORE_SRC"
+  cd "$CORE_SRC"
+
+  if [[ -x ./build-aux/config.guess ]]; then
+    HOST_TRIPLE="$(./build-aux/config.guess)"
+  else
+    case "$(uname -m)" in
+      x86_64) HOST_TRIPLE="x86_64-pc-linux-gnu" ;;
+      aarch64|arm64) HOST_TRIPLE="aarch64-linux-gnu" ;;
+      *) die "Unsupported architecture for source build: $(uname -m)" ;;
+    esac
+  fi
+
+  log "Building Core dependencies for $HOST_TRIPLE with $JOBS job(s)"
+  make -C depends -j"$JOBS" HOST="$HOST_TRIPLE" NO_QT=1 NO_WALLET=1
+
+  ./autogen.sh
+  CONFIG_SITE="$CORE_SRC/depends/$HOST_TRIPLE/share/config.site" \
+    ./configure \
+      --prefix="$CORE_SRC/depends/$HOST_TRIPLE" \
+      --disable-wallet \
+      --with-gui=no \
+      --disable-tests \
+      --disable-bench
+
+  make -j"$JOBS"
+
+  install -m 0755 src/yerbasd /usr/local/bin/yerbasd
+  install -m 0755 src/yerbas-cli /usr/local/bin/yerbas-cli
+
+  cd /
+  rm -rf "$CORE_SRC"
+}
+
+if (( FORCE_SOURCE_BUILD )); then
+  install_core_from_source
+else
+  if ! install_core_from_release; then
+    install_core_from_source
+  fi
 fi
 
-log "Building Core dependencies ($HOST_TRIPLE) with $JOBS job(s)"
-make -C depends -j"$JOBS" HOST="$HOST_TRIPLE" NO_QT=1 NO_WALLET=1
+[[ -x /usr/local/bin/yerbasd ]] || die "yerbasd was not installed."
+[[ -x /usr/local/bin/yerbas-cli ]] || die "yerbas-cli was not installed."
 
-log "Building headless Yerbas Core"
-./autogen.sh
-CONFIG_SITE="$CORE_SRC/depends/$HOST_TRIPLE/share/config.site" \
-  ./configure \
-    --prefix="$CORE_SRC/depends/$HOST_TRIPLE" \
-    --disable-wallet \
-    --with-gui=no \
-    --disable-tests \
-    --disable-bench
-make -j"$JOBS"
-
-install -m 0755 src/yerbasd /usr/local/bin/yerbasd
-install -m 0755 src/yerbas-cli /usr/local/bin/yerbas-cli
-
+log "Configuring Yerbas Core"
 RPC_USER="explorer"
 RPC_PASSWORD="$(openssl rand -hex 32)"
 
-log "Configuring Yerbas Core"
 install -d -m 0700 -o "$CORE_USER" -g "$CORE_USER" "$CORE_DATA"
+
 cat > "$CORE_DATA/yerbas.conf" <<EOF
 server=1
 listen=1
+disablewallet=1
 
+# Explorer indexes.
+# These match the official bootstrap-index.zip snapshot.
 txindex=1
 addressindex=1
 assetindex=1
+spentindex=1
+timestampindex=1
 
+# Core RPC is localhost-only.
 rpcbind=127.0.0.1
 rpcallowip=127.0.0.1
 rpcport=$RPC_PORT
 rpcuser=$RPC_USER
 rpcpassword=$RPC_PASSWORD
 EOF
+
 chown "$CORE_USER:$CORE_USER" "$CORE_DATA/yerbas.conf"
 chmod 0600 "$CORE_DATA/yerbas.conf"
+
+if (( ! SKIP_BOOTSTRAP )); then
+  log "Discovering latest official YERB-Bootstrap release"
+  BOOT_JSON="$(curl -fsSL "$BOOTSTRAP_RELEASE_API")" || die "Unable to read YERB-Bootstrap release metadata."
+  BOOT_TAG="$(printf '%s' "$BOOT_JSON" | jq -r '.tag_name // empty')"
+  BOOT_NAME="$(printf '%s' "$BOOT_JSON" | jq -r '.name // empty')"
+  BOOT_BODY="$(printf '%s' "$BOOT_JSON" | jq -r '.body // empty')"
+
+  BOOT_URL="$(printf '%s' "$BOOT_JSON" | jq -r '.assets[] | select(.name == "bootstrap-index.zip") | .browser_download_url' | head -n 1)"
+  BOOT_DIGEST="$(printf '%s' "$BOOT_JSON" | jq -r '.assets[] | select(.name == "bootstrap-index.zip") | (.digest // "")' | head -n 1 | sed 's/^sha256://')"
+  BOOT_SIZE="$(printf '%s' "$BOOT_JSON" | jq -r '.assets[] | select(.name == "bootstrap-index.zip") | .size' | head -n 1)"
+
+  POW_URL="$(printf '%s' "$BOOT_JSON" | jq -r '.assets[] | select(.name == "powcache.dat") | .browser_download_url' | head -n 1)"
+  POW_DIGEST="$(printf '%s' "$BOOT_JSON" | jq -r '.assets[] | select(.name == "powcache.dat") | (.digest // "")' | head -n 1 | sed 's/^sha256://')"
+
+  [[ -n "$BOOT_URL" && "$BOOT_URL" != "null" ]] || die "Latest bootstrap release has no bootstrap-index.zip."
+  [[ -n "$POW_URL" && "$POW_URL" != "null" ]] || die "Latest bootstrap release has no powcache.dat."
+
+  if [[ "$BOOT_SIZE" =~ ^[0-9]+$ ]]; then
+    BOOT_MB=$(( BOOT_SIZE / 1024 / 1024 ))
+    log "Bootstrap release $BOOT_TAG: $BOOT_NAME"
+    log "bootstrap-index.zip download size: about $BOOT_MB MiB"
+  else
+    log "Bootstrap release $BOOT_TAG: $BOOT_NAME"
+  fi
+
+  if [[ -n "$BOOT_BODY" ]]; then
+    printf '%s\n' "$BOOT_BODY" | sed 's/^/[bootstrap] /'
+  fi
+
+  BOOT_ZIP="$WORKDIR/bootstrap-index.zip"
+  POW_FILE="$WORKDIR/powcache.dat"
+
+  log "Downloading indexed blockchain bootstrap"
+  curl -fL --retry 3 --retry-delay 2 --progress-bar "$BOOT_URL" -o "$BOOT_ZIP"
+  verify_sha256 "$BOOT_ZIP" "$BOOT_DIGEST"
+
+  log "Extracting bootstrap into $CORE_DATA"
+  unzip -q "$BOOT_ZIP" -d "$CORE_DATA"
+
+  [[ -d "$CORE_DATA/blocks" ]] || die "Bootstrap extraction did not create blocks/."
+  [[ -d "$CORE_DATA/chainstate" ]] || die "Bootstrap extraction did not create chainstate/."
+
+  log "Downloading GhostRider PoW cache"
+  curl -fL --retry 3 --retry-delay 2 --progress-bar "$POW_URL" -o "$POW_FILE"
+  verify_sha256 "$POW_FILE" "$POW_DIGEST"
+  install -m 0600 "$POW_FILE" "$CORE_DATA/powcache.dat"
+
+  chown -R "$CORE_USER:$CORE_USER" "$CORE_DATA"
+  log "Official indexed blockchain bootstrap loaded"
+else
+  warn "Bootstrap download was skipped; Core will sync the blockchain from peers."
+fi
 
 cat > /etc/systemd/system/yerbasd.service <<EOF
 [Unit]
@@ -227,14 +490,45 @@ EOF
 systemctl daemon-reload
 systemctl enable --now yerbasd
 
-log "Installing Explorer Light: $EXPLORER_BRANCH"
+log "Waiting for Yerbas Core RPC to become available"
+CORE_RPC_READY=0
+for attempt in $(seq 1 900); do
+  if sudo -u "$CORE_USER" /usr/local/bin/yerbas-cli \
+      -datadir="$CORE_DATA" \
+      -conf="$CORE_DATA/yerbas.conf" \
+      getblockchaininfo > "$WORKDIR/blockchaininfo.json" 2>/dev/null; then
+    CORE_RPC_READY=1
+    break
+  fi
+
+  if (( attempt % 15 == 0 )); then
+    printf '[Explorer-Light] Core is loading bootstrap/index data...\n'
+  fi
+  sleep 2
+done
+
+(( CORE_RPC_READY )) || die "Yerbas Core RPC did not become ready. Check: journalctl -u yerbasd -n 100 --no-pager"
+
+log "Yerbas Core RPC is ready"
+jq '{
+  chain,
+  blocks,
+  headers,
+  bestblockhash,
+  verificationprogress,
+  initialblockdownload
+}' "$WORKDIR/blockchaininfo.json" || cat "$WORKDIR/blockchaininfo.json"
+
+log "Installing Explorer Light branch $EXPLORER_BRANCH"
 rm -rf "$EXPLORER_DIR"
 git clone --depth 1 --branch "$EXPLORER_BRANCH" "$EXPLORER_REPO" "$EXPLORER_DIR"
 
 cat > "$EXPLORER_DIR/.env" <<EOF
+# Explorer HTTP service. nginx is the public entry point.
 HOST=127.0.0.1
 PORT=$APP_PORT
 
+# Local Yerbas Core RPC generated by the installer.
 RPC_PROTOCOL=http
 RPC_HOST=127.0.0.1
 RPC_PORT=$RPC_PORT
@@ -245,6 +539,7 @@ RPC_TIMEOUT_MS=10000
 RECENT_BLOCKS=12
 CACHE_MS=5000
 
+# Read-only Yerbas AI gateway.
 AI_API_ENABLED=true
 AI_MAX_BODY_BYTES=32768
 EOF
@@ -253,11 +548,13 @@ chown -R root:"$EXPLORER_USER" "$EXPLORER_DIR"
 chmod -R g+rX,o-rwx "$EXPLORER_DIR"
 chmod 0640 "$EXPLORER_DIR/.env"
 
+log "Validating Explorer Light"
 cd "$EXPLORER_DIR"
 npm test
 npm run check
 
 NODE_BIN="$(command -v node)"
+
 cat > /etc/systemd/system/yerbas-explorer-light.service <<EOF
 [Unit]
 Description=Yerbas Explorer Light
@@ -308,12 +605,14 @@ server {
     location ~ ^/(api/ai(?:/v1)?/query|ext/ai/query)\$ {
         limit_req zone=yerbas_ai_query burst=20 nodelay;
         client_max_body_size 64k;
+
         proxy_pass http://127.0.0.1:$APP_PORT;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 30s;
     }
 
     location / {
@@ -323,58 +622,75 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 30s;
     }
 }
 EOF
 
 rm -f /etc/nginx/sites-enabled/default
-ln -sfn /etc/nginx/sites-available/yerbas-explorer-light /etc/nginx/sites-enabled/yerbas-explorer-light
+ln -sfn \
+  /etc/nginx/sites-available/yerbas-explorer-light \
+  /etc/nginx/sites-enabled/yerbas-explorer-light
+
 nginx -t
 systemctl enable --now nginx
 systemctl reload nginx
 
 if (( HTTPS )); then
-  log "Configuring Let's Encrypt HTTPS"
+  log "Configuring Let's Encrypt HTTPS for $DOMAIN"
   apt-get install -y certbot python3-certbot-nginx
-  certbot --nginx --non-interactive --agree-tos --redirect --email "$EMAIL" -d "$DOMAIN"
+  certbot \
+    --nginx \
+    --non-interactive \
+    --agree-tos \
+    --redirect \
+    --email "$EMAIL" \
+    -d "$DOMAIN"
 fi
 
-log "Removing Core build source to save disk"
-rm -rf "$CORE_SRC"
+log "Running final local checks"
+systemctl is-active --quiet yerbasd \
+  || die "yerbasd failed. Run: journalctl -u yerbasd -n 100 --no-pager"
+systemctl is-active --quiet yerbas-explorer-light \
+  || die "Explorer failed. Run: journalctl -u yerbas-explorer-light -n 100 --no-pager"
+systemctl is-active --quiet nginx \
+  || die "nginx failed."
 
-log "Checking services"
-systemctl is-active --quiet yerbasd || die "yerbasd failed. Run: journalctl -u yerbasd -n 100 --no-pager"
-systemctl is-active --quiet yerbas-explorer-light || die "Explorer failed. Run: journalctl -u yerbas-explorer-light -n 100 --no-pager"
-systemctl is-active --quiet nginx || die "nginx failed."
+curl -fsS "http://127.0.0.1:$APP_PORT/api/health" \
+  | jq . \
+  || die "Explorer health endpoint failed."
 
-for attempt in $(seq 1 30); do
-  if curl -fsS "http://127.0.0.1:$APP_PORT/api/health" >/tmp/explorer-health.json 2>/dev/null; then
-    break
-  fi
-  sleep 1
-done
+curl -fsS "http://127.0.0.1:$APP_PORT/api/ai/v1/status" \
+  | jq . \
+  || die "AI status endpoint failed."
 
 printf '\n============================================================\n'
 printf ' Yerbas Explorer Light installation complete\n'
 printf '============================================================\n\n'
 
 if [[ "$DOMAIN" == "_" ]]; then
-  echo "Open: http://<server-ip>/"
+  echo "Explorer: http://<server-ip>/"
 elif (( HTTPS )); then
-  echo "Open: https://$DOMAIN/"
+  echo "Explorer: https://$DOMAIN/"
 else
-  echo "Open: http://$DOMAIN/"
+  echo "Explorer: http://$DOMAIN/"
 fi
 
 echo
-echo "Health:"
+echo "Yerbas Core configuration:"
+echo "  $CORE_DATA/yerbas.conf"
+echo
+echo "Explorer RPC configuration:"
+echo "  $EXPLORER_DIR/.env"
+echo
+echo "Core synchronization:"
+echo "  sudo -u $CORE_USER yerbas-cli -datadir=$CORE_DATA -conf=$CORE_DATA/yerbas.conf getblockchaininfo"
+echo
+echo "Explorer:"
 echo "  curl -s http://127.0.0.1:$APP_PORT/api/health | jq"
 echo
-echo "AI status:"
+echo "AI:"
 echo "  curl -s http://127.0.0.1:$APP_PORT/api/ai/v1/status | jq"
-echo
-echo "Core sync:"
-echo "  sudo -u $CORE_USER yerbas-cli -datadir=$CORE_DATA -conf=$CORE_DATA/yerbas.conf getblockchaininfo"
 echo
 echo "Services:"
 echo "  systemctl status yerbasd --no-pager"
@@ -385,6 +701,8 @@ echo "Logs:"
 echo "  journalctl -u yerbasd -f"
 echo "  journalctl -u yerbas-explorer-light -f"
 echo
-echo "Core RPC remains bound to 127.0.0.1 only."
-echo "Explorer Light remains bound to 127.0.0.1 behind nginx."
-echo "The AI gateway is read-only and has no arbitrary RPC endpoint."
+echo "Security:"
+echo "  Yerbas RPC is bound to 127.0.0.1 only."
+echo "  Explorer Light is bound to 127.0.0.1 behind nginx."
+echo "  The Explorer .env contains generated RPC credentials and is not web-accessible."
+echo "  The AI gateway remains read-only and exposes no arbitrary RPC."
