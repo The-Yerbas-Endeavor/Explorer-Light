@@ -133,14 +133,31 @@ async function handleApi(req, res, url) {
   }
 
   if (url.pathname.startsWith('/api/tx/')) {
-    const txid = decodeURIComponent(url.pathname.slice('/api/tx/'.length));
+    const txid = decodeURIComponent(url.pathname.slice('/api/tx/'.length)).toLowerCase();
     if (!isHash(txid)) return sendJson(res, 400, { error: 'Invalid transaction ID.' });
+
+    const knownBlock = (url.searchParams.get('block') || '').toLowerCase();
+    if (knownBlock) {
+      if (!isHash(knownBlock)) return sendJson(res, 400, { error: 'Invalid block hash.' });
+      const block = await rpc.call('getblock', [knownBlock, 2]);
+      const tx = Array.isArray(block.tx)
+        ? block.tx.find((item) => item && typeof item === 'object' && item.txid === txid)
+        : null;
+      if (!tx) return sendJson(res, 404, { error: 'Transaction was not found in the supplied block.' });
+      return sendJson(res, 200, {
+        ...tx,
+        blockhash: tx.blockhash || block.hash || knownBlock,
+        confirmations: tx.confirmations ?? block.confirmations,
+        blocktime: tx.blocktime || block.time
+      });
+    }
+
     try {
-      const tx = await rpc.call('getrawtransaction', [txid.toLowerCase(), true]);
+      const tx = await rpc.call('getrawtransaction', [txid, true]);
       return sendJson(res, 200, tx);
     } catch (error) {
       if (error instanceof RpcError && error.code === -5) {
-        error.message = 'Transaction not found. For historical transaction lookup, enable txindex=1 in yerbas.conf and reindex the node.';
+        error.message = 'Transaction not found. Direct historical TXID lookup needs txindex=1, but transactions opened from a block work without it.';
       }
       throw error;
     }
