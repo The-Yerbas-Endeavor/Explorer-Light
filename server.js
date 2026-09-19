@@ -261,6 +261,89 @@ async function handleApi(req, res, url) {
     }
   }
 
+  if (url.pathname === '/api/assets') {
+    const rawQuery = (url.searchParams.get('q') || '').trim();
+    if (rawQuery.length > 128) {
+      return sendJson(res, 400, { error: 'Asset search is too long.' });
+    }
+
+    const requestedCount = Number.parseInt(url.searchParams.get('count') || '50', 10);
+    const requestedStart = Number.parseInt(url.searchParams.get('start') || '0', 10);
+    const count = Number.isSafeInteger(requestedCount) ? Math.min(100, Math.max(1, requestedCount)) : 50;
+    const start = Number.isSafeInteger(requestedStart) ? Math.max(0, requestedStart) : 0;
+    const cleanQuery = rawQuery.replaceAll('*', '');
+    const filter = cleanQuery ? cleanQuery + '*' : '*';
+
+    const assets = await rpc.call('listassets', [filter, true, count, start]);
+    if (typeof assets === 'string') {
+      return sendJson(res, 409, { error: assets.replace(/^_/, '') });
+    }
+
+    const items = Object.entries(assets || {}).map(([name, metadata]) => ({
+      name,
+      ...metadata
+    }));
+
+    return sendJson(res, 200, {
+      query: rawQuery,
+      filter,
+      count,
+      start,
+      returned: items.length,
+      nextStart: items.length === count ? start + items.length : null,
+      items
+    });
+  }
+
+  if (url.pathname.startsWith('/api/asset/')) {
+    const assetName = decodeURIComponent(url.pathname.slice('/api/asset/'.length)).trim();
+    if (!assetName || assetName.length > 128) {
+      return sendJson(res, 400, { error: 'Invalid Yerbas asset name.' });
+    }
+
+    const [metadataResult, directoryResult, holderCountResult, holdersResult] = await Promise.allSettled([
+      rpc.call('getassetdata', [assetName]),
+      rpc.call('listassets', [assetName, true, 1, 0]),
+      rpc.call('listaddressesbyasset', [assetName, true]),
+      rpc.call('listaddressesbyasset', [assetName, false, 100, 0])
+    ]);
+
+    const metadata = metadataResult.status === 'fulfilled' ? metadataResult.value : null;
+    if (!metadata || typeof metadata !== 'object') {
+      return sendJson(res, 404, { error: 'Yerbas asset was not found.' });
+    }
+
+    const directory = directoryResult.status === 'fulfilled' && directoryResult.value && typeof directoryResult.value === 'object'
+      ? directoryResult.value[assetName] || Object.values(directoryResult.value)[0] || null
+      : null;
+
+    const holderCount = holderCountResult.status === 'fulfilled' && Number.isFinite(Number(holderCountResult.value))
+      ? Number(holderCountResult.value)
+      : null;
+
+    const holderValue = holdersResult.status === 'fulfilled' ? holdersResult.value : null;
+    const holdersAvailable = holderValue && typeof holderValue === 'object' && !Array.isArray(holderValue);
+    const holders = holdersAvailable
+      ? Object.entries(holderValue).map(([address, balance]) => ({ address, balance }))
+      : [];
+
+    return sendJson(res, 200, {
+      name: metadata.name || assetName,
+      metadata,
+      issuance: directory ? {
+        blockHeight: directory.block_height ?? null,
+        blockHash: directory.blockhash ?? null
+      } : null,
+      holders: {
+        available: holdersAvailable,
+        total: holderCount,
+        returned: holders.length,
+        items: holders,
+        unavailableReason: typeof holderValue === 'string' ? holderValue.replace(/^_/, '') : null
+      }
+    });
+  }
+
   if (url.pathname.startsWith('/api/address/')) {
     const address = decodeURIComponent(url.pathname.slice('/api/address/'.length)).trim();
     if (!address || address.length > 128) {
@@ -359,7 +442,9 @@ async function requestHandler(req, res) {
     if (url.pathname === '/'
       || url.pathname.startsWith('/block/')
       || url.pathname.startsWith('/tx/')
-      || url.pathname.startsWith('/address/')) {
+      || url.pathname.startsWith('/address/')
+      || url.pathname === '/assets'
+      || url.pathname.startsWith('/asset/')) {
       return await sendFile(req, res, 'index.html', 'text/html; charset=utf-8', 'no-cache');
     }
 
