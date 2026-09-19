@@ -124,6 +124,9 @@ test('manifest explicitly denies signing, broadcasting, wallet, and shell capabi
   const manifest = gateway.manifest();
 
   assert.equal(manifest.readOnly, true);
+  assert.equal(manifest.endpoints.status, '/api/ai/v1/status');
+  assert.equal(manifest.endpoints.tools, '/api/ai/v1/tools');
+  assert.equal(manifest.endpoints.query, '/api/ai/v1/query');
   for (const capability of [
     'wallet_access',
     'private_keys',
