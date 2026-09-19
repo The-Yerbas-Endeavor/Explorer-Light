@@ -1322,3 +1322,97 @@ tbody tr:hover {
 .footer-meta a:hover {
   color: var(--green-hot);
 }
+
+.api-docs {
+  padding-top: 34px;
+}
+
+.api-docs-hero {
+  margin-bottom: 18px;
+}
+
+.api-note {
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  background: rgba(141, 241, 158, .035);
+  color: var(--text-soft);
+  line-height: 1.65;
+}
+
+.api-note strong {
+  color: var(--green-hot);
+}
+
+.api-note code,
+.api-row code {
+  font-family: var(--mono);
+}
+
+.api-list {
+  display: grid;
+}
+
+.api-row {
+  min-height: 78px;
+  padding: 16px 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  border-bottom: 1px solid rgba(164, 255, 178, .075);
+}
+
+.api-row:last-child {
+  border-bottom: 0;
+}
+
+.api-row:hover {
+  background: rgba(141, 241, 158, .025);
+}
+
+.api-row code {
+  color: var(--green-hot);
+  font-size: 12px;
+}
+
+.api-row p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.api-row > a,
+.api-row > span {
+  min-width: 92px;
+  text-align: right;
+  color: var(--green);
+  font: 700 9px/1 var(--mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.api-row > a:hover {
+  color: var(--green-hot);
+}
+
+.api-row.unavailable {
+  opacity: .72;
+}
+
+.api-row.unavailable > span {
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .api-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .api-row > a,
+  .api-row > span {
+    min-width: 0;
+    text-align: left;
+  }
+}
