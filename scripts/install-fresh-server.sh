@@ -747,6 +747,73 @@ EOF
 systemctl daemon-reload
 systemctl enable --now yerbasd
 
+log "Publishing temporary Explorer sync page"
+
+install -d -m 0755 /var/www/yerbas-explorer-sync
+cat > /var/www/yerbas-explorer-sync/index.html <<'EOF'
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="refresh" content="60">
+  <meta name="theme-color" content="#07110b">
+  <title>Yerbas Explorer Light · Core Syncing</title>
+  <style>
+    :root{color-scheme:dark;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;color:#edf8ef;
+    background:radial-gradient(circle at 70% 10%,rgba(77,149,96,.17),transparent 32rem),#07110b}
+    main{width:min(760px,calc(100% - 34px));border:1px solid rgba(164,255,178,.18);padding:clamp(28px,7vw,68px);
+    background:rgba(11,23,16,.82);box-shadow:0 32px 90px rgba(0,0,0,.35)}
+    .signal{display:flex;align-items:center;gap:10px;color:#8df19e;font-size:11px;letter-spacing:.14em}
+    .dot{width:8px;height:8px;border-radius:50%;background:#8df19e;box-shadow:0 0 18px #8df19e}
+    h1{font-family:system-ui,sans-serif;font-size:clamp(40px,9vw,74px);line-height:.94;letter-spacing:-.055em;margin:26px 0 20px}
+    p{color:#9db1a2;line-height:1.7;max-width:620px}strong{color:#b5ffc0}
+    .rail{margin:30px 0 16px;height:3px;background:rgba(164,255,178,.09);overflow:hidden}
+    .rail:after{content:"";display:block;width:32%;height:100%;background:#8df19e;animation:scan 2.2s ease-in-out infinite}
+    .meta{display:flex;gap:14px;flex-wrap:wrap;color:#6f8876;font-size:10px;letter-spacing:.1em}
+    @keyframes scan{0%{transform:translateX(-105%)}100%{transform:translateX(420%)}}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="signal"><span class="dot"></span><span>YERBAS MAINNET · CORE STARTING</span></div>
+    <h1>Loading the chain.</h1>
+    <p><strong>Yerbas Explorer Light is installed.</strong> Yerbas Core is loading and synchronizing the blockchain first so the explorer starts from authoritative chain data.</p>
+    <div class="rail"></div>
+    <div class="meta"><span>RPC-FIRST</span><span>DATABASE 0</span><span>AUTO-REFRESH 60S</span></div>
+  </main>
+</body>
+</html>
+EOF
+
+if [[ "$DOMAIN" == "_" ]]; then
+  SYNC_LISTEN_LINE="listen 80 default_server;"
+else
+  SYNC_LISTEN_LINE="listen 80;"
+fi
+
+cat > /etc/nginx/sites-available/yerbas-explorer-light <<EOF
+server {
+    $SYNC_LISTEN_LINE
+    server_name $DOMAIN;
+    root /var/www/yerbas-explorer-sync;
+    index index.html;
+
+    location / {
+        try_files \$uri /index.html;
+    }
+}
+EOF
+
+rm -f /etc/nginx/sites-enabled/default
+ln -sfn /etc/nginx/sites-available/yerbas-explorer-light /etc/nginx/sites-enabled/yerbas-explorer-light
+nginx -t
+systemctl enable --now nginx
+systemctl reload nginx
+
+log "Temporary website is online while Yerbas Core synchronizes"
+
 log "Waiting for Yerbas Core RPC to become available"
 CORE_RPC_READY=0
 for attempt in $(seq 1 900); do
@@ -972,6 +1039,8 @@ if (( HTTPS )); then
     --email "$EMAIL" \
     -d "$DOMAIN"
 fi
+
+rm -rf /var/www/yerbas-explorer-sync
 
 log "Running final local checks"
 systemctl is-active --quiet yerbasd \
