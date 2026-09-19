@@ -36,7 +36,7 @@ Returns the protocol version, tool schemas, endpoint locations, Core index recom
 ### Status
 
 \`\`\`http
-GET /api/ai/status
+GET /api/ai/v1/status
 GET /ext/ai/status
 \`\`\`
 
@@ -45,15 +45,15 @@ The \`/ext/ai/status\` route is a compatibility alias for earlier Yerbas AI prot
 ### Tools
 
 \`\`\`http
-GET /api/ai/tools
+GET /api/ai/v1/tools
 \`\`\`
 
-Returns the machine-readable tool definitions.
+Returns the machine-readable tool definitions. The unversioned `/api/ai/tools` route is a compatibility alias.
 
 ## Tool invocation
 
 \`\`\`http
-POST /api/ai/query
+POST /api/ai/v1/query
 Content-Type: application/json
 \`\`\`
 
@@ -316,7 +316,7 @@ curl -s http://127.0.0.1:3001/.well-known/yerbas-ai.json | python3 -m json.tool
 Status:
 
 \`\`\`bash
-curl -s http://127.0.0.1:3001/api/ai/status | python3 -m json.tool
+curl -s http://127.0.0.1:3001/api/ai/v1/status | python3 -m json.tool
 \`\`\`
 
 Network summary:
@@ -325,7 +325,7 @@ Network summary:
 curl -s \
   -H 'Content-Type: application/json' \
   -d '{"tool":"get_network_summary","arguments":{}}' \
-  http://127.0.0.1:3001/api/ai/query | python3 -m json.tool
+  http://127.0.0.1:3001/api/ai/v1/query | python3 -m json.tool
 \`\`\`
 
 69,000 YERB Smartnodes:
@@ -334,7 +334,7 @@ curl -s \
 curl -s \
   -H 'Content-Type: application/json' \
   -d '{"tool":"get_smartnodes_by_collateral","arguments":{"amount":69000}}' \
-  http://127.0.0.1:3001/api/ai/query | python3 -m json.tool
+  http://127.0.0.1:3001/api/ai/v1/query | python3 -m json.tool
 \`\`\`
 
 Address:
@@ -343,7 +343,7 @@ Address:
 curl -s \
   -H 'Content-Type: application/json' \
   -d '{"tool":"get_address","arguments":{"address":"<address>"}}' \
-  http://127.0.0.1:3001/api/ai/query | python3 -m json.tool
+  http://127.0.0.1:3001/api/ai/v1/query | python3 -m json.tool
 \`\`\`
 
 ## Future adapters
