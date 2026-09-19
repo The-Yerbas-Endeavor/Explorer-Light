@@ -337,7 +337,7 @@ EOF
   fi
 
   local ssh_port
-  ssh_port="$(sshd -T 2>/dev/null | awk '$1 == "port" {print $2; exit}')"
+  ssh_port="$(sshd -T 2>/dev/null | awk '$1 == "port" {port=$2} END {if (port != "") print port}')"
   [[ "$ssh_port" =~ ^[0-9]+$ ]] || ssh_port=22
 
   ufw --force reset >/dev/null
