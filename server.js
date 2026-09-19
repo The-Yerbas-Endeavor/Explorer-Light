@@ -3,6 +3,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { AiToolError, AI_API_VERSION, AI_PROTOCOL, AI_TOOL_DEFINITIONS, createAiGateway } from './src/ai.js';
 import { config } from './src/config.js';
 import { RpcError, YerbasRpc } from './src/rpc.js';
 import { classifySearchInput } from './src/search.js';
@@ -45,8 +46,54 @@ function cached(key, ttl, producer) {
   return promise;
 }
 
+const ai = createAiGateway({
+  rpc,
+  cached,
+  marketPriceUrl: config.ai.marketPriceUrl
+});
+
 function isHash(value) {
   return /^[0-9a-fA-F]{64}$/.test(value);
+}
+
+function isAiPath(pathname) {
+  return pathname === '/.well-known/yerbas-ai.json'
+    || pathname === '/api/ai/status'
+    || pathname === '/api/ai/tools'
+    || pathname === '/api/ai/query'
+    || pathname === '/ext/ai/status'
+    || pathname === '/ext/ai/query';
+}
+
+function isAiQueryPath(pathname) {
+  return pathname === '/api/ai/query' || pathname === '/ext/ai/query';
+}
+
+async function readJsonBody(req, maxBytes) {
+  const chunks = [];
+  let total = 0;
+
+  for await (const chunk of req) {
+    total += chunk.length;
+    if (total > maxBytes) {
+      throw new AiToolError('AI query body exceeds the configured size limit.', {
+        code: 'BODY_TOO_LARGE',
+        status: 413
+      });
+    }
+    chunks.push(chunk);
+  }
+
+  if (!chunks.length) return {};
+
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  } catch {
+    throw new AiToolError('AI query body must contain valid JSON.', {
+      code: 'INVALID_JSON',
+      status: 400
+    });
+  }
 }
 
 async function blockHashFromIdentifier(identifier) {
@@ -105,6 +152,52 @@ async function recentBlocks(limit) {
     difficulty: block.difficulty,
     previousBlockHash: block.previousblockhash ?? null
   }));
+}
+
+async function handleAi(req, res, url) {
+  if (!config.ai.enabled) {
+    return sendJson(res, 404, { error: 'Not found.' });
+  }
+
+  if (url.pathname === '/.well-known/yerbas-ai.json') {
+    if (!['GET', 'HEAD'].includes(req.method || '')) {
+      return sendJson(res, 405, { error: 'Method not allowed.' });
+    }
+    return sendJson(res, 200, ai.manifest());
+  }
+
+  if (url.pathname === '/api/ai/status' || url.pathname === '/ext/ai/status') {
+    if (!['GET', 'HEAD'].includes(req.method || '')) {
+      return sendJson(res, 405, { error: 'Method not allowed.' });
+    }
+    return sendJson(res, 200, await ai.status());
+  }
+
+  if (url.pathname === '/api/ai/tools') {
+    if (!['GET', 'HEAD'].includes(req.method || '')) {
+      return sendJson(res, 405, { error: 'Method not allowed.' });
+    }
+    return sendJson(res, 200, {
+      protocol: AI_PROTOCOL,
+      version: AI_API_VERSION,
+      readOnly: true,
+      tools: AI_TOOL_DEFINITIONS
+    });
+  }
+
+  if (isAiQueryPath(url.pathname)) {
+    if (req.method !== 'POST') {
+      return sendJson(res, 405, { error: 'Method not allowed. AI tool invocation requires POST.' });
+    }
+
+    const body = await readJsonBody(req, config.ai.maxBodyBytes);
+    const tool = body.tool || body.name || (typeof body.query === 'string' ? body.query : '');
+    const args = body.arguments || body.args || body.params || {};
+    const result = await ai.invoke(tool, args);
+    return sendJson(res, 200, result);
+  }
+
+  return sendJson(res, 404, { error: 'AI route not found.' });
 }
 
 async function handleApi(req, res, url) {
@@ -194,7 +287,7 @@ async function handleApi(req, res, url) {
           type: 'address',
           target: classified.value,
           supported: false,
-          message: 'This is a valid Yerbas address. Address history is intentionally not indexed in the RPC-only test build.'
+          message: 'This is a valid Yerbas address. Enable Core addressindex=1 to expose address history through the AI gateway without an explorer database.'
         });
       }
     } catch {
@@ -225,11 +318,16 @@ async function sendFile(req, res, fileName, contentType, cacheControl = 'public,
 
 async function requestHandler(req, res) {
   try {
+    const url = new URL(req.url || '/', 'http://localhost');
+
+    if (isAiPath(url.pathname)) {
+      return await handleAi(req, res, url);
+    }
+
     if (!['GET', 'HEAD'].includes(req.method || '')) {
       return sendJson(res, 405, { error: 'Method not allowed.' });
     }
 
-    const url = new URL(req.url || '/', 'http://localhost');
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
 
     const staticFile = staticFiles.get(url.pathname);
@@ -241,6 +339,16 @@ async function requestHandler(req, res) {
 
     return sendJson(res, 404, { error: 'Page not found.' });
   } catch (error) {
+    if (error instanceof AiToolError) {
+      return sendJson(res, error.status, {
+        ok: false,
+        error: {
+          code: error.code,
+          message: error.message
+        }
+      });
+    }
+
     const isRpc = error instanceof RpcError;
     const notFound = isRpc && [-5, -8].includes(error.code);
     const status = notFound ? 404 : (isRpc ? 502 : 500);
@@ -257,6 +365,7 @@ server.listen(config.port, config.host, () => {
   console.log('Yerbas Explorer Light listening on http://' + config.host + ':' + config.port);
   console.log('Yerbas RPC target: ' + config.rpc.protocol + '://' + config.rpc.host + ':' + config.rpc.port);
   console.log('Database: disabled (RPC-only mode)');
+  console.log('AI gateway: ' + (config.ai.enabled ? 'enabled (read-only)' : 'disabled'));
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
