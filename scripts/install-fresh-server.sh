@@ -315,10 +315,14 @@ bantime = 1h
 EOF
   systemctl enable --now fail2ban
 
+  local ssh_port
+  ssh_port="$(sshd -T 2>/dev/null | awk '$1 == "port" {print $2; exit}')"
+  [[ "$ssh_port" =~ ^[0-9]+$ ]] || ssh_port=22
+
   ufw --force reset >/dev/null
   ufw default deny incoming
   ufw default allow outgoing
-  ufw allow OpenSSH
+  ufw allow "$ssh_port/tcp" comment 'SSH'
   ufw allow 80/tcp
   ufw allow 443/tcp
   ufw allow 15420/tcp comment 'Yerbas P2P' || true
@@ -849,6 +853,7 @@ fi
 echo
 echo "Security:"
 echo "  UFW is enabled with inbound deny-by-default."
+echo "  Only SSH, HTTP/HTTPS, and Yerbas P2P 15420/tcp are opened."
 echo "  Fail2ban SSH protection and unattended security updates are enabled."
 echo "  Yerbas RPC is bound to 127.0.0.1 only."
 echo "  Explorer Light is bound to 127.0.0.1 behind nginx."
