@@ -397,10 +397,22 @@ async function handleApi(req, res, url) {
         });
       }
     } catch {
-      // Older nodes may not expose validateaddress. Fall through to a normal not-found response.
+      // Older nodes may not expose validateaddress. Continue to asset lookup.
     }
 
-    return sendJson(res, 404, { error: 'No block, transaction, or valid Yerbas address matched that search.' });
+    try {
+      const asset = await rpc.call('getassetdata', [classified.value]);
+      if (asset && typeof asset === 'object' && asset.name) {
+        return sendJson(res, 200, {
+          type: 'asset',
+          target: asset.name
+        });
+      }
+    } catch {
+      // Not an asset. Fall through to the normal not-found response.
+    }
+
+    return sendJson(res, 404, { error: 'No block, transaction, Yerbas address, or asset matched that search.' });
   }
 
   return sendJson(res, 404, { error: 'API route not found.' });
