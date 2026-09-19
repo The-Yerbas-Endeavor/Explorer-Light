@@ -587,6 +587,154 @@ async function renderAsset(name) {
     '</section>';
 }
 
+function shortService(value) {
+  return value || '—';
+}
+
+function smartnodeStatusClass(status) {
+  if (status === 'ENABLED') return 'status-enabled';
+  if (status === 'POSE_BANNED') return 'status-banned';
+  return 'status-unknown';
+}
+
+function smartnodeListHref(params, page) {
+  const next = new URLSearchParams();
+  const q = (params.get('q') || '').trim();
+  const status = params.get('status') || 'ENABLED';
+  const collateral = params.get('collateral') || '';
+  const sort = params.get('sort') || 'last-paid';
+
+  if (q) next.set('q', q);
+  if (status && status !== 'ENABLED') next.set('status', status);
+  if (collateral) next.set('collateral', collateral);
+  if (sort && sort !== 'last-paid') next.set('sort', sort);
+  if (page > 1) next.set('page', String(page));
+
+  const query = next.toString();
+  return '/smartnodes' + (query ? '?' + query : '');
+}
+
+async function renderSmartnodes() {
+  renderLoading('Reading active smartnodes from Yerbas Core');
+
+  const params = new URLSearchParams(location.search);
+  const request = new URLSearchParams({
+    q: (params.get('q') || '').trim(),
+    status: params.get('status') || 'ENABLED',
+    collateral: params.get('collateral') || '',
+    sort: params.get('sort') || 'last-paid',
+    page: String(Math.max(1, Number.parseInt(params.get('page') || '1', 10) || 1)),
+    count: '50'
+  });
+
+  const data = await api('/api/smartnodes?' + request.toString());
+  setRpcState('online', 'Core online');
+  document.title = 'Yerbas Smartnodes · Explorer Light';
+
+  const collateralOptions = Object.entries(data.collateralCounts || {})
+    .filter(([amount]) => amount !== 'unknown')
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([amount, count]) =>
+      '<option value="' + esc(amount) + '"' +
+      (request.get('collateral') === amount ? ' selected' : '') +
+      '>' + number(amount) + ' YERB (' + number(count) + ')</option>'
+    ).join('');
+
+  const rows = data.items.length
+    ? data.items.map((node) => {
+        const paid = Number(node.lastPaidTime || 0);
+        const registered = Number(node.registeredTime || 0);
+        const payout = node.payoutAddress
+          ? '<a class="mono" href="/address/' + encodeURIComponent(node.payoutAddress) + '">' + esc(node.payoutAddress) + '</a>'
+          : '<span class="muted">—</span>';
+
+        return '<tr>' +
+          '<td>' + (node.paymentAgeRank === null ? '—' : number(node.paymentAgeRank)) + '</td>' +
+          '<td><span class="mono">' + esc(shortService(node.service)) + '</span>' +
+            '<div class="row-sub mono">' + esc(compactHash(node.proTxHash || node.outpoint)) + '</div></td>' +
+          '<td>' + payout + '</td>' +
+          '<td>' + (node.collateralAmount === null ? '—' : number(node.collateralAmount) + ' YERB') + '</td>' +
+          '<td>' + (paid > 0 ? esc(isoTime(paid)) : 'Never') + '</td>' +
+          '<td>' + number(node.lastPaidBlock) + '</td>' +
+          '<td>' + number(node.PoSePenalty) + '</td>' +
+          '<td>' + (Number(node.PoSeBanHeight) >= 0 ? number(node.PoSeBanHeight) : '—') + '</td>' +
+          '<td>' + (registered > 0
+            ? esc(isoTime(registered))
+            : (node.registeredHeight !== null ? 'Block ' + number(node.registeredHeight) : '—')) + '</td>' +
+          '<td><span class="smartnode-status ' + smartnodeStatusClass(node.status) + '">' + esc(node.status) + '</span></td>' +
+        '</tr>';
+      }).join('')
+    : '<tr><td colspan="10" class="muted">No smartnodes matched these filters.</td></tr>';
+
+  const pageLinks =
+    '<div class="asset-pagination">' +
+      (data.page > 1
+        ? '<a class="text-link" href="' + smartnodeListHref(params, data.page - 1) + '">← Previous</a>'
+        : '<span></span>') +
+      '<span class="page-status">Page ' + number(data.page) + ' of ' + number(data.totalPages) + '</span>' +
+      (data.page < data.totalPages
+        ? '<a class="text-link" href="' + smartnodeListHref(params, data.page + 1) + '">Next →</a>'
+        : '<span></span>') +
+    '</div>';
+
+  const cards = [
+    metricCard('01', 'Active smartnodes', number(data.network?.enabled), 'ENABLED at current chain tip'),
+    metricCard('02', 'Registered total', number(data.network?.total), 'deterministic smartnodes'),
+    metricCard('03', 'PoSe banned', number(data.network?.poseBanned), 'current Core state'),
+    metricCard('04', 'Protocol', data.protocolVersion === null ? '—' : number(data.protocolVersion), 'local Core network protocol')
+  ].join('');
+
+  app.innerHTML =
+    '<section class="detail-hero smartnode-hero">' +
+      '<div class="detail-kicker">Yerbas deterministic smartnode network</div>' +
+      '<h2>Yerbas Smartnodes</h2>' +
+      '<div class="detail-hash">A listing of smartnodes known to Yerbas Core. The default view shows nodes currently reported as ENABLED.</div>' +
+      '<div class="detail-actions"><a class="text-link" href="/">← Back to live chain</a></div>' +
+    '</section>' +
+
+    '<section class="metric-strip">' + cards + '</section>' +
+
+    '<section class="panel">' +
+      '<div class="asset-toolbar smartnode-toolbar">' +
+        '<div><p class="eyebrow">SMARTNODE DIRECTORY</p><h2>' + number(data.total) + ' matching nodes</h2></div>' +
+        '<form class="asset-filter-grid smartnode-filter" action="/smartnodes" method="get" role="search">' +
+          '<input name="q" value="' + esc(request.get('q')) + '" autocomplete="off" spellcheck="false" placeholder="IP, payout address, ProTx hash…">' +
+          '<select name="status" aria-label="Status">' +
+            '<option value="ENABLED"' + (request.get('status') === 'ENABLED' ? ' selected' : '') + '>Active / ENABLED</option>' +
+            '<option value="ALL"' + (request.get('status') === 'ALL' ? ' selected' : '') + '>All statuses</option>' +
+            '<option value="POSE_BANNED"' + (request.get('status') === 'POSE_BANNED' ? ' selected' : '') + '>PoSe banned</option>' +
+          '</select>' +
+          '<select name="collateral" aria-label="Collateral">' +
+            '<option value="">All collateral</option>' + collateralOptions +
+          '</select>' +
+          '<select name="sort" aria-label="Sort">' +
+            '<option value="last-paid"' + (request.get('sort') === 'last-paid' ? ' selected' : '') + '>Oldest last-paid first</option>' +
+            '<option value="registered"' + (request.get('sort') === 'registered' ? ' selected' : '') + '>Registration height</option>' +
+            '<option value="collateral-desc"' + (request.get('sort') === 'collateral-desc' ? ' selected' : '') + '>Collateral: high to low</option>' +
+            '<option value="service"' + (request.get('sort') === 'service' ? ' selected' : '') + '>Service / IP</option>' +
+          '</select>' +
+          '<button type="submit">Filter</button>' +
+        '</form>' +
+      '</div>' +
+
+      '<div class="smartnode-note">' +
+        '<strong>Pay age rank</strong> is an informational ordering by oldest last-paid block among currently ENABLED nodes. ' +
+        'It is not a prediction of the next payment winner.' +
+      '</div>' +
+
+      '<div class="table-wrap">' +
+        '<table class="smartnode-table">' +
+          '<thead><tr>' +
+            '<th>Pay age</th><th>Service / ProTx</th><th>Payout address</th><th>Collateral</th>' +
+            '<th>Last paid</th><th>Paid block</th><th>PoSe</th><th>Ban height</th><th>Registered</th><th>Status</th>' +
+          '</tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
+      '</div>' +
+      pageLinks +
+    '</section>';
+}
+
 async function renderTransaction(txid) {
   renderLoading('Resolving transaction from Yerbas Core');
 
@@ -674,6 +822,10 @@ async function route() {
 
     if (parts[0] === 'asset' && parts[1]) {
       return await renderAsset(decodeURIComponent(parts.slice(1).join('/')));
+    }
+
+    if (parts[0] === 'smartnodes' || parts[0] === 'masternodes') {
+      return await renderSmartnodes();
     }
 
     return await renderHome();
