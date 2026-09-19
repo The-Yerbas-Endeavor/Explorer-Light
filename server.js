@@ -356,6 +356,177 @@ async function allSmartnodes() {
   return { total: first.total, items };
 }
 
+async function loadLiveSmartnodes() {
+  return cached('smartnodes:live-directory', 15000, async () => {
+    const [listResult, protxResult, countResult, networkResult] = await Promise.all([
+      rpc.call('smartnodelist', ['json']),
+      rpc.call('protx', ['list', 'registered', true]),
+      rpc.call('smartnode', ['count']).catch(() => null),
+      rpc.call('getnetworkinfo').catch(() => null)
+    ]);
+
+    const detailed = Array.isArray(protxResult) ? protxResult : [];
+    const byHash = new Map(detailed.map((item) => [String(item?.proTxHash || ''), item]));
+
+    const items = Object.entries(listResult || {}).map(([outpoint, row]) => {
+      const protx = byHash.get(String(row?.proTxHash || '')) || null;
+      const state = protx?.state || {};
+      const poseBanHeight = state.PoSeBanHeight ?? state.poseBanHeight ?? -1;
+
+      return {
+        outpoint,
+        proTxHash: row?.proTxHash ?? protx?.proTxHash ?? null,
+        service: row?.address ?? state.service ?? null,
+        payoutAddress: row?.payee ?? state.payoutAddress ?? null,
+        ownerAddress: row?.owneraddress ?? state.ownerAddress ?? null,
+        votingAddress: row?.votingaddress ?? state.votingAddress ?? null,
+        collateralAddress: row?.collateraladdress ?? protx?.collateralAddress ?? null,
+        collateralAmount: protx?.collateralAmount ?? null,
+        pubKeyOperator: row?.pubkeyoperator ?? state.pubKeyOperator ?? null,
+        status: row?.status ?? (poseBanHeight !== -1 ? 'POSE_BANNED' : 'UNKNOWN'),
+        lastPaidTime: row?.lastpaidtime ?? null,
+        lastPaidBlock: row?.lastpaidblock ?? state.lastPaidHeight ?? null,
+        registeredHeight: state.registeredHeight ?? null,
+        PoSePenalty: state.PoSePenalty ?? null,
+        PoSeRevivedHeight: state.PoSeRevivedHeight ?? null,
+        PoSeBanHeight: poseBanHeight,
+        confirmations: protx?.confirmations ?? null,
+        needToUpgrade: Boolean(protx?.needToUpgrade)
+      };
+    });
+
+    const total = typeof countResult === 'object' && countResult !== null
+      ? Number(countResult.total ?? items.length)
+      : items.length;
+    const enabled = typeof countResult === 'object' && countResult !== null
+      ? Number(countResult.enabled ?? items.filter((item) => item.status === 'ENABLED').length)
+      : items.filter((item) => item.status === 'ENABLED').length;
+
+    return {
+      generatedAt: new Date().toISOString(),
+      protocolVersion: networkResult?.protocolversion ?? null,
+      total,
+      enabled,
+      poseBanned: items.filter((item) => item.status === 'POSE_BANNED').length,
+      items
+    };
+  });
+}
+
+async function smartnodeRegisteredTimes(items) {
+  const heights = [...new Set(items
+    .map((item) => Number(item.registeredHeight))
+    .filter((height) => Number.isSafeInteger(height) && height >= 0))];
+
+  if (!heights.length) return new Map();
+
+  try {
+    const hashes = await rpc.batch(heights.map((height) => ({ method: 'getblockhash', params: [height] })));
+    const blocks = await rpc.batch(hashes.map((hash) => ({ method: 'getblock', params: [hash, 1] })));
+    return new Map(heights.map((height, index) => [height, blocks[index]?.time ?? null]));
+  } catch {
+    return new Map();
+  }
+}
+
+async function smartnodeDirectory(url) {
+  const live = await loadLiveSmartnodes();
+  const query = (url.searchParams.get('q') || '').trim().toLowerCase();
+  const status = (url.searchParams.get('status') || 'ENABLED').trim().toUpperCase();
+  const collateral = (url.searchParams.get('collateral') || '').trim();
+  const sort = (url.searchParams.get('sort') || 'last-paid').trim().toLowerCase();
+  const count = apiInt(url.searchParams.get('count'), 50, 1, 100);
+  const page = apiInt(url.searchParams.get('page'), 1, 1, 1000000);
+
+  let items = [...live.items];
+
+  if (status && status !== 'ALL') {
+    items = items.filter((item) => item.status === status);
+  }
+
+  if (collateral) {
+    const amount = Number(collateral);
+    if (Number.isFinite(amount)) {
+      items = items.filter((item) => Number(item.collateralAmount) === amount);
+    }
+  }
+
+  if (query) {
+    items = items.filter((item) => [
+      item.proTxHash,
+      item.outpoint,
+      item.service,
+      item.payoutAddress,
+      item.ownerAddress,
+      item.votingAddress,
+      item.collateralAddress
+    ].some((value) => String(value || '').toLowerCase().includes(query)));
+  }
+
+  items.sort((a, b) => {
+    if (sort === 'registered') {
+      return Number(a.registeredHeight ?? Number.MAX_SAFE_INTEGER) - Number(b.registeredHeight ?? Number.MAX_SAFE_INTEGER);
+    }
+    if (sort === 'collateral-desc') {
+      return Number(b.collateralAmount || 0) - Number(a.collateralAmount || 0);
+    }
+    if (sort === 'service') {
+      return String(a.service || '').localeCompare(String(b.service || ''));
+    }
+    const aPaid = Number(a.lastPaidBlock || 0);
+    const bPaid = Number(b.lastPaidBlock || 0);
+    return aPaid - bPaid;
+  });
+
+  const total = items.length;
+  const totalPages = Math.max(1, Math.ceil(total / count));
+  const safePage = Math.min(page, totalPages);
+  const start = (safePage - 1) * count;
+  const pageItems = items.slice(start, start + count);
+  const registeredTimes = await smartnodeRegisteredTimes(pageItems);
+
+  const queueRanks = new Map();
+  live.items
+    .filter((item) => item.status === 'ENABLED')
+    .sort((a, b) => Number(a.lastPaidBlock || 0) - Number(b.lastPaidBlock || 0))
+    .forEach((item, index) => queueRanks.set(item.proTxHash || item.outpoint, index + 1));
+
+  const collateralCounts = {};
+  for (const item of live.items.filter((entry) => entry.status === 'ENABLED')) {
+    const key = item.collateralAmount === null || item.collateralAmount === undefined
+      ? 'unknown'
+      : String(item.collateralAmount);
+    collateralCounts[key] = (collateralCounts[key] || 0) + 1;
+  }
+
+  return {
+    generatedAt: live.generatedAt,
+    protocolVersion: live.protocolVersion,
+    network: {
+      total: live.total,
+      enabled: live.enabled,
+      poseBanned: live.poseBanned
+    },
+    collateralCounts,
+    filters: {
+      q: url.searchParams.get('q') || '',
+      status,
+      collateral,
+      sort
+    },
+    page: safePage,
+    count,
+    total,
+    totalPages,
+    returned: pageItems.length,
+    items: pageItems.map((item) => ({
+      ...item,
+      paymentAgeRank: queueRanks.get(item.proTxHash || item.outpoint) ?? null,
+      registeredTime: registeredTimes.get(Number(item.registeredHeight)) ?? null
+    }))
+  };
+}
+
 async function addressData(address, txLimit = 100, utxoLimit = 100) {
   const result = await ai.invoke('get_address', {
     address,
@@ -386,7 +557,7 @@ async function handlePublicApi(req, res, url) {
         asset: '/api/v1/asset/:asset-name',
         supply: '/api/v1/supply',
         emission: '/api/v1/emission?height=',
-        smartnodes: '/api/v1/smartnodes?limit=100&offset=0',
+        smartnodes: '/api/v1/smartnodes?status=ENABLED&page=1&count=50&collateral=&q=',
         peers: '/api/v1/network/peers',
         marketPrice: '/api/v1/market-price'
       }
@@ -404,7 +575,7 @@ async function handlePublicApi(req, res, url) {
   }
 
   if (path === '/api/v1/smartnodes') {
-    return sendJson(res, 200, await smartnodeData(url));
+    return sendJson(res, 200, await smartnodeDirectory(url));
   }
 
   if (path === '/api/v1/network/peers') {
@@ -629,6 +800,10 @@ async function handleApi(req, res, url) {
       }
       throw error;
     }
+  }
+
+  if (url.pathname === '/api/smartnodes') {
+    return sendJson(res, 200, await smartnodeDirectory(url));
   }
 
   if (url.pathname === '/api/assets/stats') {
@@ -880,7 +1055,9 @@ async function requestHandler(req, res) {
       || url.pathname.startsWith('/tx/')
       || url.pathname.startsWith('/address/')
       || url.pathname === '/assets'
-      || url.pathname.startsWith('/asset/')) {
+      || url.pathname.startsWith('/asset/')
+      || url.pathname === '/smartnodes'
+      || url.pathname === '/masternodes') {
       return await sendFile(req, res, 'index.html', 'text/html; charset=utf-8', 'no-cache');
     }
 
