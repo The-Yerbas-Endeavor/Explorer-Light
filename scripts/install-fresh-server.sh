@@ -932,6 +932,12 @@ CACHE_MS=5000
 # Read-only Yerbas AI gateway.
 AI_API_ENABLED=true
 AI_MAX_BODY_BYTES=32768
+
+# Approximate network map geolocation. Requests are made server-side and cached.
+NETWORK_MAP_ENABLED=true
+NETWORK_MAP_GEO_URL=https://hackmyip.com/api/bulk
+NETWORK_MAP_GEO_CACHE_MS=86400000
+NETWORK_MAP_GEO_TIMEOUT_MS=12000
 EOF
 
 log "Validating Explorer Light as $ADMIN_USER"
