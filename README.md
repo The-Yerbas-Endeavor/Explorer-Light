@@ -31,6 +31,8 @@ server=1
 txindex=1
 addressindex=1
 assetindex=1
+spentindex=1
+timestampindex=1
 rpcbind=127.0.0.1
 rpcallowip=127.0.0.1
 \`\`\`
@@ -86,6 +88,9 @@ Useful installer options:
 --domain NAME
 --https
 --email ADDRESS
+--source-build
+--skip-bootstrap
+--keep-downloads
 \`\`\`
 
 On small servers, the installer automatically limits parallel Core compilation according to available RAM and creates a 2 GiB swapfile when memory is below 4 GiB and no meaningful swap exists.
