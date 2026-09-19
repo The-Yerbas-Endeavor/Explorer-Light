@@ -30,6 +30,7 @@
 
       <div class="header-actions">
         <a class="header-link assets-link" href="/assets">Assets</a>
+        <a class="header-link assets-link" href="/smartnodes">Smartnodes</a>
         <a class="header-link" href="/">Explorer</a>
         <span class="rpc-state online">
           <span class="rpc-dot" aria-hidden="true"></span>
@@ -80,7 +81,7 @@
         <article class="api-row"><div><code>GET /api/v1/asset/:asset-name</code><p>Asset metadata, issuance block, holder count, and indexed holder balances.</p></div><span>path parameter</span></article>
         <article class="api-row"><div><code>GET /api/v1/supply</code><p>UTXO-set supply data from <code>gettxoutsetinfo</code>.</p></div><a href="/api/v1/supply">Try</a></article>
         <article class="api-row"><div><code>GET /api/v1/emission?height=</code><p>Block subsidy/emission details; defaults to the current tip.</p></div><a href="/api/v1/emission">Try</a></article>
-        <article class="api-row"><div><code>GET /api/v1/smartnodes?limit=100&amp;offset=0</code><p>Registered smartnodes with optional status and collateral filters.</p></div><a href="/api/v1/smartnodes?limit=25">Try</a></article>
+        <article class="api-row"><div><code>GET /api/v1/smartnodes?status=ENABLED&amp;page=1&amp;count=50&amp;collateral=&amp;q=</code><p>Live deterministic smartnode directory merged from Core smartnodelist and ProTx data. Defaults to active/ENABLED nodes.</p></div><a href="/api/v1/smartnodes?status=ENABLED&count=25">Try</a></article>
         <article class="api-row"><div><code>GET /api/v1/network/peers</code><p>Current peer connections reported by this Yerbas Core node.</p></div><a href="/api/v1/network/peers">Try</a></article>
         <article class="api-row"><div><code>GET /api/v1/market-price</code><p>Configured external market-price feed. Returns unavailable until a feed is configured.</p></div><a href="/api/v1/market-price">Try</a></article>
       </div>
@@ -161,6 +162,7 @@
     <div class="footer-meta">
       <a href="/">EXPLORER</a>
       <a href="/assets">ASSETS</a>
+      <a href="/smartnodes">SMARTNODES</a>
       <a href="/api/v1">API JSON</a>
     </div>
   </footer>
