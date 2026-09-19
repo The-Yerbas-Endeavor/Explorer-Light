@@ -38,6 +38,7 @@ KEEP_DOWNLOADS=0
 JOBS=""
 ADMIN_USER="yerbasadmin"
 SSH_HARDENED=0
+CORE_SYNC_TIMEOUT_SECONDS="${CORE_SYNC_TIMEOUT_SECONDS:-10800}"
 
 CORE_REPO="https://github.com/The-Yerbas-Endeavor/yerbas.git"
 CORE_RELEASE_API="https://api.github.com/repos/The-Yerbas-Endeavor/yerbas/releases/latest"
@@ -751,7 +752,71 @@ done
 
 (( CORE_RPC_READY )) || die "Yerbas Core RPC did not become ready. Check: journalctl -u yerbasd -n 100 --no-pager"
 
-log "Yerbas Core RPC is ready"
+log "Yerbas Core RPC is responding"
+jq '{
+  chain,
+  blocks,
+  headers,
+  bestblockhash,
+  verificationprogress,
+  initialblockdownload
+}' "$WORKDIR/blockchaininfo.json" || cat "$WORKDIR/blockchaininfo.json"
+
+log "Waiting for Yerbas Core to finish blockchain synchronization before installing Explorer Light"
+log "This can take an hour or more after loading the bootstrap; timeout is $CORE_SYNC_TIMEOUT_SECONDS seconds."
+
+SYNC_STARTED="$(date +%s)"
+SYNC_LAST_REPORT=0
+CORE_SYNC_READY=0
+
+while true; do
+  if sudo -u "$CORE_USER" /usr/local/bin/yerbas-cli \
+      -datadir="$CORE_DATA" \
+      -conf="$CORE_DATA/yerbas.conf" \
+      getblockchaininfo > "$WORKDIR/blockchaininfo.json" 2>/dev/null; then
+
+    BLOCKS="$(jq -r '.blocks // 0' "$WORKDIR/blockchaininfo.json")"
+    HEADERS="$(jq -r '.headers // 0' "$WORKDIR/blockchaininfo.json")"
+    VERIFY="$(jq -r '.verificationprogress // 0' "$WORKDIR/blockchaininfo.json")"
+
+    CONNECTIONS="$(sudo -u "$CORE_USER" /usr/local/bin/yerbas-cli \
+      -datadir="$CORE_DATA" \
+      -conf="$CORE_DATA/yerbas.conf" \
+      getconnectioncount 2>/dev/null || printf '0')"
+
+    SYNC_NOW="$(date +%s)"
+    SYNC_ELAPSED=$(( SYNC_NOW - SYNC_STARTED ))
+
+    if (( SYNC_ELAPSED - SYNC_LAST_REPORT >= 60 )); then
+      VERIFY_PERCENT="$(awk -v p="$VERIFY" 'BEGIN { printf "%.4f", p * 100 }')"
+      printf '[Explorer-Light] Core sync: blocks=%s headers=%s verification=%s%% peers=%s elapsed=%ss\n' \
+        "$BLOCKS" "$HEADERS" "$VERIFY_PERCENT" "$CONNECTIONS" "$SYNC_ELAPSED"
+      SYNC_LAST_REPORT="$SYNC_ELAPSED"
+    fi
+
+    # A newly loaded bootstrap can report blocks == headers before it has
+    # connected to peers. Require peers plus near-complete verification so the
+    # explorer is never brought online against a stale bootstrap tip.
+    if [[ "$BLOCKS" =~ ^[0-9]+$ && "$HEADERS" =~ ^[0-9]+$ && "$CONNECTIONS" =~ ^[0-9]+$ ]]; then
+      VERIFY_READY="$(awk -v p="$VERIFY" 'BEGIN { print (p >= 0.99999) ? 1 : 0 }')"
+      if (( BLOCKS >= HEADERS && CONNECTIONS > 0 && VERIFY_READY == 1 )); then
+        CORE_SYNC_READY=1
+        break
+      fi
+    fi
+  else
+    SYNC_NOW="$(date +%s)"
+    SYNC_ELAPSED=$(( SYNC_NOW - SYNC_STARTED ))
+  fi
+
+  if (( SYNC_ELAPSED >= CORE_SYNC_TIMEOUT_SECONDS )); then
+    die "Yerbas Core did not finish synchronizing within $CORE_SYNC_TIMEOUT_SECONDS seconds. Leave yerbasd running and re-run the installer later."
+  fi
+
+  sleep 15
+done
+
+log "Yerbas Core blockchain synchronization is ready"
 jq '{
   chain,
   blocks,
@@ -900,13 +965,34 @@ systemctl is-active --quiet yerbas-explorer-light \
 systemctl is-active --quiet nginx \
   || die "nginx failed."
 
-curl -fsS "http://127.0.0.1:$APP_PORT/api/health" \
-  | jq . \
-  || die "Explorer health endpoint failed."
+EXPLORER_HEALTH_READY=0
+for attempt in $(seq 1 60); do
+  if curl -fsS "http://127.0.0.1:$APP_PORT/api/health" > "$WORKDIR/explorer-health.json" 2>/dev/null; then
+    EXPLORER_HEALTH_READY=1
+    break
+  fi
+  sleep 2
+done
 
-curl -fsS "http://127.0.0.1:$APP_PORT/api/ai/v1/status" \
-  | jq . \
-  || die "AI status endpoint failed."
+(( EXPLORER_HEALTH_READY )) || {
+  systemctl status yerbas-explorer-light --no-pager || true
+  journalctl -u yerbas-explorer-light -n 60 --no-pager || true
+  die "Explorer health endpoint did not become ready."
+}
+
+jq . "$WORKDIR/explorer-health.json"
+
+AI_HEALTH_READY=0
+for attempt in $(seq 1 30); do
+  if curl -fsS "http://127.0.0.1:$APP_PORT/api/ai/v1/status" > "$WORKDIR/ai-status.json" 2>/dev/null; then
+    AI_HEALTH_READY=1
+    break
+  fi
+  sleep 2
+done
+
+(( AI_HEALTH_READY )) || die "AI status endpoint did not become ready."
+jq . "$WORKDIR/ai-status.json"
 
 printf '\n============================================================\n'
 printf ' Yerbas Explorer Light installation complete\n'
