@@ -574,57 +574,132 @@ EOF
 chown "$CORE_USER:$CORE_USER" "$CORE_DATA/yerbas.conf"
 chmod 0600 "$CORE_DATA/yerbas.conf"
 
+install_bootstrap_tree() {
+  local source_root="$1"
+  local component
+
+  [[ -d "$source_root/blocks" ]] || die "Bootstrap tree has no blocks/ directory: $source_root"
+  [[ -d "$source_root/chainstate" ]] || die "Bootstrap tree has no chainstate/ directory: $source_root"
+
+  # Official snapshots across Yerbas release generations have used both a
+  # conventional indexes/ tree and older Core database directories. Move every
+  # known chain/index component that is present, while never importing config,
+  # wallets, peers, or other host-specific files.
+  for component in blocks chainstate indexes assets evodb llmq myrestricted rewards; do
+    if [[ -e "$source_root/$component" ]]; then
+      rm -rf "$CORE_DATA/$component"
+      mv "$source_root/$component" "$CORE_DATA/$component"
+    fi
+  done
+
+  [[ -d "$CORE_DATA/blocks" ]] || die "Bootstrap installation did not create blocks/."
+  [[ -d "$CORE_DATA/chainstate" ]] || die "Bootstrap installation did not create chainstate/."
+}
+
+find_bootstrap_root() {
+  local stage="$1"
+  local candidate
+
+  if [[ -d "$stage/blocks" && -d "$stage/chainstate" ]]; then
+    printf '%s\n' "$stage"
+    return 0
+  fi
+
+  if [[ -d "$stage/bootstrap-index/blocks" && -d "$stage/bootstrap-index/chainstate" ]]; then
+    printf '%s\n' "$stage/bootstrap-index"
+    return 0
+  fi
+
+  while IFS= read -r -d '' candidate; do
+    candidate="$(dirname "$candidate")"
+    if [[ -d "$candidate/chainstate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done < <(find "$stage" -mindepth 1 -maxdepth 3 -type d -name blocks -print0)
+
+  return 1
+}
+
 if (( ! SKIP_BOOTSTRAP )); then
+  BOOTSTRAP_READY=0
+
+  # Recover the nested layout left by older official bootstrap-index releases.
+  # This also lets a failed installer retry continue without another 1.9 GiB
+  # download when the previous unzip completed successfully.
+  if [[ -d "$CORE_DATA/bootstrap-index/blocks" && -d "$CORE_DATA/bootstrap-index/chainstate" ]]; then
+    log "Recovering previously extracted nested bootstrap"
+    install_bootstrap_tree "$CORE_DATA/bootstrap-index"
+    rm -rf "$CORE_DATA/bootstrap-index"
+    BOOTSTRAP_READY=1
+    log "Recovered blockchain bootstrap without re-downloading it"
+  elif [[ -d "$CORE_DATA/blocks" && -d "$CORE_DATA/chainstate" ]]; then
+    BOOTSTRAP_READY=1
+    log "Existing blockchain data detected; keeping current blocks/ and chainstate/"
+  fi
+
   log "Discovering latest official YERB-Bootstrap release"
   BOOT_JSON="$(curl -fsSL "$BOOTSTRAP_RELEASE_API")" || die "Unable to read YERB-Bootstrap release metadata."
   BOOT_TAG="$(printf '%s' "$BOOT_JSON" | jq -r '.tag_name // empty')"
   BOOT_NAME="$(printf '%s' "$BOOT_JSON" | jq -r '.name // empty')"
   BOOT_BODY="$(printf '%s' "$BOOT_JSON" | jq -r '.body // empty')"
 
-  BOOT_URL="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "bootstrap-index.zip") | .browser_download_url) // empty')"
-  BOOT_DIGEST="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "bootstrap-index.zip") | (.digest // "")) // empty')"
-  BOOT_DIGEST="${BOOT_DIGEST#sha256:}"
-  BOOT_SIZE="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "bootstrap-index.zip") | .size) // empty')"
-
   POW_URL="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "powcache.dat") | .browser_download_url) // empty')"
   POW_DIGEST="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "powcache.dat") | (.digest // "")) // empty')"
-  POW_DIGEST="${POW_DIGEST#sha256:}"
-
-  [[ -n "$BOOT_URL" && "$BOOT_URL" != "null" ]] || die "Latest bootstrap release has no bootstrap-index.zip."
+  POW_DIGEST="\${POW_DIGEST#sha256:}"
   [[ -n "$POW_URL" && "$POW_URL" != "null" ]] || die "Latest bootstrap release has no powcache.dat."
 
-  if [[ "$BOOT_SIZE" =~ ^[0-9]+$ ]]; then
-    BOOT_MB=$(( BOOT_SIZE / 1024 / 1024 ))
-    log "Bootstrap release $BOOT_TAG: $BOOT_NAME"
-    log "bootstrap-index.zip download size: about $BOOT_MB MiB"
-  else
-    log "Bootstrap release $BOOT_TAG: $BOOT_NAME"
+  if (( ! BOOTSTRAP_READY )); then
+    BOOT_URL="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "bootstrap-index.zip") | .browser_download_url) // empty')"
+    BOOT_DIGEST="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "bootstrap-index.zip") | (.digest // "")) // empty')"
+    BOOT_DIGEST="\${BOOT_DIGEST#sha256:}"
+    BOOT_SIZE="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "bootstrap-index.zip") | .size) // empty')"
+    [[ -n "$BOOT_URL" && "$BOOT_URL" != "null" ]] || die "Latest bootstrap release has no bootstrap-index.zip."
+
+    if [[ "$BOOT_SIZE" =~ ^[0-9]+$ ]]; then
+      BOOT_MB=$(( BOOT_SIZE / 1024 / 1024 ))
+      log "Bootstrap release $BOOT_TAG: $BOOT_NAME"
+      log "bootstrap-index.zip download size: about $BOOT_MB MiB"
+    else
+      log "Bootstrap release $BOOT_TAG: $BOOT_NAME"
+    fi
+
+    if [[ -n "$BOOT_BODY" ]]; then
+      printf '%s\n' "$BOOT_BODY" | sed 's/^/[bootstrap] /'
+    fi
+
+    BOOT_ZIP="$WORKDIR/bootstrap-index.zip"
+    BOOT_STAGE="$WORKDIR/bootstrap-stage"
+    mkdir -p "$BOOT_STAGE"
+
+    log "Downloading indexed blockchain bootstrap"
+    curl -fL --retry 3 --retry-delay 2 --progress-bar "$BOOT_URL" -o "$BOOT_ZIP"
+    verify_sha256 "$BOOT_ZIP" "$BOOT_DIGEST"
+
+    log "Staging indexed blockchain bootstrap"
+    unzip -oq "$BOOT_ZIP" -d "$BOOT_STAGE"
+
+    BOOT_ROOT="$(find_bootstrap_root "$BOOT_STAGE")" \
+      || die "Unable to locate blocks/ and chainstate/ inside bootstrap-index.zip."
+
+    log "Installing bootstrap tree"
+    install_bootstrap_tree "$BOOT_ROOT"
+    BOOTSTRAP_READY=1
   fi
 
-  if [[ -n "$BOOT_BODY" ]]; then
-    printf '%s\n' "$BOOT_BODY" | sed 's/^/[bootstrap] /'
-  fi
-
-  BOOT_ZIP="$WORKDIR/bootstrap-index.zip"
   POW_FILE="$WORKDIR/powcache.dat"
+  if [[ ! -s "$CORE_DATA/powcache.dat" ]]; then
+    log "Downloading GhostRider PoW cache"
+    curl -fL --retry 3 --retry-delay 2 --progress-bar "$POW_URL" -o "$POW_FILE"
+    verify_sha256 "$POW_FILE" "$POW_DIGEST"
+    install -m 0600 "$POW_FILE" "$CORE_DATA/powcache.dat"
+  else
+    log "Existing powcache.dat detected; keeping current cache"
+  fi
 
-  log "Downloading indexed blockchain bootstrap"
-  curl -fL --retry 3 --retry-delay 2 --progress-bar "$BOOT_URL" -o "$BOOT_ZIP"
-  verify_sha256 "$BOOT_ZIP" "$BOOT_DIGEST"
-
-  log "Extracting bootstrap into $CORE_DATA"
-  unzip -q "$BOOT_ZIP" -d "$CORE_DATA"
-
-  [[ -d "$CORE_DATA/blocks" ]] || die "Bootstrap extraction did not create blocks/."
-  [[ -d "$CORE_DATA/chainstate" ]] || die "Bootstrap extraction did not create chainstate/."
-
-  log "Downloading GhostRider PoW cache"
-  curl -fL --retry 3 --retry-delay 2 --progress-bar "$POW_URL" -o "$POW_FILE"
-  verify_sha256 "$POW_FILE" "$POW_DIGEST"
-  install -m 0600 "$POW_FILE" "$CORE_DATA/powcache.dat"
-
+  printf '%s\n' "$BOOT_TAG" > "$CORE_DATA/.explorer-light-bootstrap-release"
   chown -R "$CORE_USER:$CORE_USER" "$CORE_DATA"
-  log "Official indexed blockchain bootstrap loaded"
+  log "Official indexed blockchain bootstrap is ready"
 else
   warn "Bootstrap download was skipped; Core will sync the blockchain from peers."
 fi
