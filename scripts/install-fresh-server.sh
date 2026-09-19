@@ -257,7 +257,7 @@ create_admin_user() {
   admin_home="$(getent passwd "$ADMIN_USER" | cut -d: -f6)"
   [[ -n "$admin_home" ]] || die "Unable to determine home directory for $ADMIN_USER."
 
-  if [[ -n "\${SUDO_USER:-}" && "\${SUDO_USER:-}" != "root" ]]; then
+  if [[ -n "${SUDO_USER:-}" && "${SUDO_USER:-}" != "root" ]]; then
     local sudo_home
     sudo_home="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
     if [[ -s "$sudo_home/.ssh/authorized_keys" ]]; then
@@ -646,13 +646,13 @@ if (( ! SKIP_BOOTSTRAP )); then
 
   POW_URL="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "powcache.dat") | .browser_download_url) // empty')"
   POW_DIGEST="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "powcache.dat") | (.digest // "")) // empty')"
-  POW_DIGEST="\${POW_DIGEST#sha256:}"
+  POW_DIGEST="${POW_DIGEST#sha256:}"
   [[ -n "$POW_URL" && "$POW_URL" != "null" ]] || die "Latest bootstrap release has no powcache.dat."
 
   if (( ! BOOTSTRAP_READY )); then
     BOOT_URL="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "bootstrap-index.zip") | .browser_download_url) // empty')"
     BOOT_DIGEST="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "bootstrap-index.zip") | (.digest // "")) // empty')"
-    BOOT_DIGEST="\${BOOT_DIGEST#sha256:}"
+    BOOT_DIGEST="${BOOT_DIGEST#sha256:}"
     BOOT_SIZE="$(printf '%s' "$BOOT_JSON" | jq -r 'first(.assets[] | select(.name == "bootstrap-index.zip") | .size) // empty')"
     [[ -n "$BOOT_URL" && "$BOOT_URL" != "null" ]] || die "Latest bootstrap release has no bootstrap-index.zip."
 
