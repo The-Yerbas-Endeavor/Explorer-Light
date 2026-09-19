@@ -1569,3 +1569,106 @@ tbody tr:hover {
     height: 420px;
   }
 }
+
+
+.smartnode-hero::after {
+  content: "SMARTNODE NETWORK";
+  position: absolute;
+  right: 22px;
+  bottom: 18px;
+  color: rgba(181, 255, 192, .055);
+  font: 800 clamp(22px, 4vw, 50px)/1 var(--mono);
+  letter-spacing: -.06em;
+  pointer-events: none;
+}
+
+.smartnode-toolbar {
+  grid-template-columns: minmax(220px, .5fr) minmax(0, 1.5fr);
+}
+
+.smartnode-filter {
+  grid-template-columns: minmax(210px, 1.7fr) repeat(3, minmax(130px, .8fr)) auto;
+}
+
+.smartnode-note {
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  background: rgba(141, 241, 158, .02);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.smartnode-note strong {
+  color: var(--green-hot);
+}
+
+.smartnode-table {
+  min-width: 1420px;
+}
+
+.smartnode-table td {
+  vertical-align: top;
+}
+
+.row-sub {
+  margin-top: 6px;
+  color: #5d7464;
+  font-size: 9px;
+}
+
+.smartnode-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font: 700 8px/1 var(--mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.smartnode-status.status-enabled {
+  color: var(--green-hot);
+  border-color: rgba(141, 241, 158, .28);
+  background: rgba(141, 241, 158, .055);
+}
+
+.smartnode-status.status-banned {
+  color: var(--danger);
+  border-color: rgba(255, 156, 156, .28);
+  background: rgba(255, 156, 156, .04);
+}
+
+.smartnode-status.status-unknown {
+  color: var(--amber);
+}
+
+@media (max-width: 1120px) {
+  .smartnode-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .smartnode-filter {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .smartnode-filter input {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 720px) {
+  .smartnode-filter {
+    grid-template-columns: 1fr;
+  }
+
+  .smartnode-filter input {
+    grid-column: auto;
+  }
+
+  .smartnode-hero::after {
+    display: none;
+  }
+}
