@@ -28,9 +28,27 @@ function sendJson(res, status, data) {
   res.writeHead(status, securityHeaders({
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
+    'access-control-allow-origin': '*',
     'content-length': Buffer.byteLength(body)
   }));
   res.end(body);
+}
+
+function sendText(res, status, data) {
+  const body = String(data ?? '');
+  res.writeHead(status, securityHeaders({
+    'content-type': 'text/plain; charset=utf-8',
+    'cache-control': 'no-store',
+    'access-control-allow-origin': '*',
+    'content-length': Buffer.byteLength(body)
+  }));
+  res.end(body);
+}
+
+function apiInt(value, fallback, min, max) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isSafeInteger(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
 }
 
 function cached(key, ttl, producer) {
@@ -203,6 +221,276 @@ async function handleAi(req, res, url) {
   }
 
   return sendJson(res, 404, { error: 'AI route not found.' });
+}
+
+async function currentPeers() {
+  const peers = await rpc.call('getpeerinfo');
+  if (!Array.isArray(peers)) return [];
+
+  return peers.map((peer) => ({
+    address: peer.addr ?? null,
+    addrlocal: peer.addrlocal ?? null,
+    services: peer.services ?? null,
+    relayTxes: peer.relaytxes ?? null,
+    lastSend: peer.lastsend ?? null,
+    lastRecv: peer.lastrecv ?? null,
+    bytesSent: peer.bytessent ?? null,
+    bytesRecv: peer.bytesrecv ?? null,
+    connectionTime: peer.conntime ?? null,
+    timeOffset: peer.timeoffset ?? null,
+    pingTime: peer.pingtime ?? null,
+    version: peer.version ?? null,
+    subversion: peer.subver ?? null,
+    inbound: peer.inbound ?? null,
+    startingHeight: peer.startingheight ?? null,
+    syncedHeaders: peer.synced_headers ?? null,
+    syncedBlocks: peer.synced_blocks ?? null
+  }));
+}
+
+async function supplyData() {
+  const result = await ai.invoke('get_supply', {});
+  return result.data;
+}
+
+async function smartnodeData(url) {
+  const result = await ai.invoke('get_smartnodes', {
+    limit: apiInt(url.searchParams.get('limit'), 100, 1, 500),
+    offset: apiInt(url.searchParams.get('offset'), 0, 0, Number.MAX_SAFE_INTEGER),
+    status: url.searchParams.get('status') || 'ALL',
+    collateral_amount: url.searchParams.has('collateral')
+      ? Number(url.searchParams.get('collateral'))
+      : undefined
+  });
+  return result.data;
+}
+
+async function allSmartnodes() {
+  const first = (await ai.invoke('get_smartnodes', { limit: 500, offset: 0 })).data;
+  const items = [...first.items];
+  for (let offset = 500; offset < first.total; offset += 500) {
+    const page = (await ai.invoke('get_smartnodes', { limit: 500, offset })).data;
+    items.push(...page.items);
+  }
+  return { total: first.total, items };
+}
+
+async function addressData(address, txLimit = 100, utxoLimit = 100) {
+  const result = await ai.invoke('get_address', {
+    address,
+    tx_limit: Math.min(200, Math.max(1, txLimit)),
+    utxo_limit: Math.min(200, Math.max(1, utxoLimit))
+  });
+  return result.data;
+}
+
+async function handlePublicApi(req, res, url) {
+  const path = url.pathname;
+
+  if (path === '/api/v1') {
+    return sendJson(res, 200, {
+      name: 'Yerbas Explorer Light Public API',
+      version: '1',
+      readOnly: true,
+      source: 'Yerbas Core RPC / native blockchain indexes',
+      documentation: '/info',
+      endpoints: {
+        status: '/api/v1/status',
+        blocks: '/api/v1/blocks?limit=12',
+        block: '/api/v1/block/:height-or-hash',
+        transaction: '/api/v1/tx/:txid',
+        address: '/api/v1/address/:address',
+        assets: '/api/v1/assets?q=&count=50&start=0',
+        asset: '/api/v1/asset/:asset-name',
+        supply: '/api/v1/supply',
+        emission: '/api/v1/emission?height=',
+        smartnodes: '/api/v1/smartnodes?limit=100&offset=0',
+        peers: '/api/v1/network/peers',
+        marketPrice: '/api/v1/market-price'
+      }
+    });
+  }
+
+  if (path === '/api/v1/supply') {
+    return sendJson(res, 200, await supplyData());
+  }
+
+  if (path === '/api/v1/emission') {
+    const height = url.searchParams.get('height');
+    const result = await ai.invoke('get_emission', height === null ? {} : { height });
+    return sendJson(res, 200, result.data);
+  }
+
+  if (path === '/api/v1/smartnodes') {
+    return sendJson(res, 200, await smartnodeData(url));
+  }
+
+  if (path === '/api/v1/network/peers') {
+    const peers = await cached('api:peers', 15000, currentPeers);
+    return sendJson(res, 200, {
+      count: peers.length,
+      current: true,
+      note: 'Current peers reported by Yerbas Core; no historical/geolocation database is used.',
+      items: peers
+    });
+  }
+
+  if (path === '/api/v1/market-price') {
+    const result = await ai.invoke('get_market_price', {});
+    return sendJson(res, result.data.available ? 200 : 503, result.data);
+  }
+
+  if (path.startsWith('/api/v1/')) {
+    const rewritten = new URL(url.toString());
+    rewritten.pathname = '/api/' + path.slice('/api/v1/'.length);
+    return handleApi(req, res, rewritten);
+  }
+
+  if (path === '/api/getdifficulty') {
+    const info = await rpc.call('getblockchaininfo');
+    return sendText(res, 200, info.difficulty);
+  }
+
+  if (path === '/api/getconnectioncount') {
+    return sendText(res, 200, await rpc.call('getconnectioncount'));
+  }
+
+  if (path === '/api/getblockcount') {
+    return sendText(res, 200, await rpc.call('getblockcount'));
+  }
+
+  if (path === '/api/getblockhash') {
+    const index = apiInt(url.searchParams.get('index'), -1, 0, Number.MAX_SAFE_INTEGER);
+    if (index < 0) return sendJson(res, 400, { error: 'index is required.' });
+    return sendText(res, 200, await rpc.call('getblockhash', [index]));
+  }
+
+  if (path === '/api/getblock') {
+    const hash = (url.searchParams.get('hash') || '').trim();
+    if (!isHash(hash)) return sendJson(res, 400, { error: 'Valid block hash is required.' });
+    return sendJson(res, 200, await rpc.call('getblock', [hash, 1]));
+  }
+
+  if (path === '/api/getrawtransaction') {
+    const txid = (url.searchParams.get('txid') || '').trim().toLowerCase();
+    if (!isHash(txid)) return sendJson(res, 400, { error: 'Valid txid is required.' });
+    const decrypt = url.searchParams.get('decrypt') !== '0';
+    const tx = await rpc.call('getrawtransaction', [txid, decrypt]);
+    return decrypt ? sendJson(res, 200, tx) : sendText(res, 200, tx);
+  }
+
+  if (path === '/api/getnetworkhashps') {
+    return sendText(res, 200, await rpc.call('getnetworkhashps'));
+  }
+
+  if (path === '/api/getmasternodecount') {
+    const count = await rpc.call('smartnode', ['count']);
+    const total = typeof count === 'object' && count !== null ? (count.total ?? count.enabled ?? 0) : count;
+    return sendText(res, 200, total);
+  }
+
+  if (path === '/ext/getmoneysupply') {
+    const supply = await supplyData();
+    return sendText(res, 200, supply.totalAmountYerb ?? 0);
+  }
+
+  if (path.startsWith('/ext/getaddress/')) {
+    const address = decodeURIComponent(path.slice('/ext/getaddress/'.length));
+    return sendJson(res, 200, await addressData(address));
+  }
+
+  if (path.startsWith('/ext/getaddresstxs/')) {
+    const parts = path.slice('/ext/getaddresstxs/'.length).split('/');
+    const address = decodeURIComponent(parts[0] || '');
+    const start = apiInt(parts[1], 0, 0, Number.MAX_SAFE_INTEGER);
+    const length = apiInt(parts[2], 50, 1, 100);
+    const data = await addressData(address, Math.min(200, start + length), 1);
+    const txids = data.history?.txids || [];
+    return sendJson(res, 200, txids.slice(start, start + length));
+  }
+
+  if (path.startsWith('/ext/gettx/')) {
+    const txid = decodeURIComponent(path.slice('/ext/gettx/'.length)).toLowerCase();
+    if (!isHash(txid)) return sendJson(res, 400, { error: 'Invalid transaction ID.' });
+    return sendJson(res, 200, await rpc.call('getrawtransaction', [txid, true]));
+  }
+
+  if (path.startsWith('/ext/getbalance/')) {
+    const address = decodeURIComponent(path.slice('/ext/getbalance/'.length));
+    const data = await addressData(address, 1, 1);
+    return sendText(res, 200, data.history?.balance?.balanceYerb ?? '0.00000000');
+  }
+
+  if (path === '/ext/getnetworkpeers') {
+    return sendJson(res, 200, await cached('legacy:peers', 15000, currentPeers));
+  }
+
+  if (path === '/ext/getbasicstats') {
+    const [chain, supply, count] = await Promise.all([
+      rpc.call('getblockchaininfo'),
+      supplyData(),
+      rpc.call('smartnode', ['count']).catch(() => null)
+    ]);
+    const total = typeof count === 'object' && count !== null ? (count.total ?? null) : count;
+    return sendJson(res, 200, {
+      block_count: chain.blocks,
+      money_supply: supply.totalAmountYerb ?? null,
+      last_price_usdt: null,
+      last_price_usd: null,
+      masternode_count: total
+    });
+  }
+
+  if (path === '/ext/getsummary') {
+    const [chain, network, supply, hashRate, count] = await Promise.all([
+      rpc.call('getblockchaininfo'),
+      rpc.call('getnetworkinfo'),
+      supplyData(),
+      rpc.call('getnetworkhashps').catch(() => null),
+      rpc.call('smartnode', ['count']).catch(() => null)
+    ]);
+    const total = typeof count === 'object' && count !== null ? (count.total ?? null) : count;
+    const enabled = typeof count === 'object' && count !== null ? (count.enabled ?? null) : null;
+    return sendJson(res, 200, {
+      difficulty: chain.difficulty,
+      difficultyHybrid: '',
+      supply: supply.totalAmountYerb ?? null,
+      hashrate: hashRate,
+      lastPrice: null,
+      connections: network.connections,
+      masternodeCountOnline: enabled,
+      masternodeCountOffline: total !== null && enabled !== null ? Math.max(0, total - enabled) : null,
+      blockcount: chain.blocks
+    });
+  }
+
+  if (path === '/ext/getmasternodelist') {
+    const nodes = await allSmartnodes();
+    return sendJson(res, 200, nodes.items);
+  }
+
+  if (path === '/ext/getcurrentprice') {
+    const result = await ai.invoke('get_market_price', {});
+    if (!result.data.available) {
+      return sendJson(res, 503, {
+        error: result.data.reason,
+        available: false
+      });
+    }
+    return sendJson(res, 200, result.data);
+  }
+
+  if (path === '/ext/getdistribution'
+      || path.startsWith('/ext/getlasttxs/')
+      || path.startsWith('/ext/getmasternoderewards/')
+      || path.startsWith('/ext/getmasternoderewardstotal/')) {
+    return sendJson(res, 501, {
+      error: 'This legacy endpoint depended on the old explorer database and is not implemented in database-free Explorer Light.',
+      documentation: '/info'
+    });
+  }
+
+  return null;
 }
 
 async function handleApi(req, res, url) {
@@ -442,14 +730,33 @@ async function requestHandler(req, res) {
       return await handleAi(req, res, url);
     }
 
+    if (req.method === 'OPTIONS' && (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ext/'))) {
+      res.writeHead(204, securityHeaders({
+        'access-control-allow-origin': '*',
+        'access-control-allow-methods': 'GET, HEAD, OPTIONS',
+        'access-control-allow-headers': 'content-type, accept',
+        'access-control-max-age': '86400'
+      }));
+      return res.end();
+    }
+
     if (!['GET', 'HEAD'].includes(req.method || '')) {
       return sendJson(res, 405, { error: 'Method not allowed.' });
     }
 
-    if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
+    if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ext/')) {
+      const publicResult = await handlePublicApi(req, res, url);
+      if (publicResult !== null) return publicResult;
+      if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
+      return sendJson(res, 404, { error: 'Legacy API route not found.', documentation: '/info' });
+    }
 
     const staticFile = staticFiles.get(url.pathname);
     if (staticFile) return await sendFile(req, res, staticFile[0], staticFile[1]);
+
+    if (url.pathname === '/info') {
+      return await sendFile(req, res, 'info.html', 'text/html; charset=utf-8', 'no-cache');
+    }
 
     if (url.pathname === '/'
       || url.pathname.startsWith('/block/')
