@@ -488,25 +488,51 @@ async function renderAsset(name) {
 
   const metadata = data.metadata || {};
   const holders = data.holders?.items || [];
+  const supply = Number(metadata.amount || 0);
+
   const holderRows = holders.length
-    ? holders.map((holder, index) =>
-        '<tr>' +
+    ? holders.map((holder, index) => {
+        const balance = Number(holder.balance || 0);
+        const ownership = supply > 0 ? (balance / supply) * 100 : 0;
+        return '<tr>' +
           '<td>' + number(index + 1) + '</td>' +
-          '<td><a class="mono" href="/address/' + encodeURIComponent(holder.address) + '">' + esc(holder.address) + '</a></td>' +
+          '<td><a class="mono" href="/address/' + encodeURIComponent(holder.address) + '">' + esc(holder.address) + '</a> ' +
+            '<a class="portfolio-link" href="/address/' + encodeURIComponent(holder.address) + '">portfolio</a></td>' +
           '<td>' + assetAmount(holder.balance, metadata.units) + '</td>' +
-        '</tr>'
-      ).join('')
-    : '<tr><td colspan="3" class="muted">' +
+          '<td>' + ownership.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%</td>' +
+        '</tr>';
+      }).join('')
+    : '<tr><td colspan="4" class="muted">' +
         esc(data.holders?.unavailableReason || 'No holder balances returned for this asset.') +
       '</td></tr>';
 
-  const metadataHash = metadata.ipfs_hash || metadata.txid || metadata.txid_hash || null;
+  const ipfsHash = metadata.ipfs_hash || null;
+  const txidHash = metadata.txid_hash || metadata.txid || null;
+  const metadataValue = ipfsHash || txidHash || null;
+  const metadataType = ipfsHash ? 'IPFS' : (txidHash ? 'TXID' : null);
+  const ipfsUrl = ipfsHash ? 'https://ipfs.io/ipfs/' + encodeURIComponent(ipfsHash) : null;
+
   const cards = [
     metricCard('01', 'Supply', assetAmount(metadata.amount, metadata.units), 'current issued amount'),
     metricCard('02', 'Units', number(metadata.units), 'decimal precision'),
     metricCard('03', 'Holders', data.holders?.total === null ? '—' : number(data.holders?.total), 'asset-index addresses'),
     metricCard('04', 'Reissuable', Number(metadata.reissuable) ? 'YES' : 'NO', assetType(data.name) + ' asset')
   ].join('');
+
+  const metadataSection = metadataValue
+    ? '<section class="panel">' +
+        panelHeading('AS2', metadataType + ' metadata', metadataType + ' Content', metadataType === 'IPFS' ? 'public gateway' : 'on-chain reference') +
+        '<div class="asset-metadata-content">' +
+          (ipfsUrl
+            ? '<div class="ipfs-preview"><iframe sandbox title="' + esc(data.name) + ' IPFS preview" loading="lazy" src="' + ipfsUrl + '"></iframe></div>' +
+              '<div class="ipfs-actions"><a class="text-link" href="' + ipfsUrl + '" target="_blank" rel="noopener noreferrer">Open IPFS content ↗</a></div>'
+            : (/^[0-9a-fA-F]{64}$/.test(txidHash || '')
+              ? '<a class="text-link" href="/tx/' + encodeURIComponent(txidHash) + '">Open metadata transaction</a>'
+              : '')) +
+          '<code class="metadata-hash">' + esc(metadataValue) + '</code>' +
+        '</div>' +
+      '</section>'
+    : '';
 
   app.innerHTML =
     '<section class="detail-hero asset-hero">' +
@@ -529,8 +555,13 @@ async function renderAsset(name) {
         '<dt>Supply</dt><dd>' + assetAmount(metadata.amount, metadata.units) + '</dd>' +
         '<dt>Units</dt><dd>' + number(metadata.units) + '</dd>' +
         '<dt>Reissuable</dt><dd>' + (Number(metadata.reissuable) ? 'Yes' : 'No') + '</dd>' +
-        '<dt>Has metadata</dt><dd>' + (Number(metadata.has_ipfs) ? 'Yes' : 'No') + '</dd>' +
-        '<dt>IPFS / TXID data</dt><dd class="mono break">' + esc(metadataHash || '—') + '</dd>' +
+        '<dt>Metadata</dt><dd class="mono break">' +
+          (metadataValue
+            ? (ipfsUrl
+              ? '<a href="' + ipfsUrl + '" target="_blank" rel="noopener noreferrer">' + esc(metadataType) + ' · ' + esc(metadataValue) + '</a>'
+              : esc(metadataType) + ' · ' + esc(metadataValue))
+            : '—') +
+        '</dd>' +
         '<dt>Verifier</dt><dd class="mono break">' + esc(metadata.verifier_string || '—') + '</dd>' +
         '<dt>Issuance block</dt><dd>' +
           (data.issuance?.blockHeight !== null && data.issuance?.blockHeight !== undefined
@@ -545,10 +576,12 @@ async function renderAsset(name) {
       '</dl>' +
     '</section>' +
 
+    metadataSection +
+
     '<section class="panel">' +
-      panelHeading('AS2', 'Asset index', 'Holders', data.holders?.total === null ? 'availability unknown' : number(data.holders?.total) + ' total') +
+      panelHeading(metadataValue ? 'AS3' : 'AS2', 'Asset index', 'Top Asset Holders', data.holders?.total === null ? 'availability unknown' : number(data.holders?.total) + ' total') +
       '<div class="table-wrap">' +
-        '<table><thead><tr><th>#</th><th>Address</th><th>Balance</th></tr></thead><tbody>' + holderRows + '</tbody></table>' +
+        '<table><thead><tr><th>Rank</th><th>Address</th><th>Balance</th><th>Ownership</th></tr></thead><tbody>' + holderRows + '</tbody></table>' +
       '</div>' +
       (data.holders?.total > holders.length
         ? '<div class="panel-foot">Showing first ' + number(holders.length) + ' indexed holders.</div>'
