@@ -809,6 +809,200 @@ async function renderSmartnodes() {
     '</section>';
 }
 
+function networkMapSeverity(status) {
+  const order = {
+    'online': 1,
+    'slow': 2,
+    'penalized': 3,
+    'offline': 4,
+    'pose-banned': 5
+  };
+  return order[status] || 0;
+}
+
+function networkMapClusters(items) {
+  const groups = new Map();
+
+  for (const item of items) {
+    if (!item?.geo) continue;
+
+    const latitude = Number(item.geo.latitude);
+    const longitude = Number(item.geo.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
+
+    const key = latitude.toFixed(2) + ',' + longitude.toFixed(2);
+    if (!groups.has(key)) {
+      groups.set(key, {
+        latitude,
+        longitude,
+        city: item.geo.city || null,
+        region: item.geo.region || null,
+        country: item.geo.country || item.geo.countryCode || null,
+        countryCode: item.geo.countryCode || null,
+        isp: item.geo.isp || null,
+        nodes: [],
+        status: item.status
+      });
+    }
+
+    const group = groups.get(key);
+    group.nodes.push(item);
+
+    if (networkMapSeverity(item.status) > networkMapSeverity(group.status)) {
+      group.status = item.status;
+    }
+  }
+
+  return [...groups.values()];
+}
+
+function networkMapPinStyle(latitude, longitude) {
+  const left = ((Number(longitude) + 180) / 360) * 100;
+  const top = ((90 - Number(latitude)) / 180) * 100;
+  return 'left:' + Math.max(0, Math.min(100, left)).toFixed(4) + '%;top:' +
+    Math.max(0, Math.min(100, top)).toFixed(4) + '%;';
+}
+
+function networkMapLocationLabel(cluster) {
+  return [cluster.city, cluster.region, cluster.country]
+    .filter(Boolean)
+    .filter((value, index, array) => array.indexOf(value) === index)
+    .join(', ') || 'Approximate location';
+}
+
+function networkMapNodeDetail(node, view) {
+  const service = esc(node.service || node.id || 'Unknown node');
+  const status = esc(String(node.status || 'unknown').replaceAll('-', ' '));
+
+  if (view === 'peers') {
+    return '<div class="map-node-row">' +
+      '<div><strong class="mono">' + service + '</strong><span class="map-node-status ' + esc(node.status) + '">' + status + '</span></div>' +
+      '<small>' +
+        (node.inbound ? 'Inbound' : 'Outbound') +
+        (node.subversion ? ' · ' + esc(node.subversion) : '') +
+        (Number.isFinite(Number(node.pingTime)) ? ' · ' + Math.round(Number(node.pingTime) * 1000) + ' ms' : '') +
+      '</small>' +
+    '</div>';
+  }
+
+  const payout = node.payoutAddress
+    ? '<a href="/address/' + encodeURIComponent(node.payoutAddress) + '">' + esc(compactMiddle(node.payoutAddress, 10, 7)) + '</a>'
+    : '—';
+
+  return '<div class="map-node-row">' +
+    '<div><strong class="mono">' + service + '</strong><span class="map-node-status ' + esc(node.status) + '">' + status + '</span></div>' +
+    '<small>Collateral ' + (node.collateralAmount === null || node.collateralAmount === undefined ? '—' : number(node.collateralAmount) + ' YERB') +
+      ' · Payout ' + payout + '</small>' +
+  '</div>';
+}
+
+async function renderNetworkMap() {
+  renderLoading('Locating Yerbas network nodes');
+
+  const params = new URLSearchParams(location.search);
+  const view = params.get('view') === 'peers' ? 'peers' : 'smartnodes';
+  const data = await api('/api/network-map?view=' + encodeURIComponent(view));
+
+  setRpcState('online', 'Core online');
+  document.title = 'Yerbas Network Map · Explorer Light';
+
+  const clusters = networkMapClusters(data.items || []);
+  const pins = clusters.map((cluster, index) => {
+    const label = networkMapLocationLabel(cluster);
+    const count = cluster.nodes.length;
+    return '<button class="network-pin status-' + esc(cluster.status) + (count > 1 ? ' cluster' : '') + '"' +
+      ' type="button" data-map-cluster="' + index + '" style="' +
+      networkMapPinStyle(cluster.latitude, cluster.longitude) + '"' +
+      ' title="' + esc(label + ' · ' + count + (count === 1 ? ' node' : ' nodes')) + '">' +
+      (count > 1 ? '<span>' + number(count) + '</span>' : '') +
+    '</button>';
+  }).join('');
+
+  const stats = data.stats || {};
+  const statCards = [
+    ['Total nodes', stats.totalNodes],
+    ['Countries', stats.countries],
+    ['Reachable', stats.reachable],
+    ['Offline', stats.offline],
+    ['PoSe banned', stats.poseBanned],
+    ['Plotted', stats.plotted]
+  ].map(([label, value]) =>
+    '<article class="network-stat"><span>' + esc(label) + '</span><strong>' + number(value) + '</strong></article>'
+  ).join('');
+
+  const legend = [
+    ['online', 'Online'],
+    ['slow', 'Slow'],
+    ['penalized', 'Penalized'],
+    ['offline', 'Offline'],
+    ['pose-banned', 'PoSe banned']
+  ].map(([status, label]) =>
+    '<span class="map-legend-item"><i class="status-' + status + '"></i>' + label + '</span>'
+  ).join('');
+
+  app.innerHTML =
+    '<section class="detail-hero network-map-hero">' +
+      '<div class="detail-kicker">Yerbas peer geography / approximate IP locations</div>' +
+      '<h2>Yerbas Network Map</h2>' +
+      '<div class="detail-hash">View currently connected network peers and registered Smartnodes around the world.</div>' +
+      '<div class="detail-actions"><a class="text-link" href="/">← Back to live chain</a></div>' +
+    '</section>' +
+
+    '<section class="network-map-tabs">' +
+      '<a class="' + (view === 'peers' ? 'active' : '') + '" href="/node-map?view=peers">Network Nodes</a>' +
+      '<a class="' + (view === 'smartnodes' ? 'active' : '') + '" href="/node-map?view=smartnodes">Smartnodes</a>' +
+      '<div class="map-legend">' + legend + '</div>' +
+    '</section>' +
+
+    '<section class="network-map-stats">' + statCards + '</section>' +
+
+    '<section class="panel network-map-panel">' +
+      '<div class="network-map-canvas">' +
+        '<img class="network-map-base" src="https://upload.wikimedia.org/wikipedia/commons/5/51/BlankMap-Equirectangular.svg" alt="" aria-hidden="true">' +
+        '<div class="network-map-grid" aria-hidden="true"></div>' +
+        '<div class="network-map-pins">' + pins + '</div>' +
+        '<aside id="network-map-detail" class="network-map-detail hidden"></aside>' +
+      '</div>' +
+      '<div class="network-map-foot">' +
+        '<span>' + esc(data.source) + '</span>' +
+        '<span>Node locations are approximate and derived from IP geolocation. Exact operator locations are not exposed.</span>' +
+        '<span>Geo: HackMyIP · Map: Wikimedia Commons CC0</span>' +
+      '</div>' +
+    '</section>';
+
+  const detail = document.querySelector('#network-map-detail');
+
+  document.querySelectorAll('[data-map-cluster]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const cluster = clusters[Number(button.dataset.mapCluster)];
+      if (!cluster || !detail) return;
+
+      const location = networkMapLocationLabel(cluster);
+      const nodes = cluster.nodes.slice(0, 20);
+
+      detail.classList.remove('hidden');
+      detail.innerHTML =
+        '<button class="map-detail-close" type="button" aria-label="Close">×</button>' +
+        '<p class="eyebrow">APPROXIMATE LOCATION</p>' +
+        '<h3>' + esc(location) + '</h3>' +
+        '<div class="map-detail-meta">' +
+          number(cluster.nodes.length) + (cluster.nodes.length === 1 ? ' node' : ' nodes') +
+          (cluster.isp ? ' · ' + esc(cluster.isp) : '') +
+        '</div>' +
+        '<div class="map-node-list">' +
+          nodes.map((node) => networkMapNodeDetail(node, view)).join('') +
+          (cluster.nodes.length > nodes.length
+            ? '<div class="map-node-more">+' + number(cluster.nodes.length - nodes.length) + ' more at this approximate location</div>'
+            : '') +
+        '</div>';
+
+      detail.querySelector('.map-detail-close')?.addEventListener('click', () => {
+        detail.classList.add('hidden');
+      });
+    });
+  });
+}
+
 async function renderTransaction(txid) {
   renderLoading('Resolving transaction from Yerbas Core');
 
@@ -900,6 +1094,10 @@ async function route() {
 
     if (parts[0] === 'smartnodes' || parts[0] === 'masternodes') {
       return await renderSmartnodes();
+    }
+
+    if (parts[0] === 'node-map') {
+      return await renderNetworkMap();
     }
 
     return await renderHome();
