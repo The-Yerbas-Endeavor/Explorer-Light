@@ -330,3 +330,13 @@ Explorer Light exposes a read-only public API backed directly by Yerbas Core and
 - CORS: public API responses allow `Access-Control-Allow-Origin: *`
 
 Database-dependent legacy routes that cannot be reproduced faithfully without restoring a separate explorer database return HTTP 501 instead of fabricated data.
+
+
+### Smartnode explorer
+
+- `/smartnodes` lists deterministic smartnodes currently known to Yerbas Core and defaults to `ENABLED` nodes.
+- `/masternodes` is retained as a compatibility browser alias.
+- The page merges live `smartnodelist json` data with `protx list registered true` data.
+- Filters include status, collateral amount, search text, and sorting.
+- The public API is `/api/v1/smartnodes`.
+- The displayed pay-age rank is based on oldest last-paid block among enabled nodes and is informational only; it is not a prediction of the next payment winner.
