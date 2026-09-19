@@ -102,7 +102,7 @@ async function renderBlock(identifier) {
   const block = await api('/api/block/' + encodeURIComponent(identifier));
   document.title = 'Block ' + block.height + ' · Yerbas Explorer Light';
 
-  const txRows = (block.tx || []).map((txid, index) => '<tr><td>' + (index + 1) + '</td><td>' + hashLink('tx', txid, txid) + '</td></tr>').join('');
+  const txRows = (block.tx || []).map((txid, index) => '<tr><td>' + (index + 1) + '</td><td><a class="mono" href="/tx/' + encodeURIComponent(txid) + '?block=' + encodeURIComponent(block.hash) + '">' + esc(txid) + '</a></td></tr>').join('');
   app.innerHTML = '<section class="panel detail"><div class="panel-head"><div><p class="eyebrow">BLOCK</p><h2>#' + number(block.height) + '</h2></div><a href="/">← Recent blocks</a></div>' +
     '<dl class="detail-grid">' +
       '<dt>Hash</dt><dd class="mono break">' + esc(block.hash) + '</dd>' +
@@ -126,7 +126,9 @@ function outputAddresses(vout) {
 
 async function renderTransaction(txid) {
   app.innerHTML = '<section class="loading-card">Loading transaction…</section>';
-  const tx = await api('/api/tx/' + encodeURIComponent(txid));
+  const knownBlock = new URLSearchParams(location.search).get('block');
+  const query = knownBlock ? '?block=' + encodeURIComponent(knownBlock) : '';
+  const tx = await api('/api/tx/' + encodeURIComponent(txid) + query);
   document.title = 'Transaction · Yerbas Explorer Light';
 
   const outputs = (tx.vout || []).map((vout) => '<tr><td>' + number(vout.n) + '</td><td>' + number(vout.value, 8) + ' YERB</td><td class="mono">' + outputAddresses(vout) + '</td></tr>').join('');
