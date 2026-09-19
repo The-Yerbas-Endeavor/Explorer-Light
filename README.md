@@ -49,18 +49,13 @@ If Explorer Light runs as the same OS user as \`yerbasd\`, it automatically trie
 
 ## Fresh-server installer
 
-For a brand-new Ubuntu/Debian server, use the repository bootstrap installer:
+For the `explorer2.yerbas.org` test server, the complete hardened install is now one command:
 
 ```bash
-curl -fsSL \
-  https://raw.githubusercontent.com/The-Yerbas-Endeavor/Explorer-Light/feature/rpc-first-test-build/scripts/install-fresh-server.sh \
-  -o /tmp/install-fresh-server.sh
-
-chmod +x /tmp/install-fresh-server.sh
-
-sudo /tmp/install-fresh-server.sh \
-  --domain explorer2.yerbas.org
+curl -fsSL https://raw.githubusercontent.com/The-Yerbas-Endeavor/Explorer-Light/feature/rpc-first-test-build/install.sh | sudo bash
 ```
+
+That one command downloads and runs the full installer with `explorer2.yerbas.org` and the default `yerbasadmin` sudo/build account.
 
 The default installation performs the **entire explorer-node bootstrap and host hardening**:
 
