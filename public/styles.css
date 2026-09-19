@@ -1179,6 +1179,10 @@ tbody tr:hover {
     display: none;
   }
 
+  .header-link.assets-link {
+    display: inline-flex;
+  }
+
   .hero {
     display: block;
     padding: 46px 0 38px;
@@ -1309,4 +1313,12 @@ tbody tr:hover {
     animation-duration: .001ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+.footer-meta a {
+  color: var(--muted);
+}
+
+.footer-meta a:hover {
+  color: var(--green-hot);
 }
