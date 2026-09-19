@@ -73,7 +73,18 @@ cleanup() {
     rm -rf "$WORKDIR"
   fi
 }
+
+on_error() {
+  local exit_code=$?
+  local line_no="${BASH_LINENO[0]:-unknown}"
+  local command="${BASH_COMMAND:-unknown}"
+  printf '\n\033[1;31m[Explorer-Light ERROR]\033[0m Installer stopped at line %s (exit %s): %s\n'     "$line_no" "$exit_code" "$command" >&2
+  printf '[Explorer-Light] Re-run the same one-command installer after the issue is corrected; completed steps are designed to be safe to repeat.\n' >&2
+  exit "$exit_code"
+}
+
 trap cleanup EXIT
+trap on_error ERR
 
 usage() {
   cat <<EOF
@@ -205,6 +216,7 @@ apt-get install -y \
   openssh-server \
   openssl \
   python3 \
+  python3-systemd \
   sudo \
   tar \
   ufw \
@@ -313,7 +325,16 @@ maxretry = 5
 findtime = 10m
 bantime = 1h
 EOF
-  systemctl enable --now fail2ban
+  if fail2ban-client -t >/dev/null 2>&1; then
+    systemctl enable fail2ban >/dev/null 2>&1 || true
+    if ! systemctl restart fail2ban; then
+      warn "Fail2ban could not be started; continuing installation."
+      warn "Check later with: systemctl status fail2ban --no-pager"
+    fi
+  else
+    warn "Fail2ban configuration validation failed; continuing installation."
+    warn "Check later with: fail2ban-client -t"
+  fi
 
   local ssh_port
   ssh_port="$(sshd -T 2>/dev/null | awk '$1 == "port" {print $2; exit}')"
@@ -519,6 +540,10 @@ fi
 [[ -x /usr/local/bin/yerbas-cli ]] || die "yerbas-cli was not installed."
 
 log "Configuring Yerbas Core"
+
+# Make re-runs safe: never replace bootstrap/index files underneath a running node.
+systemctl stop yerbasd.service >/dev/null 2>&1 || true
+
 RPC_USER="explorer"
 RPC_PASSWORD="$(openssl rand -hex 32)"
 
