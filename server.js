@@ -58,6 +58,9 @@ function isHash(value) {
 
 function isAiPath(pathname) {
   return pathname === '/.well-known/yerbas-ai.json'
+    || pathname === '/api/ai/v1/status'
+    || pathname === '/api/ai/v1/tools'
+    || pathname === '/api/ai/v1/query'
     || pathname === '/api/ai/status'
     || pathname === '/api/ai/tools'
     || pathname === '/api/ai/query'
@@ -66,7 +69,9 @@ function isAiPath(pathname) {
 }
 
 function isAiQueryPath(pathname) {
-  return pathname === '/api/ai/query' || pathname === '/ext/ai/query';
+  return pathname === '/api/ai/v1/query'
+    || pathname === '/api/ai/query'
+    || pathname === '/ext/ai/query';
 }
 
 async function readJsonBody(req, maxBytes) {
@@ -166,14 +171,14 @@ async function handleAi(req, res, url) {
     return sendJson(res, 200, ai.manifest());
   }
 
-  if (url.pathname === '/api/ai/status' || url.pathname === '/ext/ai/status') {
+  if (url.pathname === '/api/ai/v1/status' || url.pathname === '/api/ai/status' || url.pathname === '/ext/ai/status') {
     if (!['GET', 'HEAD'].includes(req.method || '')) {
       return sendJson(res, 405, { error: 'Method not allowed.' });
     }
     return sendJson(res, 200, await ai.status());
   }
 
-  if (url.pathname === '/api/ai/tools') {
+  if (url.pathname === '/api/ai/v1/tools' || url.pathname === '/api/ai/tools') {
     if (!['GET', 'HEAD'].includes(req.method || '')) {
       return sendJson(res, 405, { error: 'Method not allowed.' });
     }
