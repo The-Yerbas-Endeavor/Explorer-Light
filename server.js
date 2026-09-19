@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import http from 'node:http';
+import { isIP } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,10 +13,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, 'public');
 const rpc = new YerbasRpc(config.rpc);
 const cache = new Map();
+const networkGeoCache = new Map();
 
 function securityHeaders(extra = {}) {
   return {
-    'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data: https://ipfs.io; frame-src https://ipfs.io; base-uri 'none'; frame-ancestors 'none'",
+    'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data: https://ipfs.io https://upload.wikimedia.org; frame-src https://ipfs.io; base-uri 'none'; frame-ancestors 'none'",
     'referrer-policy': 'no-referrer',
     'x-content-type-options': 'nosniff',
     'x-frame-options': 'DENY',
@@ -304,6 +306,239 @@ async function handleAi(req, res, url) {
   return sendJson(res, 404, { error: 'AI route not found.' });
 }
 
+function serviceHost(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+
+  if (text.startsWith('[')) {
+    const end = text.indexOf(']');
+    return end > 1 ? text.slice(1, end) : '';
+  }
+
+  const firstColon = text.indexOf(':');
+  const lastColon = text.lastIndexOf(':');
+
+  if (firstColon > 0 && firstColon === lastColon) {
+    return text.slice(0, lastColon);
+  }
+
+  return text;
+}
+
+function isPublicIp(ip) {
+  const version = isIP(ip);
+  if (!version) return false;
+
+  if (version === 4) {
+    const parts = ip.split('.').map(Number);
+    const [a, b] = parts;
+
+    if (a === 10 || a === 127 || a === 0) return false;
+    if (a === 169 && b === 254) return false;
+    if (a === 172 && b >= 16 && b <= 31) return false;
+    if (a === 192 && b === 168) return false;
+    if (a >= 224) return false;
+    return true;
+  }
+
+  const lower = ip.toLowerCase();
+  if (lower === '::1' || lower === '::') return false;
+  if (lower.startsWith('fe80:')) return false;
+  if (lower.startsWith('fc') || lower.startsWith('fd')) return false;
+  if (lower.startsWith('2001:db8:')) return false;
+  return true;
+}
+
+function normalizeGeoResult(row) {
+  if (!row || typeof row !== 'object') return null;
+
+  const location = row.location && typeof row.location === 'object' ? row.location : row;
+  const ip = row.ip || row.query || row.address || null;
+  const latitude = Number(location.latitude ?? location.lat);
+  const longitude = Number(location.longitude ?? location.lon ?? location.lng);
+
+  if (!ip || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+  return {
+    ip: String(ip),
+    latitude,
+    longitude,
+    city: location.city || row.city || null,
+    region: location.region || location.region_name || row.region || row.regionName || null,
+    countryCode: location.country || location.country_code || row.countryCode || row.country_code || null,
+    country: location.country_name || row.country || row.country_name || location.country || null,
+    isp: row.network?.isp || row.isp || row.org || null,
+    asn: row.network?.asn || row.asn || null
+  };
+}
+
+async function geolocateIps(ips) {
+  if (!config.networkMap.enabled) return new Map();
+
+  const now = Date.now();
+  const unique = [...new Set(ips.filter(isPublicIp))];
+  const results = new Map();
+  const missing = [];
+
+  for (const ip of unique) {
+    const cachedGeo = networkGeoCache.get(ip);
+    if (cachedGeo && cachedGeo.expiresAt > now) {
+      if (cachedGeo.value) results.set(ip, cachedGeo.value);
+    } else {
+      missing.push(ip);
+    }
+  }
+
+  for (let offset = 0; offset < missing.length; offset += 50) {
+    const batch = missing.slice(offset, offset + 50);
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), config.networkMap.geoTimeoutMs);
+
+      const response = await fetch(config.networkMap.geoUrl, {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'content-type': 'application/json',
+          'user-agent': 'Yerbas-Explorer-Light/1.0'
+        },
+        body: JSON.stringify({ ips: batch }),
+        signal: controller.signal
+      }).finally(() => clearTimeout(timeout));
+
+      if (!response.ok) throw new Error('Geolocation HTTP ' + response.status);
+
+      const payload = await response.json();
+      const rows = Array.isArray(payload)
+        ? payload
+        : (Array.isArray(payload?.data?.results)
+          ? payload.data.results
+          : (Array.isArray(payload?.results) ? payload.results : []));
+
+      const found = new Set();
+      for (const row of rows) {
+        const geo = normalizeGeoResult(row);
+        if (!geo || !batch.includes(geo.ip)) continue;
+
+        found.add(geo.ip);
+        results.set(geo.ip, geo);
+        networkGeoCache.set(geo.ip, {
+          value: geo,
+          expiresAt: now + config.networkMap.geoCacheMs
+        });
+      }
+
+      for (const ip of batch) {
+        if (!found.has(ip)) {
+          networkGeoCache.set(ip, {
+            value: null,
+            expiresAt: now + Math.min(config.networkMap.geoCacheMs, 3600000)
+          });
+        }
+      }
+    } catch {
+      for (const ip of batch) {
+        networkGeoCache.set(ip, {
+          value: null,
+          expiresAt: now + 300000
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+function mapNodeStatus(node, view) {
+  if (view === 'peers') {
+    return Number(node.pingTime || 0) > 0.5 ? 'slow' : 'online';
+  }
+
+  if (node.status === 'POSE_BANNED') return 'pose-banned';
+  if (Number(node.PoSePenalty || 0) > 0) return 'penalized';
+  if (node.status === 'ENABLED') return 'online';
+  return 'offline';
+}
+
+async function networkMapData(view) {
+  const normalizedView = view === 'peers' ? 'peers' : 'smartnodes';
+  let nodes;
+
+  if (normalizedView === 'peers') {
+    const peers = await cached('network-map:peers', 15000, currentPeers);
+    nodes = peers.map((peer) => ({
+      id: peer.address,
+      service: peer.address,
+      ip: serviceHost(peer.address),
+      status: mapNodeStatus(peer, 'peers'),
+      inbound: peer.inbound,
+      version: peer.version,
+      subversion: peer.subversion,
+      pingTime: peer.pingTime,
+      bytesSent: peer.bytesSent,
+      bytesRecv: peer.bytesRecv
+    }));
+  } else {
+    const live = await loadLiveSmartnodes();
+    nodes = live.items.map((node) => ({
+      id: node.proTxHash || node.outpoint,
+      service: node.service,
+      ip: serviceHost(node.service),
+      status: mapNodeStatus(node, 'smartnodes'),
+      payoutAddress: node.payoutAddress,
+      collateralAmount: node.collateralAmount,
+      PoSePenalty: node.PoSePenalty,
+      PoSeBanHeight: node.PoSeBanHeight,
+      proTxHash: node.proTxHash
+    }));
+  }
+
+  const geoByIp = await geolocateIps(nodes.map((node) => node.ip));
+  const items = nodes.map((node) => {
+    const geo = geoByIp.get(node.ip) || null;
+    return {
+      ...node,
+      geo
+    };
+  });
+
+  const plotted = items.filter((item) => item.geo);
+  const countries = new Set(plotted.map((item) => item.geo.countryCode || item.geo.country).filter(Boolean));
+
+  const counts = {
+    online: items.filter((item) => item.status === 'online').length,
+    slow: items.filter((item) => item.status === 'slow').length,
+    penalized: items.filter((item) => item.status === 'penalized').length,
+    offline: items.filter((item) => item.status === 'offline').length,
+    poseBanned: items.filter((item) => item.status === 'pose-banned').length
+  };
+
+  return {
+    view: normalizedView,
+    generatedAt: new Date().toISOString(),
+    approximate: true,
+    source: normalizedView === 'peers'
+      ? 'Yerbas Core getpeerinfo'
+      : 'Yerbas Core smartnodelist/protx',
+    geolocation: {
+      enabled: config.networkMap.enabled,
+      provider: config.networkMap.enabled ? 'HackMyIP bulk IP geolocation' : null,
+      cacheMs: config.networkMap.geoCacheMs
+    },
+    stats: {
+      totalNodes: items.length,
+      countries: countries.size,
+      reachable: counts.online + counts.slow + counts.penalized,
+      offline: counts.offline,
+      poseBanned: counts.poseBanned,
+      plotted: plotted.length,
+      ...counts
+    },
+    items
+  };
+}
+
 async function currentPeers() {
   const peers = await rpc.call('getpeerinfo');
   if (!Array.isArray(peers)) return [];
@@ -583,6 +818,7 @@ async function handlePublicApi(req, res, url) {
         supply: '/api/v1/supply',
         emission: '/api/v1/emission?height=',
         smartnodes: '/api/v1/smartnodes?status=ENABLED&page=1&count=50&collateral=&q=&sort=pay-age-asc',
+        networkMap: '/api/v1/network-map?view=smartnodes',
         peers: '/api/v1/network/peers',
         marketPrice: '/api/v1/market-price'
       }
@@ -601,6 +837,11 @@ async function handlePublicApi(req, res, url) {
 
   if (path === '/api/v1/smartnodes') {
     return sendJson(res, 200, await smartnodeDirectory(url));
+  }
+
+  if (path === '/api/v1/network-map') {
+    const view = url.searchParams.get('view') === 'peers' ? 'peers' : 'smartnodes';
+    return sendJson(res, 200, await networkMapData(view));
   }
 
   if (path === '/api/v1/network/peers') {
@@ -825,6 +1066,11 @@ async function handleApi(req, res, url) {
       }
       throw error;
     }
+  }
+
+  if (url.pathname === '/api/network-map') {
+    const view = url.searchParams.get('view') === 'peers' ? 'peers' : 'smartnodes';
+    return sendJson(res, 200, await networkMapData(view));
   }
 
   if (url.pathname === '/api/smartnodes') {
@@ -1082,7 +1328,8 @@ async function requestHandler(req, res) {
       || url.pathname === '/assets'
       || url.pathname.startsWith('/asset/')
       || url.pathname === '/smartnodes'
-      || url.pathname === '/masternodes') {
+      || url.pathname === '/masternodes'
+      || url.pathname === '/node-map') {
       return await sendFile(req, res, 'index.html', 'text/html; charset=utf-8', 'no-cache');
     }
 
