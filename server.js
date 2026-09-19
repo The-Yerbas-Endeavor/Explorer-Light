@@ -434,7 +434,7 @@ async function smartnodeDirectory(url) {
   const query = (url.searchParams.get('q') || '').trim().toLowerCase();
   const status = (url.searchParams.get('status') || 'ENABLED').trim().toUpperCase();
   const collateral = (url.searchParams.get('collateral') || '').trim();
-  const sort = (url.searchParams.get('sort') || 'last-paid').trim().toLowerCase();
+  const sort = (url.searchParams.get('sort') || 'pay-age-asc').trim().toLowerCase();
   const count = apiInt(url.searchParams.get('count'), 50, 1, 100);
   const page = apiInt(url.searchParams.get('page'), 1, 1, 1000000);
 
@@ -464,18 +464,43 @@ async function smartnodeDirectory(url) {
   }
 
   items.sort((a, b) => {
-    if (sort === 'registered') {
-      return Number(a.registeredHeight ?? Number.MAX_SAFE_INTEGER) - Number(b.registeredHeight ?? Number.MAX_SAFE_INTEGER);
+    const dir = sort.endsWith('-desc') ? -1 : 1;
+    const numeric = (left, right) => (Number(left || 0) - Number(right || 0)) * dir;
+    const text = (left, right) => String(left || '').localeCompare(String(right || '')) * dir;
+
+    if (sort.startsWith('service-') || sort === 'service') {
+      return text(a.service, b.service) || text(a.proTxHash, b.proTxHash);
     }
-    if (sort === 'collateral-desc') {
-      return Number(b.collateralAmount || 0) - Number(a.collateralAmount || 0);
+
+    if (sort.startsWith('payout-')) {
+      return text(a.payoutAddress, b.payoutAddress) || text(a.service, b.service);
     }
-    if (sort === 'service') {
-      return String(a.service || '').localeCompare(String(b.service || ''));
+
+    if (sort.startsWith('collateral-') || sort === 'collateral-desc') {
+      return numeric(a.collateralAmount, b.collateralAmount) || text(a.service, b.service);
     }
-    const aPaid = Number(a.lastPaidBlock || 0);
-    const bPaid = Number(b.lastPaidBlock || 0);
-    return aPaid - bPaid;
+
+    if (sort.startsWith('pose-')) {
+      return numeric(a.PoSePenalty, b.PoSePenalty)
+        || numeric(a.PoSeBanHeight, b.PoSeBanHeight)
+        || text(a.service, b.service);
+    }
+
+    if (sort.startsWith('registered-') || sort === 'registered') {
+      const aHeight = a.registeredHeight ?? Number.MAX_SAFE_INTEGER;
+      const bHeight = b.registeredHeight ?? Number.MAX_SAFE_INTEGER;
+      return (Number(aHeight) - Number(bHeight)) * dir || text(a.service, b.service);
+    }
+
+    if (sort.startsWith('status-')) {
+      return text(a.status, b.status) || text(a.service, b.service);
+    }
+
+    if (sort.startsWith('pay-age-') || sort.startsWith('last-paid-') || sort === 'last-paid') {
+      return numeric(a.lastPaidBlock, b.lastPaidBlock) || text(a.service, b.service);
+    }
+
+    return numeric(a.lastPaidBlock, b.lastPaidBlock) || text(a.service, b.service);
   });
 
   const total = items.length;
@@ -557,7 +582,7 @@ async function handlePublicApi(req, res, url) {
         asset: '/api/v1/asset/:asset-name',
         supply: '/api/v1/supply',
         emission: '/api/v1/emission?height=',
-        smartnodes: '/api/v1/smartnodes?status=ENABLED&page=1&count=50&collateral=&q=',
+        smartnodes: '/api/v1/smartnodes?status=ENABLED&page=1&count=50&collateral=&q=&sort=pay-age-asc',
         peers: '/api/v1/network/peers',
         marketPrice: '/api/v1/market-price'
       }
