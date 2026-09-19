@@ -98,7 +98,7 @@ For a custom administrator name:
 ```bash
 sudo /tmp/install-fresh-server.sh \
   --domain explorer2.yerbas.org \
-  --admin-user chuck
+  --admin-user exploreradmin
 ```
 
 For HTTPS once DNS for `explorer2.yerbas.org` resolves to the server:
