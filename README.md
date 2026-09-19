@@ -49,51 +49,62 @@ If Explorer Light runs as the same OS user as \`yerbasd\`, it automatically trie
 
 ## Fresh-server installer
 
-For a brand-new Ubuntu/Debian server, the repository now includes a full bootstrap installer:
+For a brand-new Ubuntu/Debian server, use the repository bootstrap installer:
 
-\`\`\`bash
+```bash
 curl -fsSL \
   https://raw.githubusercontent.com/The-Yerbas-Endeavor/Explorer-Light/feature/rpc-first-test-build/scripts/install-fresh-server.sh \
   -o /tmp/install-fresh-server.sh
 
 chmod +x /tmp/install-fresh-server.sh
-sudo /tmp/install-fresh-server.sh
-\`\`\`
 
-The default install builds a **headless, wallet-disabled Yerbas Core node**, enables \`txindex=1\`, \`addressindex=1\`, and \`assetindex=1\`, installs Node.js 24, Explorer Light, systemd services, and nginx, and then runs the Explorer test/syntax suite.
-
-For a domain:
-
-\`\`\`bash
-sudo /tmp/install-fresh-server.sh --domain explorer.example.org
-\`\`\`
-
-For a domain with Let's Encrypt HTTPS:
-
-\`\`\`bash
 sudo /tmp/install-fresh-server.sh \
-  --domain explorer.example.org \
+  --domain explorer2.yerbas.org
+```
+
+The default installation now performs the **entire explorer-node bootstrap**:
+
+- Downloads the latest matching official Yerbas Core Linux release for Ubuntu 22.04, 24.04, or 26.04. If no matching binary exists, it falls back to a headless source build.
+- Creates the dedicated `yerbas` Core service user and `explorer-light` web service user.
+- Generates localhost-only Core RPC credentials.
+- Writes Core configuration to `/home/yerbas/.yerbascore/yerbas.conf`.
+- Enables `txindex=1`, `addressindex=1`, `assetindex=1`, `spentindex=1`, and `timestampindex=1`.
+- Discovers the latest release from `The-Yerbas-Endeavor/YERB-Bootstrap`.
+- Downloads `bootstrap-index.zip` and `powcache.dat`.
+- Verifies both files against the SHA-256 digests published by GitHub Releases.
+- Extracts the indexed blockchain snapshot into `/home/yerbas/.yerbascore` **before Core starts**.
+- Starts Core and waits until its RPC interface is actually responding.
+- Clones Explorer Light to `/opt/yerbas-explorer-light`.
+- Writes the matching RPC host, port, username, and generated password to `/opt/yerbas-explorer-light/.env`. This is the runtime configuration read by `src/config.js`.
+- Runs `npm test` and `npm run check`.
+- Installs and starts the Explorer Light systemd service.
+- Configures nginx as the only public HTTP entry point.
+- Optionally requests a Let's Encrypt certificate.
+
+The explorer does **not** need a separate MongoDB or SQLite blockchain database. The indexes used by the explorer live in Yerbas Core and are included in the indexed bootstrap snapshot.
+
+For HTTPS once DNS for `explorer2.yerbas.org` resolves to the server:
+
+```bash
+sudo /tmp/install-fresh-server.sh \
+  --domain explorer2.yerbas.org \
   --https \
   --email admin@example.org
-\`\`\`
-
-The installer keeps Yerbas Core RPC on \`127.0.0.1:9998\`, keeps Explorer Light on \`127.0.0.1:3001\`, and exposes only nginx publicly. The Core build is compiled without the wallet and GUI to reduce dependencies and attack surface. Its temporary source/build tree is removed after successful installation to reclaim disk space.
+```
 
 Useful installer options:
 
-\`\`\`text
---core-ref REF
---branch REF
---jobs N
+```text
 --domain NAME
 --https
 --email ADDRESS
+--branch REF
+--core-ref REF
 --source-build
 --skip-bootstrap
 --keep-downloads
-\`\`\`
-
-On small servers, the installer automatically limits parallel Core compilation according to available RAM and creates a 2 GiB swapfile when memory is below 4 GiB and no meaningful swap exists.
+--jobs N
+```
 
 ## Run the test build
 
