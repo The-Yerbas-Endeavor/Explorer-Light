@@ -547,7 +547,21 @@ log "Configuring Yerbas Core"
 systemctl stop yerbasd.service >/dev/null 2>&1 || true
 
 RPC_USER="explorer"
-RPC_PASSWORD="$(openssl rand -hex 32)"
+RPC_PASSWORD=""
+
+# Preserve generated RPC credentials across retries so an already-installed
+# Explorer and Core cannot drift onto different passwords.
+if [[ -s "$CORE_DATA/yerbas.conf" ]]; then
+  EXISTING_RPC_USER="$(awk -F= '$1 == "rpcuser" {v=substr($0,index($0,"=")+1)} END {print v}' "$CORE_DATA/yerbas.conf")"
+  EXISTING_RPC_PASSWORD="$(awk -F= '$1 == "rpcpassword" {v=substr($0,index($0,"=")+1)} END {print v}' "$CORE_DATA/yerbas.conf")"
+  if [[ -n "$EXISTING_RPC_USER" && -n "$EXISTING_RPC_PASSWORD" ]]; then
+    RPC_USER="$EXISTING_RPC_USER"
+    RPC_PASSWORD="$EXISTING_RPC_PASSWORD"
+    log "Reusing existing localhost RPC credentials"
+  fi
+fi
+
+[[ -n "$RPC_PASSWORD" ]] || RPC_PASSWORD="$(openssl rand -hex 32)"
 
 install -d -m 0700 -o "$CORE_USER" -g "$CORE_USER" "$CORE_DATA"
 
@@ -827,6 +841,7 @@ jq '{
 }' "$WORKDIR/blockchaininfo.json" || cat "$WORKDIR/blockchaininfo.json"
 
 log "Installing Explorer Light branch $EXPLORER_BRANCH as $ADMIN_USER"
+systemctl stop yerbas-explorer-light.service >/dev/null 2>&1 || true
 rm -rf "$EXPLORER_DIR"
 install -d -m 0755 -o "$ADMIN_USER" -g "$ADMIN_USER" "$EXPLORER_DIR"
 sudo -u "$ADMIN_USER" git clone --depth 1 --branch "$EXPLORER_BRANCH" "$EXPLORER_REPO" "$EXPLORER_DIR"
@@ -895,7 +910,8 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable --now yerbas-explorer-light
+systemctl enable yerbas-explorer-light
+systemctl restart yerbas-explorer-light
 
 log "Configuring nginx"
 if [[ "$DOMAIN" == "_" ]]; then
