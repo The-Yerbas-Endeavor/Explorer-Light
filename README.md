@@ -78,8 +78,8 @@ The default installation performs the **entire explorer-node bootstrap and host 
 - Downloads `bootstrap-index.zip` and `powcache.dat`.
 - Verifies both files against the SHA-256 digests published by GitHub Releases.
 - Extracts the indexed blockchain snapshot into `/home/yerbas/.yerbascore` **before Core starts**.
-- Starts Core and waits until its RPC interface is actually responding.
-- Clones Explorer Light to `/opt/yerbas-explorer-light`.
+- Starts Core, waits for RPC, and then waits for the Yerbas blockchain to catch up before bringing the explorer online. The default synchronization window is up to 3 hours, with progress reports while Core loads/catches up.
+- Only after Core is synchronized does it clone Explorer Light to `/opt/yerbas-explorer-light`.
 - Writes the matching RPC host, port, username, and generated password to `/opt/yerbas-explorer-light/.env`.
 - Runs `npm test` and `npm run check` as the non-root build administrator, then locks the deployed tree down for the service account.
 - Installs and starts the Explorer Light systemd service.
