@@ -45,6 +45,51 @@ Changing index settings on an existing node can require a Core reindex.
 
 If Explorer Light runs as the same OS user as \`yerbasd\`, it automatically tries the RPC cookie at \`~/.yerbascore/.cookie\`. Otherwise configure an RPC user/password in \`.env\`.
 
+## Fresh-server installer
+
+For a brand-new Ubuntu/Debian server, the repository now includes a full bootstrap installer:
+
+\`\`\`bash
+curl -fsSL \
+  https://raw.githubusercontent.com/The-Yerbas-Endeavor/Explorer-Light/feature/rpc-first-test-build/scripts/install-fresh-server.sh \
+  -o /tmp/install-fresh-server.sh
+
+chmod +x /tmp/install-fresh-server.sh
+sudo /tmp/install-fresh-server.sh
+\`\`\`
+
+The default install builds a **headless, wallet-disabled Yerbas Core node**, enables \`txindex=1\`, \`addressindex=1\`, and \`assetindex=1\`, installs Node.js 24, Explorer Light, systemd services, and nginx, and then runs the Explorer test/syntax suite.
+
+For a domain:
+
+\`\`\`bash
+sudo /tmp/install-fresh-server.sh --domain explorer.example.org
+\`\`\`
+
+For a domain with Let's Encrypt HTTPS:
+
+\`\`\`bash
+sudo /tmp/install-fresh-server.sh \
+  --domain explorer.example.org \
+  --https \
+  --email admin@example.org
+\`\`\`
+
+The installer keeps Yerbas Core RPC on \`127.0.0.1:9998\`, keeps Explorer Light on \`127.0.0.1:3001\`, and exposes only nginx publicly. The Core build is compiled without the wallet and GUI to reduce dependencies and attack surface. Its temporary source/build tree is removed after successful installation to reclaim disk space.
+
+Useful installer options:
+
+\`\`\`text
+--core-ref REF
+--branch REF
+--jobs N
+--domain NAME
+--https
+--email ADDRESS
+\`\`\`
+
+On small servers, the installer automatically limits parallel Core compilation according to available RAM and creates a 2 GiB swapfile when memory is below 4 GiB and no meaningful swap exists.
+
 ## Run the test build
 
 \`\`\`bash
