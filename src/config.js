@@ -52,6 +52,12 @@ export const config = Object.freeze({
     maxBodyBytes: intEnv('AI_MAX_BODY_BYTES', 32768, 1024, 262144),
     marketPriceUrl: process.env.AI_MARKET_PRICE_URL || ''
   }),
+  networkMap: Object.freeze({
+    enabled: boolEnv('NETWORK_MAP_ENABLED', true),
+    geoUrl: process.env.NETWORK_MAP_GEO_URL || 'https://hackmyip.com/api/bulk',
+    geoCacheMs: intEnv('NETWORK_MAP_GEO_CACHE_MS', 86400000, 60000, 604800000),
+    geoTimeoutMs: intEnv('NETWORK_MAP_GEO_TIMEOUT_MS', 12000, 1000, 60000)
+  }),
   recentBlocks: intEnv('RECENT_BLOCKS', 12, 5, 25),
   cacheMs: intEnv('CACHE_MS', 5000, 0, 60000)
 });
