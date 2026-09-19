@@ -36,6 +36,8 @@ FORCE_SOURCE_BUILD=0
 SKIP_BOOTSTRAP=0
 KEEP_DOWNLOADS=0
 JOBS=""
+ADMIN_USER="yerbasadmin"
+SSH_HARDENED=0
 
 CORE_REPO="https://github.com/The-Yerbas-Endeavor/yerbas.git"
 CORE_RELEASE_API="https://api.github.com/repos/The-Yerbas-Endeavor/yerbas/releases/latest"
@@ -88,6 +90,7 @@ Options:
   --skip-bootstrap       Do not download bootstrap-index.zip / powcache.dat.
   --keep-downloads       Keep installer downloads under /var/tmp.
   --jobs N               Source-build parallel jobs.
+  --admin-user NAME       Sudo/build administrator. Default: yerbasadmin
   -h, --help             Show help.
 
 The default path uses the latest matching official Yerbas Core Ubuntu release
@@ -138,6 +141,11 @@ while [[ $# -gt 0 ]]; do
       JOBS="$2"
       shift 2
       ;;
+    --admin-user)
+      [[ $# -ge 2 ]] || die "Missing admin username."
+      ADMIN_USER="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -149,6 +157,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ "$EUID" -eq 0 ]] || die "Run this installer with sudo/root."
+[[ "$ADMIN_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || die "Invalid --admin-user value."
+[[ "$ADMIN_USER" != "root" ]] || die "--admin-user cannot be root."
 
 if (( HTTPS )); then
   [[ "$DOMAIN" != "_" ]] || die "--https requires --domain."
@@ -188,12 +198,17 @@ apt-get update
 apt-get install -y \
   ca-certificates \
   curl \
+  fail2ban \
   git \
   jq \
   nginx \
+  openssh-server \
   openssl \
   python3 \
+  sudo \
   tar \
+  ufw \
+  unattended-upgrades \
   unzip
 
 node_ok=0
@@ -213,6 +228,125 @@ fi
 
 command -v node >/dev/null || die "Node.js installation failed."
 log "Using Node.js $(node --version)"
+
+create_admin_user() {
+  local source_keys=""
+  local admin_home
+
+  log "Creating hardened sudo/build administrator: $ADMIN_USER"
+
+  if ! id -u "$ADMIN_USER" >/dev/null 2>&1; then
+    adduser --disabled-password --gecos "" "$ADMIN_USER"
+  fi
+
+  usermod -aG sudo "$ADMIN_USER"
+  passwd -l "$ADMIN_USER" >/dev/null 2>&1 || true
+
+  admin_home="$(getent passwd "$ADMIN_USER" | cut -d: -f6)"
+  [[ -n "$admin_home" ]] || die "Unable to determine home directory for $ADMIN_USER."
+
+  if [[ -n "\${SUDO_USER:-}" && "\${SUDO_USER:-}" != "root" ]]; then
+    local sudo_home
+    sudo_home="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+    if [[ -s "$sudo_home/.ssh/authorized_keys" ]]; then
+      source_keys="$sudo_home/.ssh/authorized_keys"
+    fi
+  fi
+
+  if [[ -z "$source_keys" && -s /root/.ssh/authorized_keys ]]; then
+    source_keys="/root/.ssh/authorized_keys"
+  fi
+
+  install -d -m 0700 -o "$ADMIN_USER" -g "$ADMIN_USER" "$admin_home/.ssh"
+
+  if [[ -n "$source_keys" ]]; then
+    install -m 0600 -o "$ADMIN_USER" -g "$ADMIN_USER" \
+      "$source_keys" "$admin_home/.ssh/authorized_keys"
+    SSH_HARDENED=1
+    log "Copied existing SSH authorized_keys to $ADMIN_USER"
+  else
+    SSH_HARDENED=0
+    warn "No existing authorized_keys file was found."
+    warn "Root/password SSH authentication will NOT be disabled automatically."
+  fi
+
+  cat > "/etc/sudoers.d/90-$ADMIN_USER" <<EOF
+$ADMIN_USER ALL=(ALL:ALL) NOPASSWD: ALL
+EOF
+  chmod 0440 "/etc/sudoers.d/90-$ADMIN_USER"
+  visudo -cf "/etc/sudoers.d/90-$ADMIN_USER" >/dev/null \
+    || die "Generated sudoers configuration is invalid."
+}
+
+harden_server() {
+  log "Applying base server hardening"
+
+  cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+EOF
+  systemctl enable --now unattended-upgrades.service >/dev/null 2>&1 || true
+
+  cat > /etc/sysctl.d/99-yerbas-explorer-hardening.conf <<'EOF'
+kernel.kptr_restrict=2
+kernel.dmesg_restrict=1
+kernel.yama.ptrace_scope=1
+fs.protected_hardlinks=1
+fs.protected_symlinks=1
+net.ipv4.conf.all.accept_redirects=0
+net.ipv4.conf.default.accept_redirects=0
+net.ipv4.conf.all.send_redirects=0
+net.ipv4.conf.default.send_redirects=0
+net.ipv4.conf.all.accept_source_route=0
+net.ipv4.conf.default.accept_source_route=0
+net.ipv4.tcp_syncookies=1
+net.ipv6.conf.all.accept_redirects=0
+net.ipv6.conf.default.accept_redirects=0
+EOF
+  sysctl --system >/dev/null
+
+  cat > /etc/fail2ban/jail.d/sshd-local.conf <<'EOF'
+[sshd]
+enabled = true
+backend = systemd
+maxretry = 5
+findtime = 10m
+bantime = 1h
+EOF
+  systemctl enable --now fail2ban
+
+  ufw --force reset >/dev/null
+  ufw default deny incoming
+  ufw default allow outgoing
+  ufw allow OpenSSH
+  ufw allow 80/tcp
+  ufw allow 443/tcp
+  ufw allow 9999/tcp comment 'Yerbas P2P' || true
+  ufw --force enable
+
+  if (( SSH_HARDENED )); then
+    log "Hardening SSH for key-only administration"
+
+    cat > /etc/ssh/sshd_config.d/99-yerbas-explorer-hardening.conf <<EOF
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitEmptyPasswords no
+PubkeyAuthentication yes
+X11Forwarding no
+AllowUsers $ADMIN_USER
+EOF
+
+    sshd -t || die "Hardened sshd configuration failed validation."
+    systemctl reload ssh || systemctl reload sshd
+  else
+    warn "SSH key migration was not verified; sshd login policy was left unchanged."
+  fi
+}
+
+create_admin_user
+harden_server
+
 
 if ! id -u "$CORE_USER" >/dev/null 2>&1; then
   useradd \
@@ -334,7 +468,8 @@ install_core_from_source() {
   fi
 
   rm -rf "$CORE_SRC"
-  git clone --depth 1 --branch "$CORE_REF" "$CORE_REPO" "$CORE_SRC"
+  install -d -m 0755 -o "$ADMIN_USER" -g "$ADMIN_USER" "$CORE_SRC"
+  sudo -u "$ADMIN_USER" git clone --depth 1 --branch "$CORE_REF" "$CORE_REPO" "$CORE_SRC"
   cd "$CORE_SRC"
 
   if [[ -x ./build-aux/config.guess ]]; then
@@ -519,9 +654,10 @@ jq '{
   initialblockdownload
 }' "$WORKDIR/blockchaininfo.json" || cat "$WORKDIR/blockchaininfo.json"
 
-log "Installing Explorer Light branch $EXPLORER_BRANCH"
+log "Installing Explorer Light branch $EXPLORER_BRANCH as $ADMIN_USER"
 rm -rf "$EXPLORER_DIR"
-git clone --depth 1 --branch "$EXPLORER_BRANCH" "$EXPLORER_REPO" "$EXPLORER_DIR"
+install -d -m 0755 -o "$ADMIN_USER" -g "$ADMIN_USER" "$EXPLORER_DIR"
+sudo -u "$ADMIN_USER" git clone --depth 1 --branch "$EXPLORER_BRANCH" "$EXPLORER_REPO" "$EXPLORER_DIR"
 
 cat > "$EXPLORER_DIR/.env" <<EOF
 # Explorer HTTP service. nginx is the public entry point.
@@ -548,10 +684,10 @@ chown -R root:"$EXPLORER_USER" "$EXPLORER_DIR"
 chmod -R g+rX,o-rwx "$EXPLORER_DIR"
 chmod 0640 "$EXPLORER_DIR/.env"
 
-log "Validating Explorer Light"
+log "Validating Explorer Light as $ADMIN_USER"
 cd "$EXPLORER_DIR"
-npm test
-npm run check
+sudo -u "$ADMIN_USER" npm test
+sudo -u "$ADMIN_USER" npm run check
 
 NODE_BIN="$(command -v node)"
 
@@ -701,7 +837,18 @@ echo "Logs:"
 echo "  journalctl -u yerbasd -f"
 echo "  journalctl -u yerbas-explorer-light -f"
 echo
+echo "Administration:"
+echo "  SSH/sudo administrator: $ADMIN_USER"
+echo "  This account is key-only and uses passwordless sudo."
+if (( SSH_HARDENED )); then
+  echo "  Root SSH login and SSH password authentication are disabled."
+else
+  echo "  SSH login policy was not tightened because no authorized key was found."
+fi
+echo
 echo "Security:"
+echo "  UFW is enabled with inbound deny-by-default."
+echo "  Fail2ban SSH protection and unattended security updates are enabled."
 echo "  Yerbas RPC is bound to 127.0.0.1 only."
 echo "  Explorer Light is bound to 127.0.0.1 behind nginx."
 echo "  The Explorer .env contains generated RPC credentials and is not web-accessible."
