@@ -321,7 +321,7 @@ EOF
   ufw allow OpenSSH
   ufw allow 80/tcp
   ufw allow 443/tcp
-  ufw allow 9999/tcp comment 'Yerbas P2P' || true
+  ufw allow 15420/tcp comment 'Yerbas P2P' || true
   ufw --force enable
 
   if (( SSH_HARDENED )); then
@@ -680,14 +680,15 @@ AI_API_ENABLED=true
 AI_MAX_BODY_BYTES=32768
 EOF
 
-chown -R root:"$EXPLORER_USER" "$EXPLORER_DIR"
-chmod -R g+rX,o-rwx "$EXPLORER_DIR"
-chmod 0640 "$EXPLORER_DIR/.env"
-
 log "Validating Explorer Light as $ADMIN_USER"
 cd "$EXPLORER_DIR"
 sudo -u "$ADMIN_USER" npm test
 sudo -u "$ADMIN_USER" npm run check
+
+# Lock the deployed tree down after the non-root build/test step.
+chown -R root:"$EXPLORER_USER" "$EXPLORER_DIR"
+chmod -R g+rX,o-rwx "$EXPLORER_DIR"
+chmod 0640 "$EXPLORER_DIR/.env"
 
 NODE_BIN="$(command -v node)"
 
