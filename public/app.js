@@ -820,17 +820,52 @@ function networkMapSeverity(status) {
   return order[status] || 0;
 }
 
+function networkMapHasGeo(item) {
+  return Boolean(
+    item?.geo
+    && Number.isFinite(Number(item.geo.latitude))
+    && Number.isFinite(Number(item.geo.longitude))
+  );
+}
+
+function networkMapMatchesFilter(item, filter) {
+  if (filter === 'reachable') {
+    return ['online', 'slow', 'penalized'].includes(item.status);
+  }
+
+  if (filter === 'offline') return item.status === 'offline';
+  if (filter === 'pose-banned') return item.status === 'pose-banned';
+  if (filter === 'plotted') return networkMapHasGeo(item);
+
+  if (filter === 'countries') {
+    return networkMapHasGeo(item) && Boolean(item.geo.countryCode || item.geo.country);
+  }
+
+  return true;
+}
+
+function networkMapFilterLabel(filter) {
+  const labels = {
+    all: 'all nodes',
+    countries: 'nodes with country data',
+    reachable: 'reachable nodes',
+    offline: 'offline nodes',
+    'pose-banned': 'PoSe-banned nodes',
+    plotted: 'geolocated nodes'
+  };
+  return labels[filter] || labels.all;
+}
+
 function networkMapClusters(items) {
   const groups = new Map();
 
   for (const item of items) {
-    if (!item?.geo) continue;
+    if (!networkMapHasGeo(item)) continue;
 
     const latitude = Number(item.geo.latitude);
     const longitude = Number(item.geo.longitude);
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
-
     const key = latitude.toFixed(2) + ',' + longitude.toFixed(2);
+
     if (!groups.has(key)) {
       groups.set(key, {
         latitude,
@@ -904,35 +939,29 @@ async function renderNetworkMap() {
 
   const params = new URLSearchParams(location.search);
   const view = params.get('view') === 'peers' ? 'peers' : 'smartnodes';
+  const allowedFilters = new Set(['all', 'countries', 'reachable', 'offline', 'pose-banned', 'plotted']);
+  let activeFilter = allowedFilters.has(params.get('filter')) ? params.get('filter') : 'all';
+
   const data = await api('/api/network-map?view=' + encodeURIComponent(view));
 
   setRpcState('online', 'Core online');
   document.title = 'Yerbas Network Map · Explorer Light';
 
-  const clusters = networkMapClusters(data.items || []);
-  const pins = clusters.map((cluster, index) => {
-    const label = networkMapLocationLabel(cluster);
-    const count = cluster.nodes.length;
-    const position = networkMapPinPosition(cluster.latitude, cluster.longitude);
-    return '<button class="network-pin status-' + esc(cluster.status) + (count > 1 ? ' cluster' : '') + '"' +
-      ' type="button" data-map-cluster="' + index + '"' +
-      ' data-map-left="' + position.left.toFixed(4) + '"' +
-      ' data-map-top="' + position.top.toFixed(4) + '"' +
-      ' title="' + esc(label + ' · ' + count + (count === 1 ? ' node' : ' nodes')) + '">' +
-      (count > 1 ? '<span>' + number(count) + '</span>' : '') +
-    '</button>';
-  }).join('');
-
   const stats = data.stats || {};
-  const statCards = [
-    ['Total nodes', stats.totalNodes],
-    ['Countries', stats.countries],
-    ['Reachable', stats.reachable],
-    ['Offline', stats.offline],
-    ['PoSe banned', stats.poseBanned],
-    ['Plotted', stats.plotted]
-  ].map(([label, value]) =>
-    '<article class="network-stat"><span>' + esc(label) + '</span><strong>' + number(value) + '</strong></article>'
+  const statDefinitions = [
+    ['Total nodes', stats.totalNodes, 'all'],
+    ['Countries', stats.countries, 'countries'],
+    ['Reachable', stats.reachable, 'reachable'],
+    ['Offline', stats.offline, 'offline'],
+    ['PoSe banned', stats.poseBanned, 'pose-banned'],
+    ['Plotted', stats.plotted, 'plotted']
+  ];
+
+  const statCards = statDefinitions.map(([label, value, filter]) =>
+    '<button type="button" class="network-stat' + (activeFilter === filter ? ' active' : '') + '"' +
+      ' data-map-filter="' + filter + '" title="Show ' + esc(networkMapFilterLabel(filter)) + '">' +
+      '<span>' + esc(label) + '</span><strong>' + number(value) + '</strong>' +
+    '</button>'
   ).join('');
 
   const legend = [
@@ -962,60 +991,243 @@ async function renderNetworkMap() {
     '<section class="network-map-stats">' + statCards + '</section>' +
 
     '<section class="panel network-map-panel">' +
-      '<div class="network-map-canvas">' +
-        '<img class="network-map-base" src="https://upload.wikimedia.org/wikipedia/commons/5/51/BlankMap-Equirectangular.svg" alt="" aria-hidden="true">' +
-        '<div class="network-map-grid" aria-hidden="true"></div>' +
-        '<div class="network-map-pins">' + pins + '</div>' +
+      '<div id="network-map-canvas" class="network-map-canvas">' +
+        '<div id="network-map-stage" class="network-map-stage">' +
+          '<img class="network-map-base" src="https://upload.wikimedia.org/wikipedia/commons/5/51/BlankMap-Equirectangular.svg" alt="" aria-hidden="true">' +
+          '<div class="network-map-grid" aria-hidden="true"></div>' +
+          '<div id="network-map-pins" class="network-map-pins"></div>' +
+        '</div>' +
+        '<div class="network-map-controls" aria-label="Map controls">' +
+          '<button type="button" data-map-zoom="in" title="Zoom in">+</button>' +
+          '<button type="button" data-map-zoom="out" title="Zoom out">−</button>' +
+          '<button type="button" data-map-zoom="reset" title="Reset map">↺</button>' +
+        '</div>' +
+        '<div class="network-map-hint">Scroll to zoom · drag to pan · double-click to zoom</div>' +
         '<aside id="network-map-detail" class="network-map-detail hidden"></aside>' +
       '</div>' +
       '<div class="network-map-foot">' +
         '<span>' + esc(data.source) + '</span>' +
+        '<span id="network-map-filter-status"></span>' +
         '<span>Node locations are approximate and derived from IP geolocation. Exact operator locations are not exposed.</span>' +
         '<span>Geo: HackMyIP · Map: Wikimedia Commons CC0</span>' +
       '</div>' +
     '</section>';
 
+  const allItems = Array.isArray(data.items) ? data.items : [];
+  const canvas = document.querySelector('#network-map-canvas');
+  const stage = document.querySelector('#network-map-stage');
+  const pinsElement = document.querySelector('#network-map-pins');
   const detail = document.querySelector('#network-map-detail');
+  const filterStatus = document.querySelector('#network-map-filter-status');
 
-  document.querySelectorAll('[data-map-cluster]').forEach((button) => {
-    const left = Number(button.dataset.mapLeft);
-    const top = Number(button.dataset.mapTop);
+  let currentClusters = [];
+  let mapView = { scale: 1, x: 0, y: 0 };
+  let dragState = null;
 
-    if (Number.isFinite(left) && Number.isFinite(top)) {
-      button.style.left = left.toFixed(4) + '%';
-      button.style.top = top.toFixed(4) + '%';
+  function clampMapView() {
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaledWidth = rect.width * mapView.scale;
+    const scaledHeight = rect.height * mapView.scale;
+
+    if (mapView.scale <= 1) {
+      mapView.x = 0;
+      mapView.y = 0;
+      return;
     }
-  });
 
-  document.querySelectorAll('[data-map-cluster]').forEach((button) => {
+    mapView.x = Math.min(0, Math.max(rect.width - scaledWidth, mapView.x));
+    mapView.y = Math.min(0, Math.max(rect.height - scaledHeight, mapView.y));
+  }
+
+  function applyMapView() {
+    if (!stage) return;
+    clampMapView();
+    stage.style.transform =
+      'translate(' + mapView.x.toFixed(2) + 'px,' + mapView.y.toFixed(2) + 'px) scale(' +
+      mapView.scale.toFixed(4) + ')';
+  }
+
+  function zoomMapAt(clientX, clientY, nextScale) {
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const oldScale = mapView.scale;
+    const scale = Math.max(1, Math.min(8, nextScale));
+
+    if (Math.abs(scale - oldScale) < 0.0001) return;
+
+    const cursorX = clientX - rect.left;
+    const cursorY = clientY - rect.top;
+    const worldX = (cursorX - mapView.x) / oldScale;
+    const worldY = (cursorY - mapView.y) / oldScale;
+
+    mapView.scale = scale;
+    mapView.x = cursorX - worldX * scale;
+    mapView.y = cursorY - worldY * scale;
+    applyMapView();
+  }
+
+  function zoomMapCentered(factor) {
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    zoomMapAt(
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2,
+      mapView.scale * factor
+    );
+  }
+
+  function resetMapView() {
+    mapView = { scale: 1, x: 0, y: 0 };
+    applyMapView();
+  }
+
+  function updateFilterUrl() {
+    const url = new URL(location.href);
+    if (activeFilter === 'all') url.searchParams.delete('filter');
+    else url.searchParams.set('filter', activeFilter);
+    history.replaceState(null, '', url.pathname + '?' + url.searchParams.toString());
+  }
+
+  function updateStatButtons() {
+    document.querySelectorAll('[data-map-filter]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.mapFilter === activeFilter);
+    });
+  }
+
+  function openCluster(index) {
+    const cluster = currentClusters[index];
+    if (!cluster || !detail) return;
+
+    const location = networkMapLocationLabel(cluster);
+    const nodes = cluster.nodes.slice(0, 20);
+
+    detail.classList.remove('hidden');
+    detail.innerHTML =
+      '<button class="map-detail-close" type="button" aria-label="Close">×</button>' +
+      '<p class="eyebrow">APPROXIMATE LOCATION</p>' +
+      '<h3>' + esc(location) + '</h3>' +
+      '<div class="map-detail-meta">' +
+        number(cluster.nodes.length) + (cluster.nodes.length === 1 ? ' node' : ' nodes') +
+        (cluster.isp ? ' · ' + esc(cluster.isp) : '') +
+      '</div>' +
+      '<div class="map-node-list">' +
+        nodes.map((node) => networkMapNodeDetail(node, view)).join('') +
+        (cluster.nodes.length > nodes.length
+          ? '<div class="map-node-more">+' + number(cluster.nodes.length - nodes.length) + ' more at this approximate location</div>'
+          : '') +
+      '</div>';
+
+    detail.querySelector('.map-detail-close')?.addEventListener('click', () => {
+      detail.classList.add('hidden');
+    });
+  }
+
+  function renderMapPins() {
+    if (!pinsElement) return;
+
+    const matchingItems = allItems.filter((item) => networkMapMatchesFilter(item, activeFilter));
+    currentClusters = networkMapClusters(matchingItems);
+
+    pinsElement.innerHTML = currentClusters.map((cluster, index) => {
+      const label = networkMapLocationLabel(cluster);
+      const count = cluster.nodes.length;
+      const position = networkMapPinPosition(cluster.latitude, cluster.longitude);
+
+      return '<button class="network-pin status-' + esc(cluster.status) + (count > 1 ? ' cluster' : '') + '"' +
+        ' type="button" data-map-cluster="' + index + '"' +
+        ' data-map-left="' + position.left.toFixed(4) + '"' +
+        ' data-map-top="' + position.top.toFixed(4) + '"' +
+        ' title="' + esc(label + ' · ' + count + (count === 1 ? ' node' : ' nodes')) + '">' +
+        (count > 1 ? '<span>' + number(count) + '</span>' : '') +
+      '</button>';
+    }).join('');
+
+    const plottedMatching = matchingItems.filter(networkMapHasGeo).length;
+    if (filterStatus) {
+      filterStatus.textContent =
+        'Showing ' + number(plottedMatching) + ' plotted of ' + number(matchingItems.length) +
+        ' ' + networkMapFilterLabel(activeFilter);
+    }
+
+    pinsElement.querySelectorAll('[data-map-cluster]').forEach((button) => {
+      const left = Number(button.dataset.mapLeft);
+      const top = Number(button.dataset.mapTop);
+
+      if (Number.isFinite(left) && Number.isFinite(top)) {
+        button.style.left = left.toFixed(4) + '%';
+        button.style.top = top.toFixed(4) + '%';
+      }
+
+      button.addEventListener('click', () => openCluster(Number(button.dataset.mapCluster)));
+    });
+
+    if (detail) detail.classList.add('hidden');
+  }
+
+  document.querySelectorAll('[data-map-filter]').forEach((button) => {
     button.addEventListener('click', () => {
-      const cluster = clusters[Number(button.dataset.mapCluster)];
-      if (!cluster || !detail) return;
-
-      const location = networkMapLocationLabel(cluster);
-      const nodes = cluster.nodes.slice(0, 20);
-
-      detail.classList.remove('hidden');
-      detail.innerHTML =
-        '<button class="map-detail-close" type="button" aria-label="Close">×</button>' +
-        '<p class="eyebrow">APPROXIMATE LOCATION</p>' +
-        '<h3>' + esc(location) + '</h3>' +
-        '<div class="map-detail-meta">' +
-          number(cluster.nodes.length) + (cluster.nodes.length === 1 ? ' node' : ' nodes') +
-          (cluster.isp ? ' · ' + esc(cluster.isp) : '') +
-        '</div>' +
-        '<div class="map-node-list">' +
-          nodes.map((node) => networkMapNodeDetail(node, view)).join('') +
-          (cluster.nodes.length > nodes.length
-            ? '<div class="map-node-more">+' + number(cluster.nodes.length - nodes.length) + ' more at this approximate location</div>'
-            : '') +
-        '</div>';
-
-      detail.querySelector('.map-detail-close')?.addEventListener('click', () => {
-        detail.classList.add('hidden');
-      });
+      activeFilter = allowedFilters.has(button.dataset.mapFilter) ? button.dataset.mapFilter : 'all';
+      updateFilterUrl();
+      updateStatButtons();
+      renderMapPins();
     });
   });
+
+  document.querySelectorAll('[data-map-zoom]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const action = button.dataset.mapZoom;
+      if (action === 'in') zoomMapCentered(1.35);
+      else if (action === 'out') zoomMapCentered(1 / 1.35);
+      else resetMapView();
+    });
+  });
+
+  canvas?.addEventListener('wheel', (event) => {
+    event.preventDefault();
+    zoomMapAt(event.clientX, event.clientY, mapView.scale * (event.deltaY < 0 ? 1.18 : 1 / 1.18));
+  }, { passive: false });
+
+  canvas?.addEventListener('dblclick', (event) => {
+    if (event.target.closest('.network-pin, .network-map-controls, .network-map-detail')) return;
+    event.preventDefault();
+    zoomMapAt(event.clientX, event.clientY, mapView.scale * 1.5);
+  });
+
+  canvas?.addEventListener('pointerdown', (event) => {
+    if (event.target.closest('.network-pin, .network-map-controls, .network-map-detail')) return;
+    dragState = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      mapX: mapView.x,
+      mapY: mapView.y
+    };
+    canvas.setPointerCapture(event.pointerId);
+    canvas.classList.add('is-dragging');
+  });
+
+  canvas?.addEventListener('pointermove', (event) => {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    mapView.x = dragState.mapX + event.clientX - dragState.startX;
+    mapView.y = dragState.mapY + event.clientY - dragState.startY;
+    applyMapView();
+  });
+
+  function finishMapDrag(event) {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    dragState = null;
+    canvas?.classList.remove('is-dragging');
+  }
+
+  canvas?.addEventListener('pointerup', finishMapDrag);
+  canvas?.addEventListener('pointercancel', finishMapDrag);
+  window.addEventListener('resize', applyMapView, { passive: true });
+
+  updateStatButtons();
+  renderMapPins();
+  applyMapView();
 }
 
 async function renderTransaction(txid) {
