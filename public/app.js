@@ -212,7 +212,7 @@ function outputAddresses(vout) {
 function yerb(value) {
   if (value === null || value === undefined || value === '') return '0.00000000';
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return esc(value);
+  if (!Number.isFinite(parsed)) return String(value);
   return parsed.toLocaleString(undefined, {
     minimumFractionDigits: 8,
     maximumFractionDigits: 8
@@ -301,137 +301,7 @@ async function renderAddress(address) {
 
 function assetType(name) {
   if (name.endsWith('!')) return 'Owner';
-  if (name.startsWith('
-  renderLoading('Resolving transaction from Yerbas Core');
-
-  const knownBlock = new URLSearchParams(location.search).get('block');
-  const query = knownBlock ? '?block=' + encodeURIComponent(knownBlock) : '';
-  const tx = await api('/api/tx/' + encodeURIComponent(txid) + query);
-
-  setRpcState('online', 'Core online');
-  document.title = 'Transaction · Yerbas Explorer Light';
-
-  const outputs = (tx.vout || []).map((vout) =>
-    '<tr>' +
-      '<td>' + number(vout.n) + '</td>' +
-      '<td>' + number(vout.value, 8) + ' YERB</td>' +
-      '<td class="mono">' + outputAddresses(vout) + '</td>' +
-    '</tr>'
-  ).join('');
-
-  const inputCount = Array.isArray(tx.vin) ? tx.vin.length : 0;
-
-  app.innerHTML =
-    '<section class="detail-hero">' +
-      '<div class="detail-kicker">Transaction record / Yerbas Core</div>' +
-      '<h2>Transaction</h2>' +
-      '<div class="detail-hash">' + esc(tx.txid) + '</div>' +
-      '<div class="detail-actions"><a class="text-link" href="/">← Back to live chain</a></div>' +
-    '</section>' +
-
-    '<section class="panel">' +
-      panelHeading('T1', 'Transaction anatomy', 'Ledger data',
-        tx.confirmations ? number(tx.confirmations) + ' confirmations' : 'unconfirmed') +
-      '<dl class="detail-grid">' +
-        '<dt>Transaction ID</dt><dd class="mono break">' + esc(tx.txid) + '</dd>' +
-        '<dt>Block</dt><dd>' +
-          (tx.blockhash
-            ? hashLink('block', tx.blockhash, tx.blockhash)
-            : '<span class="pending">Mempool / unconfirmed</span>') +
-        '</dd>' +
-        '<dt>Confirmations</dt><dd>' + number(tx.confirmations) + '</dd>' +
-        '<dt>Size</dt><dd>' + bytes(tx.size) + '</dd>' +
-        '<dt>Inputs</dt><dd>' + number(inputCount) + '</dd>' +
-        '<dt>Outputs</dt><dd>' + number(tx.vout?.length) + '</dd>' +
-        '<dt>Time</dt><dd>' + esc(isoTime(tx.blocktime || tx.time)) + '</dd>' +
-      '</dl>' +
-    '</section>' +
-
-    '<section class="panel">' +
-      panelHeading('T2', 'Value distribution', 'Outputs', 'reported by Core') +
-      '<div class="table-wrap">' +
-        '<table>' +
-          '<thead><tr><th>#</th><th>Value</th><th>Address / script</th></tr></thead>' +
-          '<tbody>' + outputs + '</tbody>' +
-        '</table>' +
-      '</div>' +
-    '</section>' +
-
-    '<details class="panel raw">' +
-      '<summary>Raw RPC response</summary>' +
-      '<pre id="raw-json"></pre>' +
-    '</details>';
-
-  document.querySelector('#raw-json').textContent = JSON.stringify(tx, null, 2);
-}
-
-async function route() {
-  clearNotice();
-  const parts = location.pathname.split('/').filter(Boolean);
-
-  try {
-    if (parts[0] === 'block' && parts[1]) {
-      return await renderBlock(decodeURIComponent(parts[1]));
-    }
-
-    if (parts[0] === 'tx' && parts[1]) {
-      return await renderTransaction(decodeURIComponent(parts[1]));
-    }
-
-    if (parts[0] === 'address' && parts[1]) {
-      return await renderAddress(decodeURIComponent(parts.slice(1).join('/')));
-    }
-
-    if (parts[0] === 'assets') {
-      return await renderAssets();
-    }
-
-    if (parts[0] === 'asset' && parts[1]) {
-      return await renderAsset(decodeURIComponent(parts.slice(1).join('/')));
-    }
-
-    return await renderHome();
-  } catch (error) {
-    setRpcState('offline', 'Core unavailable');
-    app.innerHTML =
-      '<section class="error-card">' +
-        '<p class="eyebrow">RPC connection error</p>' +
-        '<h2>Explorer request failed</h2>' +
-        '<p>' + esc(error.message) + '</p>' +
-        '<a class="button-link" href="/">Retry explorer</a>' +
-      '</section>';
-  }
-}
-
-searchForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  clearNotice();
-
-  const query = searchInput.value.trim();
-  if (!query) {
-    showNotice('Enter a block height, block hash, transaction ID, Yerbas address, or asset name.', 'error');
-    return;
-  }
-
-  try {
-    const result = await api('/api/search?q=' + encodeURIComponent(query));
-
-    if (result.type === 'block') {
-      location.href = '/block/' + encodeURIComponent(result.target);
-    } else if (result.type === 'tx') {
-      location.href = '/tx/' + encodeURIComponent(result.target);
-    } else if (result.type === 'address') {
-      location.href = '/address/' + encodeURIComponent(result.target);
-    } else if (result.type === 'asset') {
-      location.href = '/asset/' + encodeURIComponent(result.target);
-    }
-  } catch (error) {
-    showNotice(error.message, 'error');
-  }
-});
-
-route();
-)) return 'Restricted';
+  if (name.startsWith('$')) return 'Restricted';
   if (name.startsWith('#')) return 'Qualifier';
   if (name.startsWith('~')) return 'Channel';
   if (name.includes('#')) return 'Unique';
@@ -442,7 +312,7 @@ route();
 function assetAmount(value, units = null) {
   if (value === null || value === undefined || value === '') return '—';
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return esc(value);
+  if (!Number.isFinite(parsed)) return String(value);
 
   const digits = Number.isInteger(Number(units))
     ? Math.min(8, Math.max(0, Number(units)))
@@ -673,6 +543,14 @@ async function route() {
       return await renderAddress(decodeURIComponent(parts.slice(1).join('/')));
     }
 
+    if (parts[0] === 'assets') {
+      return await renderAssets();
+    }
+
+    if (parts[0] === 'asset' && parts[1]) {
+      return await renderAsset(decodeURIComponent(parts.slice(1).join('/')));
+    }
+
     return await renderHome();
   } catch (error) {
     setRpcState('offline', 'Core unavailable');
@@ -692,7 +570,7 @@ searchForm.addEventListener('submit', async (event) => {
 
   const query = searchInput.value.trim();
   if (!query) {
-    showNotice('Enter a block height, block hash, transaction ID, or Yerbas address.', 'error');
+    showNotice('Enter a block height, block hash, transaction ID, Yerbas address, or asset name.', 'error');
     return;
   }
 
@@ -705,6 +583,8 @@ searchForm.addEventListener('submit', async (event) => {
       location.href = '/tx/' + encodeURIComponent(result.target);
     } else if (result.type === 'address') {
       location.href = '/address/' + encodeURIComponent(result.target);
+    } else if (result.type === 'asset') {
+      location.href = '/asset/' + encodeURIComponent(result.target);
     }
   } catch (error) {
     showNotice(error.message, 'error');
