@@ -856,11 +856,14 @@ function networkMapClusters(items) {
   return [...groups.values()];
 }
 
-function networkMapPinStyle(latitude, longitude) {
+function networkMapPinPosition(latitude, longitude) {
   const left = ((Number(longitude) + 180) / 360) * 100;
   const top = ((90 - Number(latitude)) / 180) * 100;
-  return 'left:' + Math.max(0, Math.min(100, left)).toFixed(4) + '%;top:' +
-    Math.max(0, Math.min(100, top)).toFixed(4) + '%;';
+
+  return {
+    left: Math.max(0, Math.min(100, left)),
+    top: Math.max(0, Math.min(100, top))
+  };
 }
 
 function networkMapLocationLabel(cluster) {
@@ -910,9 +913,11 @@ async function renderNetworkMap() {
   const pins = clusters.map((cluster, index) => {
     const label = networkMapLocationLabel(cluster);
     const count = cluster.nodes.length;
+    const position = networkMapPinPosition(cluster.latitude, cluster.longitude);
     return '<button class="network-pin status-' + esc(cluster.status) + (count > 1 ? ' cluster' : '') + '"' +
-      ' type="button" data-map-cluster="' + index + '" style="' +
-      networkMapPinStyle(cluster.latitude, cluster.longitude) + '"' +
+      ' type="button" data-map-cluster="' + index + '"' +
+      ' data-map-left="' + position.left.toFixed(4) + '"' +
+      ' data-map-top="' + position.top.toFixed(4) + '"' +
       ' title="' + esc(label + ' · ' + count + (count === 1 ? ' node' : ' nodes')) + '">' +
       (count > 1 ? '<span>' + number(count) + '</span>' : '') +
     '</button>';
@@ -971,6 +976,16 @@ async function renderNetworkMap() {
     '</section>';
 
   const detail = document.querySelector('#network-map-detail');
+
+  document.querySelectorAll('[data-map-cluster]').forEach((button) => {
+    const left = Number(button.dataset.mapLeft);
+    const top = Number(button.dataset.mapTop);
+
+    if (Number.isFinite(left) && Number.isFinite(top)) {
+      button.style.left = left.toFixed(4) + '%';
+      button.style.top = top.toFixed(4) + '%';
+    }
+  });
 
   document.querySelectorAll('[data-map-cluster]').forEach((button) => {
     button.addEventListener('click', () => {
