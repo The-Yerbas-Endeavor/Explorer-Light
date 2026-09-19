@@ -324,65 +324,159 @@ function assetAmount(value, units = null) {
   });
 }
 
+function assetMetadataLink(asset) {
+  const ref = asset?.metadataRef;
+  if (!ref?.value) return '<span class="muted">—</span>';
+
+  if (ref.type === 'ipfs') {
+    const href = 'https://ipfs.io/ipfs/' + encodeURIComponent(ref.value);
+    return '<a class="metadata-link" href="' + href + '" target="_blank" rel="noopener noreferrer">IPFS ↗</a>';
+  }
+
+  if (ref.type === 'txid' && /^[0-9a-fA-F]{64}$/.test(ref.value)) {
+    return '<a class="metadata-link" href="/tx/' + encodeURIComponent(ref.value) + '">TXID</a>';
+  }
+
+  return '<span class="mono">' + esc(ref.value) + '</span>';
+}
+
+function assetListHref(params, page) {
+  const next = new URLSearchParams();
+  const q = (params.get('q') || '').trim();
+  const type = params.get('type') || '';
+  const metadata = params.get('metadata') || '';
+  const reissuable = params.get('reissuable') || '';
+  const sort = params.get('sort') || 'name';
+
+  if (q) next.set('q', q);
+  if (type) next.set('type', type);
+  if (metadata) next.set('metadata', metadata);
+  if (reissuable) next.set('reissuable', reissuable);
+  if (sort && sort !== 'name') next.set('sort', sort);
+  if (page > 1) next.set('page', String(page));
+
+  const query = next.toString();
+  return '/assets' + (query ? '?' + query : '');
+}
+
 async function renderAssets() {
   renderLoading('Reading Yerbas asset index');
 
   const params = new URLSearchParams(location.search);
   const query = (params.get('q') || '').trim();
-  const start = Math.max(0, Number.parseInt(params.get('start') || '0', 10) || 0);
-  const data = await api('/api/assets?q=' + encodeURIComponent(query) + '&count=50&start=' + start);
+  const type = params.get('type') || '';
+  const metadata = params.get('metadata') || '';
+  const reissuable = params.get('reissuable') || '';
+  const sort = params.get('sort') || 'name';
+  const page = Math.max(1, Number.parseInt(params.get('page') || '1', 10) || 1);
+
+  const request = new URLSearchParams({
+    q: query,
+    type,
+    metadata,
+    reissuable,
+    sort,
+    page: String(page),
+    count: '25'
+  });
+
+  const data = await api('/api/assets?' + request.toString());
 
   setRpcState('online', 'Core online');
-  document.title = 'Assets · Yerbas Explorer Light';
+  document.title = 'Yerbas Assets · Explorer Light';
 
   const rows = data.items.length
     ? data.items.map((asset) =>
         '<tr>' +
-          '<td><a class="asset-name" href="/asset/' + encodeURIComponent(asset.name) + '">' + esc(asset.name) + '</a>' +
-            '<span class="asset-badge">' + esc(assetType(asset.name)) + '</span></td>' +
+          '<td><a class="asset-name" href="/asset/' + encodeURIComponent(asset.name) + '">' + esc(asset.name) + '</a></td>' +
+          '<td><span class="asset-badge no-margin">' + esc(asset.type || assetType(asset.name)) + '</span></td>' +
           '<td>' + assetAmount(asset.amount, asset.units) + '</td>' +
+          '<td>' + (asset.holders === null ? '—' : number(asset.holders)) + '</td>' +
           '<td>' + number(asset.units) + '</td>' +
+          '<td>' + assetMetadataLink(asset) + '</td>' +
           '<td>' + (Number(asset.reissuable) ? 'Yes' : 'No') + '</td>' +
-          '<td>' + (asset.block_height !== undefined && asset.block_height !== null
-            ? '<a href="/block/' + encodeURIComponent(asset.block_height) + '">' + number(asset.block_height) + '</a>'
-            : '—') + '</td>' +
         '</tr>'
       ).join('')
-    : '<tr><td colspan="5" class="muted">No assets matched this search.</td></tr>';
+    : '<tr><td colspan="7" class="muted">No assets matched these filters.</td></tr>';
 
-  const previousStart = Math.max(0, start - 50);
   const pagination =
     '<div class="asset-pagination">' +
-      (start > 0
-        ? '<a class="text-link" href="/assets?q=' + encodeURIComponent(query) + '&start=' + previousStart + '">← Previous</a>'
+      (data.page > 1
+        ? '<a class="text-link" href="' + assetListHref(params, data.page - 1) + '">← Previous</a>'
         : '<span></span>') +
-      (data.nextStart !== null
-        ? '<a class="text-link" href="/assets?q=' + encodeURIComponent(query) + '&start=' + data.nextStart + '">Next →</a>'
-        : '') +
+      '<span class="page-status">Page ' + number(data.page) + ' of ' + number(data.totalPages) + '</span>' +
+      (data.page < data.totalPages
+        ? '<a class="text-link" href="' + assetListHref(params, data.page + 1) + '">Next →</a>'
+        : '<span></span>') +
     '</div>';
+
+  const summaryCards = [
+    metricCard('01', 'Index status', 'LIVE', 'native Core assetindex'),
+    metricCard('02', 'Indexed assets', number(data.total), query || type || metadata || reissuable ? 'matching current filters' : 'current directory'),
+    metricCard('03', 'Indexed holders', '…', 'loading aggregate count'),
+    metricCard('04', 'Last index read', 'NOW', 'no explorer sync database')
+  ].join('');
 
   app.innerHTML =
     '<section class="detail-hero asset-hero">' +
-      '<div class="detail-kicker">Native Core asset index / database-free</div>' +
-      '<h2>Asset explorer</h2>' +
-      '<div class="detail-hash">Browse assets issued on the Yerbas blockchain.</div>' +
+      '<div class="detail-kicker">Yerbas native asset index</div>' +
+      '<h2>Yerbas Assets</h2>' +
+      '<div class="detail-hash">' + number(data.total) + ' assets in the current view · live from Yerbas Core</div>' +
       '<div class="detail-actions"><a class="text-link" href="/">← Back to live chain</a></div>' +
     '</section>' +
 
+    '<section id="asset-summary" class="metric-strip">' + summaryCards + '</section>' +
+
     '<section class="panel">' +
-      '<div class="asset-toolbar">' +
-        '<div><p class="eyebrow">ASSET DIRECTORY</p><h2>' + (query ? 'Results for “' + esc(query) + '”' : 'Browse assets') + '</h2></div>' +
-        '<form class="asset-filter" action="/assets" method="get" role="search">' +
-          '<input name="q" value="' + esc(query) + '" autocomplete="off" spellcheck="false" placeholder="Filter asset names">' +
-          '<button type="submit">Find asset</button>' +
+      '<div class="asset-toolbar asset-toolbar-oldstyle">' +
+        '<div><p class="eyebrow">ASSET DIRECTORY</p><h2>Browse indexed assets</h2></div>' +
+        '<form class="asset-filter-grid" action="/assets" method="get" role="search">' +
+          '<input name="q" value="' + esc(query) + '" autocomplete="off" spellcheck="false" placeholder="Search asset names">' +
+          '<select name="type" aria-label="Asset type">' +
+            '<option value="">All types</option>' +
+            ['Root','Sub-asset','Unique','Qualifier','Restricted','Owner'].map((value) =>
+              '<option value="' + value + '"' + (type === value ? ' selected' : '') + '>' + value + '</option>'
+            ).join('') +
+          '</select>' +
+          '<select name="metadata" aria-label="Metadata">' +
+            '<option value="">Any metadata</option>' +
+            '<option value="yes"' + (metadata === 'yes' ? ' selected' : '') + '>Has metadata</option>' +
+            '<option value="no"' + (metadata === 'no' ? ' selected' : '') + '>No metadata</option>' +
+          '</select>' +
+          '<select name="reissuable" aria-label="Reissuable">' +
+            '<option value="">Any reissuability</option>' +
+            '<option value="yes"' + (reissuable === 'yes' ? ' selected' : '') + '>Reissuable</option>' +
+            '<option value="no"' + (reissuable === 'no' ? ' selected' : '') + '>Not reissuable</option>' +
+          '</select>' +
+          '<select name="sort" aria-label="Sort">' +
+            '<option value="name"' + (sort === 'name' ? ' selected' : '') + '>Name</option>' +
+            '<option value="supply-desc"' + (sort === 'supply-desc' ? ' selected' : '') + '>Supply: high to low</option>' +
+            '<option value="supply-asc"' + (sort === 'supply-asc' ? ' selected' : '') + '>Supply: low to high</option>' +
+          '</select>' +
+          '<button type="submit">Search</button>' +
         '</form>' +
       '</div>' +
       '<div class="table-wrap">' +
-        '<table><thead><tr><th>Asset</th><th>Supply</th><th>Units</th><th>Reissuable</th><th>Issued at</th></tr></thead>' +
-        '<tbody>' + rows + '</tbody></table>' +
+        '<table>' +
+          '<thead><tr><th>Asset</th><th>Type</th><th>Supply</th><th>Holders</th><th>Units</th><th>Metadata</th><th>Reissuable</th></tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
       '</div>' +
       pagination +
     '</section>';
+
+  api('/api/assets/stats').then((stats) => {
+    const summary = document.querySelector('#asset-summary');
+    if (!summary) return;
+    summary.innerHTML = [
+      metricCard('01', 'Index status', stats.ready ? 'LIVE' : 'CHECK', 'native Core assetindex'),
+      metricCard('02', 'Indexed assets', number(stats.indexedAssets), 'whole Core asset directory'),
+      metricCard('03', 'Indexed holders', number(stats.indexedHolders), 'asset/address relationships'),
+      metricCard('04', 'Last index read', 'NOW', 'live RPC · no sync database')
+    ].join('');
+  }).catch(() => {
+    // The page remains useful even if the aggregate holder-count scan is slow.
+  });
 }
 
 async function renderAsset(name) {
