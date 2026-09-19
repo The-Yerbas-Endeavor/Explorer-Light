@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Yerbas Explorer Light public API documentation">
+  <meta name="theme-color" content="#07110b">
+  <title>Yerbas Public API · Explorer Light</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="page-noise" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="/" aria-label="Yerbas Explorer Light home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" role="img">
+            <path d="M24 40V22" class="mark-stem"/>
+            <path d="M23.8 24.5C17.5 23.8 12.8 19.4 12 12c6.7.3 11.2 3.7 12 10.5" class="mark-leaf"/>
+            <path d="M24.2 20.5C29 19.9 33.2 16.7 35 11c-6.2-.1-10.2 2.8-11 8.6" class="mark-leaf mark-leaf-alt"/>
+            <circle cx="24" cy="40" r="2.4" class="mark-node"/>
+          </svg>
+        </span>
+        <span class="brand-copy">
+          <strong>YERBAS</strong>
+          <small>PUBLIC API</small>
+        </span>
+      </a>
+
+      <div class="header-actions">
+        <a class="header-link assets-link" href="/assets">Assets</a>
+        <a class="header-link" href="/">Explorer</a>
+        <span class="rpc-state online">
+          <span class="rpc-dot" aria-hidden="true"></span>
+          <span>Read only</span>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell api-docs">
+    <section class="detail-hero api-docs-hero">
+      <div class="detail-kicker">PUBLIC · READ ONLY · RPC FIRST</div>
+      <h2>Yerbas Public API</h2>
+      <div class="detail-hash">
+        Public blockchain data directly from Yerbas Core and native indexes.
+        No explorer database and no wallet/private-key access.
+      </div>
+      <div class="detail-actions">
+        <a class="text-link" href="/api/v1">API index JSON</a>
+        <a class="text-link" href="/.well-known/yerbas-ai.json">AI manifest</a>
+        <a class="text-link" href="/">Explorer</a>
+      </div>
+    </section>
+
+    <section class="api-note">
+      <strong>Recommended:</strong> use <code>/api/v1/...</code> for new integrations.
+      Legacy <code>/api/get...</code> and <code>/ext/...</code> routes are provided for migration from the older explorer where the result can be produced faithfully from Yerbas Core.
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <span class="panel-index">V1</span>
+          <div><p class="eyebrow">STABLE PUBLIC SURFACE</p><h2>Versioned API</h2></div>
+        </div>
+        <span class="panel-meta">JSON · CORS enabled</span>
+      </div>
+      <div class="api-list">
+        <article class="api-row"><div><code>GET /api/v1</code><p>Machine-readable API index and endpoint map.</p></div><a href="/api/v1">Try</a></article>
+        <article class="api-row"><div><code>GET /api/v1/health</code><p>Explorer/Core health and current block height.</p></div><a href="/api/v1/health">Try</a></article>
+        <article class="api-row"><div><code>GET /api/v1/status</code><p>Chain, network, connection, mempool, and synchronization status.</p></div><a href="/api/v1/status">Try</a></article>
+        <article class="api-row"><div><code>GET /api/v1/blocks?limit=12</code><p>Recent blocks. Limit: 1–25.</p></div><a href="/api/v1/blocks?limit=12">Try</a></article>
+        <article class="api-row"><div><code>GET /api/v1/block/:height-or-hash</code><p>Block details by height or block hash.</p></div><span>path parameter</span></article>
+        <article class="api-row"><div><code>GET /api/v1/tx/:txid</code><p>Decoded transaction from Core txindex.</p></div><span>path parameter</span></article>
+        <article class="api-row"><div><code>GET /api/v1/address/:address</code><p>Address balance, total received, transaction IDs, UTXOs, and asset balances.</p></div><span>path parameter</span></article>
+        <article class="api-row"><div><code>GET /api/v1/assets?q=&amp;count=50&amp;start=0</code><p>Browse/search the native Core asset directory.</p></div><a href="/api/v1/assets?count=20&start=0">Try</a></article>
+        <article class="api-row"><div><code>GET /api/v1/asset/:asset-name</code><p>Asset metadata, issuance block, holder count, and indexed holder balances.</p></div><span>path parameter</span></article>
+        <article class="api-row"><div><code>GET /api/v1/supply</code><p>UTXO-set supply data from <code>gettxoutsetinfo</code>.</p></div><a href="/api/v1/supply">Try</a></article>
+        <article class="api-row"><div><code>GET /api/v1/emission?height=</code><p>Block subsidy/emission details; defaults to the current tip.</p></div><a href="/api/v1/emission">Try</a></article>
+        <article class="api-row"><div><code>GET /api/v1/smartnodes?limit=100&amp;offset=0</code><p>Registered smartnodes with optional status and collateral filters.</p></div><a href="/api/v1/smartnodes?limit=25">Try</a></article>
+        <article class="api-row"><div><code>GET /api/v1/network/peers</code><p>Current peer connections reported by this Yerbas Core node.</p></div><a href="/api/v1/network/peers">Try</a></article>
+        <article class="api-row"><div><code>GET /api/v1/market-price</code><p>Configured external market-price feed. Returns unavailable until a feed is configured.</p></div><a href="/api/v1/market-price">Try</a></article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <span class="panel-index">L1</span>
+          <div><p class="eyebrow">OLD EXPLORER MIGRATION</p><h2>Legacy RPC-style compatibility</h2></div>
+        </div>
+        <span class="panel-meta">plain text / JSON</span>
+      </div>
+      <div class="api-list">
+        <article class="api-row"><div><code>GET /api/getdifficulty</code><p>Current network difficulty.</p></div><a href="/api/getdifficulty">Try</a></article>
+        <article class="api-row"><div><code>GET /api/getconnectioncount</code><p>Current Core peer connection count.</p></div><a href="/api/getconnectioncount">Try</a></article>
+        <article class="api-row"><div><code>GET /api/getblockcount</code><p>Current block height.</p></div><a href="/api/getblockcount">Try</a></article>
+        <article class="api-row"><div><code>GET /api/getblockhash?index=HEIGHT</code><p>Block hash at a specific height.</p></div><span>query parameter</span></article>
+        <article class="api-row"><div><code>GET /api/getblock?hash=HASH</code><p>Decoded block object.</p></div><span>query parameter</span></article>
+        <article class="api-row"><div><code>GET /api/getrawtransaction?txid=TXID&amp;decrypt=1</code><p>Raw hex when decrypt=0; decoded transaction when decrypt=1.</p></div><span>query parameter</span></article>
+        <article class="api-row"><div><code>GET /api/getnetworkhashps</code><p>Current network hash rate reported by Core.</p></div><a href="/api/getnetworkhashps">Try</a></article>
+        <article class="api-row"><div><code>GET /api/getmasternodecount</code><p>Compatibility name for current smartnode count.</p></div><a href="/api/getmasternodecount">Try</a></article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <span class="panel-index">LX</span>
+          <div><p class="eyebrow">EXTENDED COMPATIBILITY</p><h2>Legacy /ext routes</h2></div>
+        </div>
+        <span class="panel-meta">Core/index backed</span>
+      </div>
+      <div class="api-list">
+        <article class="api-row"><div><code>GET /ext/getmoneysupply</code><p>Current UTXO-set money supply.</p></div><a href="/ext/getmoneysupply">Try</a></article>
+        <article class="api-row"><div><code>GET /ext/getaddress/:address</code><p>Address/index information.</p></div><span>path parameter</span></article>
+        <article class="api-row"><div><code>GET /ext/getaddresstxs/:address/:start/:length</code><p>Indexed transaction IDs for an address. Length is capped at 100.</p></div><span>path parameters</span></article>
+        <article class="api-row"><div><code>GET /ext/gettx/:txid</code><p>Decoded transaction.</p></div><span>path parameter</span></article>
+        <article class="api-row"><div><code>GET /ext/getbalance/:address</code><p>Current address balance as YERB.</p></div><span>path parameter</span></article>
+        <article class="api-row"><div><code>GET /ext/getnetworkpeers</code><p>Current peers only. Explorer-Light does not maintain a 24-hour peer/geolocation database.</p></div><a href="/ext/getnetworkpeers">Try</a></article>
+        <article class="api-row"><div><code>GET /ext/getbasicstats</code><p>Block count, supply, market placeholders, and smartnode total.</p></div><a href="/ext/getbasicstats">Try</a></article>
+        <article class="api-row"><div><code>GET /ext/getsummary</code><p>Difficulty, supply, hash rate, connections, block count, and smartnode counts.</p></div><a href="/ext/getsummary">Try</a></article>
+        <article class="api-row"><div><code>GET /ext/getmasternodelist</code><p>Compatibility route returning registered smartnodes with wallet ownership metadata removed.</p></div><a href="/ext/getmasternodelist">Try</a></article>
+        <article class="api-row"><div><code>GET /ext/getcurrentprice</code><p>Market feed when configured; otherwise HTTP 503 with an explicit unavailable response.</p></div><a href="/ext/getcurrentprice">Try</a></article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <span class="panel-index">DB0</span>
+          <div><p class="eyebrow">INTENTIONALLY NOT EMULATED</p><h2>Database-dependent legacy calls</h2></div>
+        </div>
+        <span class="panel-meta">HTTP 501</span>
+      </div>
+      <div class="api-list">
+        <article class="api-row unavailable"><div><code>/ext/getdistribution</code><p>Old explorer wealth-distribution database aggregation.</p></div><span>not available</span></article>
+        <article class="api-row unavailable"><div><code>/ext/getlasttxs/...</code><p>Old explorer globally indexed transaction scan.</p></div><span>not available</span></article>
+        <article class="api-row unavailable"><div><code>/ext/getmasternoderewards/...</code><p>Old explorer database-derived reward history.</p></div><span>not available</span></article>
+        <article class="api-row unavailable"><div><code>/ext/getmasternoderewardstotal/...</code><p>Old explorer database-derived reward aggregation.</p></div><span>not available</span></article>
+      </div>
+    </section>
+
+    <section class="api-note">
+      <strong>CORS:</strong> public API responses include <code>Access-Control-Allow-Origin: *</code>.
+      This API is read-only. Arbitrary RPC, wallet access, transaction creation, signing, broadcasting, shell execution, and private-key access are not exposed.
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-brand">
+      <span class="footer-mark">Y</span>
+      <span>
+        <strong>Yerbas Explorer Light</strong>
+        <small>Public API · Core data only</small>
+      </span>
+    </div>
+    <div class="footer-meta">
+      <a href="/">EXPLORER</a>
+      <a href="/assets">ASSETS</a>
+      <a href="/api/v1">API JSON</a>
+    </div>
+  </footer>
+</body>
+</html>
