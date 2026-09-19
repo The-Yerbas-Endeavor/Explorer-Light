@@ -104,20 +104,20 @@ GET /.well-known/yerbas-ai.json
 Status:
 
 \`\`\`text
-GET /api/ai/status
+GET /api/ai/v1/status
 GET /ext/ai/status
 \`\`\`
 
 Tool definitions:
 
 \`\`\`text
-GET /api/ai/tools
+GET /api/ai/v1/tools
 \`\`\`
 
 Tool invocation:
 
 \`\`\`text
-POST /api/ai/query
+POST /api/ai/v1/query
 POST /ext/ai/query
 \`\`\`
 
@@ -127,7 +127,7 @@ Example:
 curl -s \
   -H 'Content-Type: application/json' \
   -d '{"tool":"get_smartnodes_by_collateral","arguments":{"amount":69000}}' \
-  http://127.0.0.1:3001/api/ai/query
+  http://127.0.0.1:3001/api/ai/v1/query
 \`\`\`
 
 Current tools:
