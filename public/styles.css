@@ -7118,3 +7118,119 @@ body::after {
     display: none;
   }
 }
+
+
+/* ==========================================================================
+   Explorer 3.8 — six-confirmation block maturity
+   ========================================================================== */
+
+.tape-age {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+}
+
+.tape-confirmation {
+  font-family: var(--mono);
+  font-size: 7px;
+  line-height: 1;
+  letter-spacing: .08em;
+  white-space: nowrap;
+}
+
+.tape-block-icon .block-check {
+  fill: none;
+  stroke: var(--green-hot);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  filter: drop-shadow(0 0 3px rgba(141, 241, 158, .55));
+  transition: opacity .16s ease;
+}
+
+/* 1–5 confirmations: holographic / still maturing. */
+.chain-tape-row.is-confirming .tape-confirmation {
+  color: var(--holo-cyan);
+}
+
+.chain-tape-row.is-confirming .tape-block-icon .block-face {
+  stroke: rgba(130, 244, 255, .82);
+}
+
+.chain-tape-row.is-confirming .tape-block-icon .block-top {
+  fill: rgba(130, 244, 255, .13);
+}
+
+.chain-tape-row.is-confirming .tape-block-icon .block-left {
+  fill: rgba(73, 165, 182, .07);
+}
+
+.chain-tape-row.is-confirming .tape-block-icon .block-right {
+  fill: rgba(130, 244, 255, .035);
+}
+
+.chain-tape-row.is-confirming .tape-block-icon .weave-front,
+.chain-tape-row.is-confirming .tape-block-icon .chain-core-line {
+  stroke: var(--holo-cyan);
+}
+
+.chain-tape-row.is-confirming .tape-block-icon {
+  filter:
+    drop-shadow(0 0 5px rgba(130, 244, 255, .25))
+    drop-shadow(0 2px 2px rgba(0, 0, 0, .32));
+}
+
+/* 6+ confirmations: solid Yerbas-green confirmed block. */
+.chain-tape-row.is-confirmed .tape-confirmation {
+  color: var(--green-hot);
+}
+
+.chain-tape-row.is-confirmed .tape-block-icon .block-face {
+  stroke: rgba(181, 255, 192, .96);
+}
+
+.chain-tape-row.is-confirmed .tape-block-icon .block-top {
+  fill: rgba(141, 241, 158, .52);
+}
+
+.chain-tape-row.is-confirmed .tape-block-icon .block-left {
+  fill: rgba(88, 199, 107, .30);
+}
+
+.chain-tape-row.is-confirmed .tape-block-icon .block-right {
+  fill: rgba(141, 241, 158, .20);
+}
+
+.chain-tape-row.is-confirmed .tape-block-icon .weave-front,
+.chain-tape-row.is-confirmed .tape-block-icon .chain-core-line {
+  stroke: var(--green-hot);
+}
+
+.chain-tape-row.is-confirmed .tape-block-icon .block-check {
+  opacity: 1;
+}
+
+.chain-tape-row.is-confirmed .tape-block-icon {
+  filter:
+    drop-shadow(0 0 5px rgba(141, 241, 158, .34))
+    drop-shadow(0 0 10px rgba(141, 241, 158, .10))
+    drop-shadow(0 2px 2px rgba(0, 0, 0, .32));
+}
+
+.chain-tape-row.is-confirmed .tape-height {
+  color: #e9ffed;
+}
+
+/* The live tip is still visually strongest, but remains in confirming state. */
+.chain-tape-row.is-tip.is-confirming .tape-block-icon {
+  filter:
+    drop-shadow(0 0 7px rgba(130, 244, 255, .62))
+    drop-shadow(0 0 16px rgba(130, 244, 255, .22));
+}
+
+@media (max-width: 700px) {
+  .tape-confirmation {
+    font-size: 6px;
+  }
+}
