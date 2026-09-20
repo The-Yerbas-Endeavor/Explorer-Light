@@ -17,7 +17,7 @@ INSTALLER_URL="https://raw.githubusercontent.com/The-Yerbas-Endeavor/Explorer-Li
 
 DOMAIN="${EXPLORER_DOMAIN:-explorer2.yerbas.org}"
 ADMIN_USER="${EXPLORER_ADMIN_USER:-yerbasadmin}"
-HTTPS="${EXPLORER_HTTPS:-0}"
+HTTPS="${EXPLORER_HTTPS:-1}"
 EMAIL="${EXPLORER_EMAIL:-}"
 
 [[ "$EUID" -eq 0 ]] || {
@@ -45,11 +45,10 @@ args=(
 )
 
 if [[ "$HTTPS" == "1" ]]; then
-  [[ -n "$EMAIL" ]] || {
-    echo "[Explorer-Light ERROR] EXPLORER_HTTPS=1 requires EXPLORER_EMAIL." >&2
-    exit 1
-  }
-  args+=(--https --email "$EMAIL")
+  args+=(--https)
+  if [[ -n "$EMAIL" ]]; then
+    args+=(--email "$EMAIL")
+  fi
 fi
 
 bash "$tmp" "${args[@]}" "$@"
