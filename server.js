@@ -161,9 +161,10 @@ async function statusPayload() {
   };
 }
 
-async function recentBlocks(limit) {
+async function recentBlocks(limit, offset = 0) {
   const tip = await rpc.call('getblockcount');
-  const heights = Array.from({ length: Math.min(limit, tip + 1) }, (_, i) => tip - i);
+  const start = Math.max(0, tip - Math.max(0, offset));
+  const heights = Array.from({ length: Math.min(limit, start + 1) }, (_, i) => start - i);
   const hashes = await rpc.batch(heights.map((height) => ({ method: 'getblockhash', params: [height] })));
   const blocks = await rpc.batch(hashes.map((hash) => ({ method: 'getblock', params: [hash, 1] })));
 
@@ -1025,8 +1026,10 @@ async function handleApi(req, res, url) {
 
   if (url.pathname === '/api/blocks') {
     const requested = Number.parseInt(url.searchParams.get('limit') || String(config.recentBlocks), 10);
+    const requestedOffset = Number.parseInt(url.searchParams.get('offset') || '0', 10);
     const limit = Number.isFinite(requested) ? Math.min(25, Math.max(1, requested)) : config.recentBlocks;
-    const data = await cached('blocks:' + limit, config.cacheMs, () => recentBlocks(limit));
+    const offset = Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0;
+    const data = await cached('blocks:' + limit + ':' + offset, config.cacheMs, () => recentBlocks(limit, offset));
     return sendJson(res, 200, data);
   }
 
