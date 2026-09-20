@@ -194,7 +194,14 @@ async function renderHome() {
     const activity = Number(block.transactions || 0) + (Number(block.size || 0) / maxSize) * maxTx;
     const level = scaleLevel(activity, maxTx * 2);
     return '<a class="chain-tape-row' + (index === 0 ? ' is-tip' : '') + '" href="/block/' + block.height + '">' +
-      '<span class="tape-node"><i></i></span>' +
+      '<span class="tape-node" aria-hidden="true">' +
+        '<svg class="tape-block-icon" viewBox="0 0 24 24" focusable="false">' +
+          '<path class="block-face block-top" d="M12 2.5 20 7 12 11.5 4 7Z"></path>' +
+          '<path class="block-face block-left" d="M4 7 12 11.5V21L4 16.5Z"></path>' +
+          '<path class="block-face block-right" d="M20 7 12 11.5V21l8-4.5Z"></path>' +
+          '<path class="block-link" d="M12 0v2.5M12 21v3"></path>' +
+        '</svg>' +
+      '</span>' +
       '<span class="tape-height">#' + number(block.height) + '</span>' +
       '<span class="tape-age">' + esc(timeAgo(block.time)) + '</span>' +
       '<span class="tape-stat"><small>TX</small><b>' + number(block.transactions) + '</b></span>' +
