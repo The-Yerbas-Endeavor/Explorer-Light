@@ -272,10 +272,19 @@ create_admin_user() {
   install -d -m 0700 -o "$ADMIN_USER" -g "$ADMIN_USER" "$admin_home/.ssh"
 
   if [[ -n "$source_keys" ]]; then
-    install -m 0600 -o "$ADMIN_USER" -g "$ADMIN_USER" \
-      "$source_keys" "$admin_home/.ssh/authorized_keys"
-    SSH_HARDENED=1
-    log "Copied existing SSH authorized_keys to $ADMIN_USER"
+    local destination_keys="$admin_home/.ssh/authorized_keys"
+
+    if [[ -e "$destination_keys" && "$source_keys" -ef "$destination_keys" ]]; then
+      chown "$ADMIN_USER:$ADMIN_USER" "$destination_keys"
+      chmod 0600 "$destination_keys"
+      SSH_HARDENED=1
+      log "Existing SSH authorized_keys already belongs to $ADMIN_USER; keeping it"
+    else
+      install -m 0600 -o "$ADMIN_USER" -g "$ADMIN_USER" \
+        "$source_keys" "$destination_keys"
+      SSH_HARDENED=1
+      log "Copied existing SSH authorized_keys to $ADMIN_USER"
+    fi
   else
     SSH_HARDENED=0
     warn "No existing authorized_keys file was found."
