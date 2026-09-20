@@ -5530,3 +5530,264 @@ tbody tr:hover {
     grid-template-columns: 24px 94px minmax(0, 1fr);
   }
 }
+
+
+/* ==========================================================================
+   Explorer 3.1 — Readability + blockchain tape glyphs
+   ========================================================================== */
+
+body {
+  font-size: 16px;
+}
+
+.mast-copy p {
+  font-size: 15px;
+}
+
+.mast-telemetry small,
+.observatory-label span,
+.observatory-source,
+.telemetry-cell > span,
+.telemetry-cell > small,
+.rail-heading span,
+.rail-heading small,
+.ledger-kind,
+.ledger-actions a,
+.ledger-row-label,
+.asset-inline-type,
+.asset-state,
+.asset-matrix-row small,
+.asset-facts-rail span,
+.node-payout-wrap small,
+.node-collateral small,
+.node-paid small,
+.node-pose small,
+.output-rail-address small,
+.raw-ledger summary {
+  font-size: 9px;
+}
+
+.mast-telemetry strong,
+.telemetry-cell > strong,
+.tape-stat b,
+.ledger-row code,
+.asset-inline-balance,
+.asset-matrix-row > span:not(.asset-inline-type):not(.asset-state):not(.ledger-open),
+.asset-facts-rail strong,
+.asset-facts-rail code,
+.holder-rail-row code,
+.holder-rail-row strong,
+.node-service b,
+.node-collateral b,
+.node-paid b,
+.node-pose b,
+.node-payout,
+.output-rail-row > strong,
+.output-rail-address,
+.raw-ledger pre {
+  font-size: 11px;
+}
+
+.rail-heading h3 {
+  font-size: 22px;
+}
+
+.ledger-title-row h2 {
+  font-size: clamp(32px, 3.5vw, 48px);
+}
+
+.ledger-identity,
+.ledger-note {
+  font-size: 12px;
+}
+
+.chain-tape-row {
+  min-height: 54px;
+  grid-template-columns: 54px 118px 88px 66px 100px minmax(190px, 1fr) 120px 22px;
+}
+
+.chain-tape::before {
+  left: 27px;
+  background: linear-gradient(
+    180deg,
+    transparent 0,
+    rgba(141, 241, 158, .18) 3%,
+    rgba(141, 241, 158, .18) 97%,
+    transparent 100%
+  );
+}
+
+.tape-node {
+  position: relative;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.tape-block-icon {
+  position: relative;
+  z-index: 1;
+  width: 25px;
+  height: 25px;
+  overflow: visible;
+  filter: drop-shadow(0 0 4px rgba(141, 241, 158, .12));
+}
+
+.tape-block-icon .block-face {
+  stroke: rgba(141, 241, 158, .78);
+  stroke-width: 1.15;
+  stroke-linejoin: round;
+}
+
+.tape-block-icon .block-top {
+  fill: rgba(141, 241, 158, .16);
+}
+
+.tape-block-icon .block-left {
+  fill: rgba(67, 151, 82, .08);
+}
+
+.tape-block-icon .block-right {
+  fill: rgba(141, 241, 158, .045);
+}
+
+.tape-block-icon .block-link {
+  fill: none;
+  stroke: rgba(141, 241, 158, .35);
+  stroke-width: 1.15;
+  stroke-linecap: round;
+}
+
+.chain-tape-row.is-tip .tape-block-icon {
+  filter:
+    drop-shadow(0 0 5px rgba(141, 241, 158, .52))
+    drop-shadow(0 0 12px rgba(141, 241, 158, .2));
+}
+
+.chain-tape-row.is-tip .tape-block-icon .block-face {
+  stroke: var(--green-hot);
+}
+
+.chain-tape-row.is-tip .tape-block-icon .block-top {
+  fill: rgba(141, 241, 158, .42);
+}
+
+.chain-tape-row:hover .tape-block-icon {
+  transform: translateY(-1px) scale(1.05);
+}
+
+.tape-block-icon {
+  transition: transform .14s ease, filter .14s ease;
+}
+
+.tape-height {
+  font-size: 18px;
+}
+
+.tape-age {
+  font-size: 10px;
+}
+
+.tape-stat small {
+  font-size: 9px;
+}
+
+.tape-stat b {
+  font-size: 12px;
+}
+
+.tape-hash {
+  font-size: 10px;
+}
+
+.tape-open,
+.ledger-open {
+  font-size: 11px;
+}
+
+.telemetry-cell {
+  min-height: 78px;
+  padding-top: 13px;
+  padding-bottom: 12px;
+}
+
+.observatory-strip {
+  min-height: 74px;
+}
+
+.observatory-label strong {
+  font-size: 15px;
+}
+
+.rhythm-line {
+  height: 46px;
+}
+
+.ledger-row {
+  min-height: 46px;
+}
+
+.asset-matrix-row {
+  min-height: 50px;
+}
+
+.holder-rail-row {
+  min-height: 46px;
+}
+
+.node-stream-row {
+  min-height: 52px;
+}
+
+.output-rail-row {
+  min-height: 54px;
+}
+
+@media (max-width: 1120px) {
+  .chain-tape-row {
+    grid-template-columns: 50px 108px 82px 60px 90px minmax(150px, 1fr) 100px 20px;
+  }
+
+  .chain-tape::before {
+    left: 25px;
+  }
+}
+
+@media (max-width: 900px) {
+  .chain-tape-row {
+    grid-template-columns: 46px 102px 78px 54px 82px minmax(120px, 1fr) 18px;
+  }
+
+  .chain-tape::before {
+    left: 23px;
+  }
+
+  .tape-block-icon {
+    width: 23px;
+    height: 23px;
+  }
+}
+
+@media (max-width: 700px) {
+  .chain-tape-row {
+    min-height: 58px;
+    grid-template-columns: 42px 100px 68px 50px 1fr 18px;
+  }
+
+  .chain-tape::before {
+    left: 21px;
+  }
+
+  .tape-block-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .tape-height {
+    font-size: 16px;
+  }
+
+  .telemetry-cell > strong {
+    font-size: 18px;
+  }
+}
