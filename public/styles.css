@@ -7609,8 +7609,7 @@ body::after {
     grid-template-columns: 28px 70px minmax(0, 1fr) 48px;
   }
 
-  .block-tx-summary:nth-of-type(2),
-  .block-tx-summary:nth-of-type(3) {
+  .block-tx-summary {
     display: none;
   }
 
