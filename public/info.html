@@ -8,7 +8,7 @@
   <title>Yerbas Public API · Explorer Light</title>
   <link rel="icon" type="image/png" href="/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c">
   <link rel="apple-touch-icon" href="/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c">
-  <link rel="stylesheet" href="/styles.css?v=20260920-factual35">
+  <link rel="stylesheet" href="/styles.css?v=20260920-page36">
 </head>
 <body>
   <div class="page-noise" aria-hidden="true"></div>
@@ -70,7 +70,7 @@
         <article class="api-row"><div><code>GET /api/v1</code><p>Machine-readable API index and endpoint map.</p></div><a href="/api/v1">Try</a></article>
         <article class="api-row"><div><code>GET /api/v1/health</code><p>Explorer/Core health and current block height.</p></div><a href="/api/v1/health">Try</a></article>
         <article class="api-row"><div><code>GET /api/v1/status</code><p>Chain, network, connection, mempool, and synchronization status.</p></div><a href="/api/v1/status">Try</a></article>
-        <article class="api-row"><div><code>GET /api/v1/blocks?limit=12</code><p>Recent blocks. Limit: 1–25.</p></div><a href="/api/v1/blocks?limit=12">Try</a></article>
+        <article class="api-row"><div><code>GET /api/v1/blocks?limit=12&amp;offset=0</code><p>Confirmed blocks from the current tip. Limit: 1–25; offset skips that many blocks from the tip for pagination.</p></div><a href="/api/v1/blocks?limit=12&amp;offset=0">Try</a></article>
         <article class="api-row"><div><code>GET /api/v1/block/:height-or-hash</code><p>Block details by height or block hash.</p></div><span>path parameter</span></article>
         <article class="api-row"><div><code>GET /api/v1/tx/:txid</code><p>Decoded transaction from Core txindex.</p></div><span>path parameter</span></article>
         <article class="api-row"><div><code>GET /api/v1/address/:address</code><p>Address balance, total received, transaction IDs, UTXOs, and asset balances.</p></div><span>path parameter</span></article>
