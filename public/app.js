@@ -201,7 +201,7 @@ function renderLoading(label) {
 }
 
 async function renderMarkets() {
-  document.title = 'Yerbas Markets · Explorer Light';
+  document.title = 'Markets · Yerbas Explorer';
   renderLoading('Reading live market feeds');
 
   const data = await api('/api/markets');
@@ -232,7 +232,7 @@ async function renderMarkets() {
 }
 
 async function renderMarketDetail(exchange = 'nestex') {
-  document.title = 'NestEx YERB/USDT · Yerbas Explorer Light';
+  document.title = 'NestEx YERB/USDT · Yerbas Explorer';
   renderLoading('Reading NestEx YERB/USDT market');
 
   if (String(exchange).toLowerCase() !== 'nestex') {
@@ -333,7 +333,7 @@ async function renderMarketDetail(exchange = 'nestex') {
 }
 
 async function renderHome() {
-  document.title = 'Yerbas Explorer Light';
+  document.title = 'Yerbas Explorer';
   renderLoading('Reading live blockchain state');
 
   const pageSize = 12;
@@ -439,7 +439,7 @@ async function renderBlock(identifier) {
   renderLoading('Resolving block from Yerbas Core');
   const block = await api('/api/block/' + encodeURIComponent(identifier));
   setRpcState('online', 'Core online');
-  document.title = 'Block ' + block.height + ' · Yerbas Explorer Light';
+  document.title = 'Block ' + block.height + ' · Yerbas Explorer';
 
   const transactions = Array.isArray(block.tx) ? block.tx : [];
   const actions = '<a href="/">LIVE CHAIN</a>';
@@ -507,7 +507,7 @@ async function renderAddress(address) {
 
   const data = await api('/api/address/' + encodeURIComponent(address));
   setRpcState('online', 'Core online');
-  document.title = 'Address ' + data.address + ' · Yerbas Explorer Light';
+  document.title = 'Address ' + data.address + ' · Yerbas Explorer';
 
   const balance = data.history?.balance;
   const txids = Array.isArray(data.history?.txids) ? data.history.txids : [];
@@ -663,7 +663,7 @@ async function renderAssets() {
 
   const data = await api('/api/assets?' + request.toString());
   setRpcState('online', 'Core online');
-  document.title = 'Yerbas Assets · Explorer Light';
+  document.title = 'Assets · Yerbas Explorer';
 
   const rows = data.items.length
     ? data.items.map((asset) =>
@@ -731,7 +731,7 @@ async function renderAsset(name) {
 
   const data = await api('/api/asset/' + encodeURIComponent(name));
   setRpcState('online', 'Core online');
-  document.title = data.name + ' · Asset · Yerbas Explorer Light';
+  document.title = data.name + ' · Asset · Yerbas Explorer';
 
   const metadata = data.metadata || {};
   const holders = data.holders?.items || [];
@@ -881,7 +881,7 @@ async function renderSmartnodes() {
 
   const data = await api('/api/smartnodes?' + request.toString());
   setRpcState('online', 'Core online');
-  document.title = 'Yerbas Smartnodes · Explorer Light';
+  document.title = 'Smartnodes · Yerbas Explorer';
 
   const collateralOptions = Object.entries(data.collateralCounts || {})
     .filter(([amount]) => amount !== 'unknown')
@@ -1088,7 +1088,7 @@ async function renderNetworkMap() {
   const data = await api('/api/network-map?view=' + encodeURIComponent(view));
 
   setRpcState('online', 'Core online');
-  document.title = 'Yerbas Network Map · Explorer Light';
+  document.title = 'Network Map · Yerbas Explorer';
 
   const stats = data.stats || {};
   const statDefinitions = [
@@ -1391,7 +1391,7 @@ async function renderTransaction(txid) {
   const tx = await api('/api/tx/' + encodeURIComponent(txid) + query);
 
   setRpcState('online', 'Core online');
-  document.title = 'Transaction · Yerbas Explorer Light';
+  document.title = 'Transaction · Yerbas Explorer';
 
   const inputCount = Array.isArray(tx.vin) ? tx.vin.length : 0;
   const outputs = Array.isArray(tx.vout) ? tx.vout : [];
