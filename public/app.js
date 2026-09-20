@@ -362,7 +362,16 @@ async function renderHome() {
   ]);
 
   const tape = blocks.map((block, index) => {
-    return '<a class="chain-tape-row' + (page === 1 && index === 0 ? ' is-tip' : '') + '" href="/block/' + block.height + '">' +
+    const confirmations = Math.max(0, Number(status.blocks || 0) - Number(block.height || 0) + 1);
+    const confirmed = confirmations >= 6;
+    const tipClass = page === 1 && index === 0 ? ' is-tip' : '';
+    const maturityClass = confirmed ? ' is-confirmed' : ' is-confirming';
+    const maturityLabel = confirmed ? 'CONFIRMED' : confirmations + '/6';
+    const maturityTitle = confirmed
+      ? number(confirmations) + ' confirmations · confirmed'
+      : number(confirmations) + ' of 6 confirmations';
+
+    return '<a class="chain-tape-row' + tipClass + maturityClass + '" href="/block/' + block.height + '" title="' + esc(maturityTitle) + '">' +
       '<span class="tape-node" aria-hidden="true">' +
         '<svg class="tape-block-icon" viewBox="0 0 32 32" focusable="false">' +
           '<path class="chain-weave weave-back" d="M16 0C7 4 7 10 12 13"></path>' +
@@ -372,10 +381,11 @@ async function renderHome() {
           '<path class="block-face block-right" d="M25 11 16 16V26l9-5Z"></path>' +
           '<path class="chain-weave weave-front" d="M12 13C15 15 17 17 20 19"></path>' +
           '<path class="chain-core-line" d="M16 0V5.3M16 26.7V32"></path>' +
+          '<path class="block-check" d="m11.5 16.5 3 3 6-7"></path>' +
         '</svg>' +
       '</span>' +
       '<span class="tape-height">#' + number(block.height) + '</span>' +
-      '<span class="tape-age">' + esc(timeAgo(block.time)) + '</span>' +
+      '<span class="tape-age">' + esc(timeAgo(block.time)) + '<small class="tape-confirmation">' + esc(maturityLabel) + '</small></span>' +
       '<span class="tape-stat"><small>TX</small><b>' + number(block.transactions) + '</b></span>' +
       '<span class="tape-stat"><small>SIZE</small><b>' + bytes(block.size) + '</b></span>' +
       '<code class="tape-hash">' + esc(block.hash) + '</code>' +
@@ -418,7 +428,7 @@ async function renderHome() {
       '<div class="observatory-source"><span class="live-dot"></span>MAX ' + number(maxTx) + ' TX</div>' +
     '</section>' +
     '<section class="ledger-section">' +
-      railHeading('CHAIN TAPE', 'Recent confirmed blocks', rangeLabel) +
+      railHeading('CHAIN TAPE', 'Recent blocks', rangeLabel + ' · confirming 1–5 · confirmed 6+') +
       '<div class="chain-tape">' + tape + '</div>' +
       pagination +
     '</section>';
