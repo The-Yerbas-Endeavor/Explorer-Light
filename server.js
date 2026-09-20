@@ -992,7 +992,9 @@ async function handlePublicApi(req, res, url) {
         smartnodes: '/api/v1/smartnodes?status=ENABLED&page=1&count=50&collateral=&q=&sort=pay-age-asc',
         networkMap: '/api/v1/network-map?view=smartnodes',
         peers: '/api/v1/network/peers',
-        marketPrice: '/api/v1/market-price'
+        marketPrice: '/api/v1/market-price',
+        markets: '/api/v1/markets',
+        market: '/api/v1/market/nestex/YERB/USDT'
       }
     });
   }
@@ -1027,8 +1029,25 @@ async function handlePublicApi(req, res, url) {
   }
 
   if (path === '/api/v1/market-price') {
-    const result = await ai.invoke('get_market_price', {});
-    return sendJson(res, result.data.available ? 200 : 503, result.data);
+    const market = await nestexMarketSummary();
+    return sendJson(res, 200, {
+      available: true,
+      exchange: market.exchange,
+      exchangeName: market.exchangeName,
+      pair: market.pair,
+      priceUsdt: market.ticker.last,
+      bidUsdt: market.ticker.bid,
+      askUsdt: market.ticker.ask,
+      high24hUsdt: market.ticker.high,
+      low24hUsdt: market.ticker.low,
+      change24hPct: market.ticker.change24hPct,
+      volume24hYerb: market.ticker.baseVolume,
+      volume24hUsdt: market.ticker.quoteVolume,
+      marketCapUsdt: market.valuation.marketCapUsdt,
+      source: market.source,
+      tradeUrl: market.tradeUrl,
+      asOf: market.asOf
+    });
   }
 
   if (path.startsWith('/api/v1/')) {
@@ -1117,28 +1136,30 @@ async function handlePublicApi(req, res, url) {
   }
 
   if (path === '/ext/getbasicstats') {
-    const [chain, supply, count] = await Promise.all([
+    const [chain, supply, count, market] = await Promise.all([
       rpc.call('getblockchaininfo'),
       supplyData(),
-      rpc.call('smartnode', ['count']).catch(() => null)
+      rpc.call('smartnode', ['count']).catch(() => null),
+      nestexMarketSummary().catch(() => null)
     ]);
     const total = typeof count === 'object' && count !== null ? (count.total ?? null) : count;
     return sendJson(res, 200, {
       block_count: chain.blocks,
       money_supply: supply.totalAmountYerb ?? null,
-      last_price_usdt: null,
-      last_price_usd: null,
+      last_price_usdt: market?.ticker?.last ?? null,
+      last_price_usd: market?.ticker?.last ?? null,
       masternode_count: total
     });
   }
 
   if (path === '/ext/getsummary') {
-    const [chain, network, supply, hashRate, count] = await Promise.all([
+    const [chain, network, supply, hashRate, count, market] = await Promise.all([
       rpc.call('getblockchaininfo'),
       rpc.call('getnetworkinfo'),
       supplyData(),
       rpc.call('getnetworkhashps').catch(() => null),
-      rpc.call('smartnode', ['count']).catch(() => null)
+      rpc.call('smartnode', ['count']).catch(() => null),
+      nestexMarketSummary().catch(() => null)
     ]);
     const total = typeof count === 'object' && count !== null ? (count.total ?? null) : count;
     const enabled = typeof count === 'object' && count !== null ? (count.enabled ?? null) : null;
@@ -1147,7 +1168,7 @@ async function handlePublicApi(req, res, url) {
       difficultyHybrid: '',
       supply: supply.totalAmountYerb ?? null,
       hashrate: hashRate,
-      lastPrice: null,
+      lastPrice: market?.ticker?.last ?? null,
       connections: network.connections,
       masternodeCountOnline: enabled,
       masternodeCountOffline: total !== null && enabled !== null ? Math.max(0, total - enabled) : null,
@@ -1161,14 +1182,18 @@ async function handlePublicApi(req, res, url) {
   }
 
   if (path === '/ext/getcurrentprice') {
-    const result = await ai.invoke('get_market_price', {});
-    if (!result.data.available) {
-      return sendJson(res, 503, {
-        error: result.data.reason,
-        available: false
-      });
-    }
-    return sendJson(res, 200, result.data);
+    const market = await nestexMarketSummary();
+    return sendJson(res, 200, {
+      available: true,
+      exchange: market.exchangeName,
+      pair: market.pair,
+      last_price_usdt: market.ticker.last,
+      last_price_usd: market.ticker.last,
+      bid: market.ticker.bid,
+      ask: market.ticker.ask,
+      change_24h: market.ticker.change24hPct,
+      source: market.source
+    });
   }
 
   if (path === '/ext/getdistribution'
@@ -1193,6 +1218,19 @@ async function handleApi(req, res, url) {
   if (url.pathname === '/api/status') {
     const data = await cached('status', config.cacheMs, statusPayload);
     return sendJson(res, 200, data);
+  }
+
+  if (url.pathname === '/api/markets') {
+    const market = await nestexMarketSummary();
+    return sendJson(res, 200, {
+      generatedAt: new Date().toISOString(),
+      markets: [market]
+    });
+  }
+
+  if (url.pathname === '/api/market/nestex/YERB/USDT'
+    || url.pathname === '/api/market/nestex/YERB_USDT') {
+    return sendJson(res, 200, await nestexMarketDetail());
   }
 
   if (url.pathname === '/api/blocks') {
@@ -1504,7 +1542,9 @@ async function requestHandler(req, res) {
       || url.pathname.startsWith('/asset/')
       || url.pathname === '/smartnodes'
       || url.pathname === '/masternodes'
-      || url.pathname === '/node-map') {
+      || url.pathname === '/node-map'
+      || url.pathname === '/markets'
+      || url.pathname === '/markets/nestex/YERB/USDT') {
       return await sendFile(req, res, 'index.html', 'text/html; charset=utf-8', 'no-cache');
     }
 
