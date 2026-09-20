@@ -58,6 +58,12 @@ export const config = Object.freeze({
     geoCacheMs: intEnv('NETWORK_MAP_GEO_CACHE_MS', 86400000, 60000, 604800000),
     geoTimeoutMs: intEnv('NETWORK_MAP_GEO_TIMEOUT_MS', 12000, 1000, 60000)
   }),
+  markets: Object.freeze({
+    enabled: boolEnv('MARKETS_ENABLED', true),
+    nestexApiBase: process.env.NESTEX_API_BASE || 'https://api.nestex.one',
+    cacheMs: intEnv('MARKETS_CACHE_MS', 30000, 5000, 300000),
+    timeoutMs: intEnv('MARKETS_TIMEOUT_MS', 10000, 1000, 30000)
+  }),
   recentBlocks: intEnv('RECENT_BLOCKS', 12, 5, 25),
   cacheMs: intEnv('CACHE_MS', 5000, 0, 60000)
 });
