@@ -1969,7 +1969,8 @@ tbody tr:hover {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(var(--network-pin-scale, 1));
+  transform-origin: center;
   cursor: pointer;
   background: var(--green);
   box-shadow: 0 0 0 3px rgba(141, 241, 158, .08), 0 0 13px rgba(141, 241, 158, .75);
@@ -1978,7 +1979,7 @@ tbody tr:hover {
 
 .network-pin:hover {
   z-index: 6;
-  transform: translate(-50%, -50%) scale(1.45);
+  transform: translate(-50%, -50%) scale(var(--network-pin-hover-scale, 1.16));
 }
 
 .network-pin.status-online {
@@ -7402,5 +7403,47 @@ body::after {
 
   .ipfs-display-foot span {
     white-space: normal;
+  }
+}
+
+
+/* ==========================================================================
+   Explorer 4.0 — adaptive network-map pins
+   Geographic positions zoom normally; pin symbols scale only gently.
+   ========================================================================== */
+
+.network-map-pins {
+  --network-pin-scale: 1;
+  --network-pin-hover-scale: 1.16;
+}
+
+.network-pin {
+  will-change: transform;
+}
+
+.network-pin.cluster {
+  width: 22px;
+  height: 22px;
+}
+
+.network-pin.cluster span {
+  font-size: 8px;
+  line-height: 1;
+}
+
+@media (max-width: 700px) {
+  .network-pin.cluster {
+    width: 20px;
+    height: 20px;
+  }
+
+  .network-pin.cluster span {
+    font-size: 7px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .network-pin {
+    transition: none;
   }
 }
