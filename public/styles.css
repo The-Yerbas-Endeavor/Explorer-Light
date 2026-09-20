@@ -6629,3 +6629,54 @@ body::after {
     transition: none;
   }
 }
+
+
+/* ==========================================================================
+   Explorer 3.5 — factual block telemetry
+   Remove ambiguous composite activity meters; visualize TX count only.
+   ========================================================================== */
+
+.chain-tape-row {
+  grid-template-columns: 54px 118px 88px 66px 100px minmax(260px, 1fr) 22px;
+}
+
+.tape-hash {
+  color: #8aa294;
+}
+
+.rhythm-line {
+  position: relative;
+  padding-top: 4px;
+  border-bottom: 1px solid rgba(130, 244, 255, .08);
+}
+
+.rhythm-tick {
+  cursor: help;
+  min-height: 5px;
+}
+
+.observatory-source {
+  white-space: nowrap;
+}
+
+@media (max-width: 1120px) {
+  .chain-tape-row {
+    grid-template-columns: 50px 108px 82px 60px 90px minmax(190px, 1fr) 20px;
+  }
+}
+
+@media (max-width: 900px) {
+  .chain-tape-row {
+    grid-template-columns: 46px 102px 78px 54px 82px minmax(130px, 1fr) 18px;
+  }
+}
+
+@media (max-width: 700px) {
+  .chain-tape-row {
+    grid-template-columns: 42px 100px 68px 50px 1fr 18px;
+  }
+
+  .tape-hash {
+    display: none;
+  }
+}
