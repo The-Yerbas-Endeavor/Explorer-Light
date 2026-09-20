@@ -113,6 +113,14 @@ function recordHero(kicker, title, value, kind, actions = '') {
   '</section>';
 }
 
+function addressIdentity(address, label = 'YERBAS ADDRESS') {
+  return '<section class="address-identity">' +
+    '<span>' + esc(label) + '</span>' +
+    '<code>' + esc(address) + '</code>' +
+    '<a href="/address/' + encodeURIComponent(address) + '">OPEN ADDRESS ↗</a>' +
+  '</section>';
+}
+
 function panelHeading(index, eyebrow, title, meta = '') {
   return '<div class="panel-head">' +
     '<div class="panel-title">' +
@@ -337,6 +345,7 @@ async function renderAddress(address) {
 
   app.innerHTML =
     recordHero('Native address index', 'Address portfolio', data.address, 'ADR', actions) +
+    addressIdentity(data.address) +
     historyNotice +
     '<section class="balance-stage">' +
       '<article class="balance-focus">' +
@@ -744,7 +753,7 @@ async function renderSmartnodes() {
               esc(shortService(node.service)) + '</span>' +
             '<div class="row-sub mono" title="' + esc(node.proTxHash || node.outpoint || '') + '">' +
               esc(compactHash(node.proTxHash || node.outpoint)) + '</div></td>' +
-          '<td>' + payout + '</td>' +
+          '<td><span class="cell-label">YERBAS PAYOUT</span>' + payout + '</td>' +
           '<td><span class="collateral-value">' +
             (node.collateralAmount === null ? '—' : number(node.collateralAmount)) +
             '</span><div class="row-sub">YERB</div></td>' +
@@ -1298,7 +1307,7 @@ async function renderTransaction(txid) {
         const level = scaleLevel(Number(vout.value || 0), maxOutput);
         return '<article class="output-card">' +
           '<div class="output-card-head"><span>OUTPUT ' + number(vout.n) + '</span><strong>' + number(vout.value, 8) + ' YERB</strong></div>' +
-          '<div class="output-destination">' + outputAddresses(vout) + '</div>' +
+          '<div class="output-destination"><span class="output-address-label">YERBAS ADDRESS / SCRIPT</span>' + outputAddresses(vout) + '</div>' +
           '<div class="value-meter"><span class="meter-fill level-' + level + '"></span></div>' +
         '</article>';
       }).join('')
