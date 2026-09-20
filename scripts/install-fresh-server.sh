@@ -174,7 +174,6 @@ done
 
 if (( HTTPS )); then
   [[ "$DOMAIN" != "_" ]] || die "--https requires --domain."
-  [[ -n "$EMAIL" ]] || die "--https requires --email."
 fi
 
 [[ -r /etc/os-release ]] || die "Cannot identify operating system."
@@ -1037,13 +1036,23 @@ systemctl reload nginx
 if (( HTTPS )); then
   log "Configuring Let's Encrypt HTTPS for $DOMAIN"
   apt-get install -y certbot python3-certbot-nginx
-  certbot \
-    --nginx \
-    --non-interactive \
-    --agree-tos \
-    --redirect \
-    --email "$EMAIL" \
+
+  CERTBOT_ARGS=(
+    --nginx
+    --non-interactive
+    --agree-tos
+    --redirect
     -d "$DOMAIN"
+  )
+
+  if [[ -n "$EMAIL" ]]; then
+    CERTBOT_ARGS+=(--email "$EMAIL")
+  else
+    CERTBOT_ARGS+=(--register-unsafely-without-email)
+  fi
+
+  certbot "${CERTBOT_ARGS[@]}"
+  systemctl enable --now certbot.timer >/dev/null 2>&1 || true
 fi
 
 rm -rf /var/www/yerbas-explorer-sync
