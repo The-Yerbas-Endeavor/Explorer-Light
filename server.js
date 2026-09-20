@@ -811,7 +811,7 @@ async function handlePublicApi(req, res, url) {
       documentation: '/info',
       endpoints: {
         status: '/api/v1/status',
-        blocks: '/api/v1/blocks?limit=12',
+        blocks: '/api/v1/blocks?limit=12&offset=0',
         block: '/api/v1/block/:height-or-hash',
         transaction: '/api/v1/tx/:txid',
         address: '/api/v1/address/:address',
