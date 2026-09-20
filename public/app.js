@@ -180,7 +180,6 @@ async function renderHome() {
   setRpcState('online', 'Core online');
 
   const maxTx = Math.max(1, ...blocks.map((block) => Number(block.transactions || 0)));
-  const maxSize = Math.max(1, ...blocks.map((block) => Number(block.size || 0)));
 
   const telemetry = telemetryRail([
     { label: 'CHAIN TIP', value: number(status.blocks), note: status.chain || 'mainnet' },
@@ -191,8 +190,6 @@ async function renderHome() {
   ]);
 
   const tape = blocks.map((block, index) => {
-    const activity = Number(block.transactions || 0) + (Number(block.size || 0) / maxSize) * maxTx;
-    const level = scaleLevel(activity, maxTx * 2);
     return '<a class="chain-tape-row' + (index === 0 ? ' is-tip' : '') + '" href="/block/' + block.height + '">' +
       '<span class="tape-node" aria-hidden="true">' +
         '<svg class="tape-block-icon" viewBox="0 0 32 32" focusable="false">' +
@@ -210,22 +207,22 @@ async function renderHome() {
       '<span class="tape-stat"><small>TX</small><b>' + number(block.transactions) + '</b></span>' +
       '<span class="tape-stat"><small>SIZE</small><b>' + bytes(block.size) + '</b></span>' +
       '<code class="tape-hash">' + esc(block.hash) + '</code>' +
-      '<span class="tape-activity"><i class="level-' + level + '"></i></span>' +
       '<span class="tape-open">↗</span>' +
     '</a>';
   }).join('');
 
   const rhythm = blocks.slice(0, 18).reverse().map((block) => {
-    const activity = Number(block.transactions || 0) + (Number(block.size || 0) / maxSize) * maxTx;
-    return '<i class="rhythm-tick level-' + scaleLevel(activity, maxTx * 2) + '"></i>';
+    const txCount = Number(block.transactions || 0);
+    return '<i class="rhythm-tick level-' + scaleLevel(txCount, maxTx) + '" title="Block ' +
+      esc(block.height) + ' · ' + number(txCount) + ' transaction' + (txCount === 1 ? '' : 's') + '"></i>';
   }).join('');
 
   app.innerHTML =
     telemetry +
     '<section class="observatory-strip">' +
-      '<div class="observatory-label"><span>NETWORK RHYTHM</span><strong>Recent block activity</strong></div>' +
-      '<div class="rhythm-line">' + rhythm + '</div>' +
-      '<div class="observatory-source"><span class="live-dot"></span>LIVE</div>' +
+      '<div class="observatory-label"><span>TX / BLOCK</span><strong>Recent transaction count</strong></div>' +
+      '<div class="rhythm-line" aria-label="Recent transactions per block">' + rhythm + '</div>' +
+      '<div class="observatory-source"><span class="live-dot"></span>MAX ' + number(maxTx) + ' TX</div>' +
     '</section>' +
     '<section class="ledger-section">' +
       railHeading('CHAIN TAPE', 'Recent confirmed blocks', number(blocks.length) + ' direct from Core') +
