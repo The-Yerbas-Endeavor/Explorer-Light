@@ -8,7 +8,7 @@
   <title>Yerbas Explorer Light</title>
   <link rel="icon" type="image/png" href="/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c">
   <link rel="apple-touch-icon" href="/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c">
-  <link rel="stylesheet" href="/styles.css?v=20260920-compact2">
+  <link rel="stylesheet" href="/styles.css?v=20260920-rails3">
 </head>
 <body>
   <div class="page-noise" aria-hidden="true"></div>
@@ -40,43 +40,22 @@
   </header>
 
   <main class="shell">
-    <section class="hero">
-      <div class="hero-copy">
+    <section class="observatory-mast">
+      <div class="mast-copy">
         <div class="signal-line">
           <span class="signal-pulse" aria-hidden="true"></span>
           <span>YERBAS MAINNET</span>
           <span class="signal-separator">/</span>
-          <span>LIVE LEDGER</span>
+          <span>LIVE OBSERVATORY</span>
         </div>
-
-        <h1>
-          <span>See the chain.</span>
-          <em>Nothing in between.</em>
-        </h1>
-
-        <p class="hero-summary">
-          Direct blockchain data from Yerbas Core. No explorer database, no stale mirror,
-          no unnecessary layer between you and the network.
-        </p>
-
-        <div class="hero-facts" aria-label="Explorer architecture">
-          <span>RPC DIRECT</span>
-          <span>DATABASE 0</span>
-            </div>
+        <h1>Yerbas <span>// live chain</span></h1>
+        <p>Direct RPC visibility into blocks, transactions, addresses, assets and smartnodes.</p>
       </div>
 
-      <div class="chain-art" aria-hidden="true">
-        <div class="orbit orbit-a"></div>
-        <div class="orbit orbit-b"></div>
-        <div class="chain-core">
-          <span class="core-label">YERB</span>
-          <strong>LIVE</strong>
-        </div>
-        <span class="chain-node node-1">01</span>
-        <span class="chain-node node-2">02</span>
-        <span class="chain-node node-3">03</span>
-        <span class="chain-node node-4">04</span>
-        <span class="chain-node node-5">05</span>
+      <div class="mast-telemetry" aria-label="Explorer architecture">
+        <span><small>SOURCE</small><strong>CORE RPC</strong></span>
+        <span><small>DATABASE</small><strong>NONE</strong></span>
+        <span><small>NETWORK</small><strong>MAINNET</strong></span>
       </div>
     </section>
 
@@ -128,6 +107,6 @@
     </div>
   </footer>
 
-  <script type="module" src="/app.js?v=20260920-compact2"></script>
+  <script type="module" src="/app.js?v=20260920-rails3"></script>
 </body>
 </html>
