@@ -195,11 +195,14 @@ async function renderHome() {
     const level = scaleLevel(activity, maxTx * 2);
     return '<a class="chain-tape-row' + (index === 0 ? ' is-tip' : '') + '" href="/block/' + block.height + '">' +
       '<span class="tape-node" aria-hidden="true">' +
-        '<svg class="tape-block-icon" viewBox="0 0 24 24" focusable="false">' +
-          '<path class="block-face block-top" d="M12 2.5 20 7 12 11.5 4 7Z"></path>' +
-          '<path class="block-face block-left" d="M4 7 12 11.5V21L4 16.5Z"></path>' +
-          '<path class="block-face block-right" d="M20 7 12 11.5V21l8-4.5Z"></path>' +
-          '<path class="block-link" d="M12 0v2.5M12 21v3"></path>' +
+        '<svg class="tape-block-icon" viewBox="0 0 32 32" focusable="false">' +
+          '<path class="chain-weave weave-back" d="M16 0C7 4 7 10 12 13"></path>' +
+          '<path class="chain-weave weave-back weave-back-bottom" d="M20 19C25 22 25 28 16 32"></path>' +
+          '<path class="block-face block-top" d="M16 6 25 11 16 16 7 11Z"></path>' +
+          '<path class="block-face block-left" d="M7 11 16 16V26L7 21Z"></path>' +
+          '<path class="block-face block-right" d="M25 11 16 16V26l9-5Z"></path>' +
+          '<path class="chain-weave weave-front" d="M12 13C15 15 17 17 20 19"></path>' +
+          '<path class="chain-core-line" d="M16 0V5.3M16 26.7V32"></path>' +
         '</svg>' +
       '</span>' +
       '<span class="tape-height">#' + number(block.height) + '</span>' +
