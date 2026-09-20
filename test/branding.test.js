@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-const logoPath = '/yerbas-logo.png?v=1a98ac7f97c926099fe420b121fccd27ab164038';
+const logoPath = '/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c';
 const pages = ['public/index.html', 'public/info.html'];
 
 for (const page of pages) {
