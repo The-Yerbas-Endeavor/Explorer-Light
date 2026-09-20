@@ -436,30 +436,55 @@ async function renderHome() {
 
 
 async function renderBlock(identifier) {
-  renderLoading('Resolving block from Yerbas Core');
-  const block = await api('/api/block/' + encodeURIComponent(identifier));
+  renderLoading('Resolving block and transaction outputs from Yerbas Core');
+  const block = await api('/api/block/' + encodeURIComponent(identifier) + '?transactions=1');
   setRpcState('online', 'Core online');
   document.title = 'Block ' + block.height + ' · Yerbas Explorer';
 
   const transactions = Array.isArray(block.tx) ? block.tx : [];
   const actions = '<a href="/">LIVE CHAIN</a>';
 
-  const txRows = transactions.length
-    ? transactions.map((txid, index) =>
-        '<a class="ledger-row tx-ledger-row" href="/tx/' + encodeURIComponent(txid) + '?block=' + encodeURIComponent(block.hash) + '">' +
-          '<span class="ledger-index">' + String(index + 1).padStart(2, '0') + '</span>' +
-          '<span class="ledger-row-label">TXID</span>' +
-          '<code>' + esc(txid) + '</code>' +
-          '<span class="ledger-open">↗</span>' +
-        '</a>'
-      ).join('')
-    : '<div class="ledger-empty">No transaction IDs returned.</div>';
+  const txGroups = transactions.length
+    ? transactions.map((tx, index) => {
+        const txid = typeof tx === 'string' ? tx : tx?.txid;
+        const outputs = Array.isArray(tx?.vout) ? tx.vout : [];
+        const totalOutput = outputs.reduce((sum, vout) => sum + Number(vout?.value || 0), 0);
+        const isCoinbase = Array.isArray(tx?.vin) && tx.vin.some((vin) => Boolean(vin?.coinbase));
+
+        const outputRows = outputs.length
+          ? outputs.map((vout) =>
+              '<div class="block-output-row">' +
+                '<span class="block-output-index">OUT ' + number(vout?.n) + '</span>' +
+                '<strong>' + yerb(vout?.value) + ' <small>YERB</small></strong>' +
+                '<div class="block-output-address">' +
+                  '<span>DESTINATION</span>' +
+                  outputAddresses(vout) +
+                '</div>' +
+              '</div>'
+            ).join('')
+          : '<div class="ledger-empty">No decoded outputs returned for this transaction.</div>';
+
+        return '<article class="block-tx-group">' +
+          '<div class="block-tx-head">' +
+            '<span class="ledger-index">' + String(index + 1).padStart(2, '0') + '</span>' +
+            '<span class="block-tx-type">' + (isCoinbase ? 'COINBASE' : 'TRANSACTION') + '</span>' +
+            '<a class="block-tx-id mono" href="/tx/' + encodeURIComponent(txid) + '?block=' + encodeURIComponent(block.hash) + '">' +
+              esc(txid || 'Unknown transaction') +
+            '</a>' +
+            '<span class="block-tx-summary"><small>OUTPUTS</small><b>' + number(outputs.length) + '</b></span>' +
+            '<span class="block-tx-summary"><small>TOTAL</small><b>' + yerb(totalOutput) + ' YERB</b></span>' +
+            '<a class="ledger-open" href="/tx/' + encodeURIComponent(txid) + '?block=' + encodeURIComponent(block.hash) + '">OPEN ↗</a>' +
+          '</div>' +
+          '<div class="block-output-list">' + outputRows + '</div>' +
+        '</article>';
+      }).join('')
+    : '<div class="ledger-empty">No decoded transactions returned.</div>';
 
   app.innerHTML =
     ledgerHeader('BLOCK', '#' + number(block.height), block.hash, actions, 'Confirmed ledger entry · ' + esc(isoTime(block.time))) +
     telemetryRail([
       { label: 'CONFIRMATIONS', value: number(block.confirmations), note: 'active chain' },
-      { label: 'TRANSACTIONS', value: number(transactions.length), note: 'entries' },
+      { label: 'TRANSACTIONS', value: number(transactions.length), note: 'decoded entries' },
       { label: 'SIZE', value: bytes(block.size), note: 'serialized' },
       { label: 'DIFFICULTY', value: number(block.difficulty, 8), note: 'target' }
     ]) +
@@ -472,12 +497,11 @@ async function renderBlock(identifier) {
         ? '<a href="/block/' + encodeURIComponent(block.nextblockhash) + '"><span>NEXT →</span><code>' + esc(compactHash(block.nextblockhash)) + '</code></a>'
         : '<span class="disabled"><span>CHAIN TIP</span></span>') +
     '</section>' +
-    '<section class="ledger-section">' +
-      railHeading('BLOCK CONTENTS', 'Transactions', number(transactions.length) + ' total') +
-      '<div class="ledger-list">' + txRows + '</div>' +
+    '<section class="ledger-section block-transactions-section">' +
+      railHeading('BLOCK CONTENTS', 'Transactions + outputs', number(transactions.length) + ' total') +
+      '<div class="block-tx-list">' + txGroups + '</div>' +
     '</section>';
 }
-
 
 function outputAddresses(vout) {
   const script = vout?.scriptPubKey || {};
