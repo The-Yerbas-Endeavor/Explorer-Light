@@ -49,13 +49,19 @@ If Explorer Light runs as the same OS user as \`yerbasd\`, it automatically trie
 
 ## Fresh-server installer
 
-For the `explorer2.yerbas.org` test server, the complete hardened install is now one command:
+The complete hardened install is one generic command:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/The-Yerbas-Endeavor/Explorer-Light/feature/rpc-first-test-build/install.sh | sudo bash
 ```
 
-That one command downloads and runs the full installer with `explorer2.yerbas.org` and the default `yerbasadmin` sudo/build account.
+The wrapper prompts for the public explorer hostname, for example:
+
+```text
+[Explorer-Light] Enter the public explorer domain (example: explorer.example.org): explorer.example.org
+```
+
+Enter only the hostname — no `http://`, `https://`, path, or port. The default one-click flow enables Let's Encrypt HTTPS automatically and uses the default `yerbasadmin` sudo/build account. For unattended installs, set `EXPLORER_DOMAIN=explorer.example.org` or pass `--domain explorer.example.org`.
 
 The default installation performs the **entire explorer-node bootstrap and host hardening**:
 
@@ -84,7 +90,7 @@ The default installation performs the **entire explorer-node bootstrap and host 
 - Runs `npm test` and `npm run check` as the non-root build administrator, then locks the deployed tree down for the service account.
 - Installs and starts the Explorer Light systemd service.
 - Configures nginx as the only public HTTP entry point.
-- Optionally requests a Let's Encrypt certificate.
+- Requests a Let's Encrypt certificate by default when the generic one-click wrapper is used with a public domain.
 
 The new administrator account is created as **SSH-key-only** with passwordless sudo so the installer never needs to create, print, or persist a reusable administrator password.
 
@@ -92,15 +98,15 @@ For a custom administrator name:
 
 ```bash
 sudo /tmp/install-fresh-server.sh \
-  --domain explorer2.yerbas.org \
+  --domain explorer.example.org \
   --admin-user exploreradmin
 ```
 
-For HTTPS once DNS for `explorer2.yerbas.org` resolves to the server:
+For a direct full-installer HTTPS run once DNS for `explorer.example.org` resolves to the server:
 
 ```bash
 sudo /tmp/install-fresh-server.sh \
-  --domain explorer2.yerbas.org \
+  --domain explorer.example.org \
   --https \
   --email admin@example.org
 ```
