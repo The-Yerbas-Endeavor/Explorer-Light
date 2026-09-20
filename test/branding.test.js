@@ -21,4 +21,5 @@ test('server whitelists the Yerbas logo PNG', async () => {
 test('Yerbas logo file is a PNG', async () => {
   const logo = await readFile(new URL('../public/yerbas-logo.png', import.meta.url));
   assert.equal(logo.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+  assert.equal(logo.subarray(-12).toString('hex'), '0000000049454e44ae426082');
 });
