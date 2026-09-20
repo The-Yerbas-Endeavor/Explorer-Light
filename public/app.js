@@ -49,6 +49,38 @@ function number(value, digits = 0) {
   return Number(value).toLocaleString(undefined, { maximumFractionDigits: digits });
 }
 
+function marketPrice(value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
+  const numeric = Number(value);
+  if (numeric === 0) return '0';
+  return numeric.toLocaleString(undefined, {
+    minimumFractionDigits: numeric < 0.01 ? 8 : 2,
+    maximumFractionDigits: numeric < 0.0001 ? 12 : (numeric < 1 ? 8 : 4)
+  });
+}
+
+function marketMoney(value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
+  const numeric = Number(value);
+  return numeric.toLocaleString(undefined, {
+    minimumFractionDigits: numeric < 1 ? 4 : 2,
+    maximumFractionDigits: numeric < 1 ? 8 : 2
+  });
+}
+
+function marketPercent(value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
+  const numeric = Number(value);
+  return (numeric > 0 ? '+' : '') + numeric.toFixed(2) + '%';
+}
+
+function marketTime(value) {
+  if (!value || !Number.isFinite(Number(value))) return '—';
+  const numeric = Number(value);
+  const epochMs = numeric > 100000000000 ? numeric : numeric * 1000;
+  return new Date(epochMs).toLocaleString();
+}
+
 function bytes(value) {
   if (!Number.isFinite(Number(value))) return '—';
   const n = Number(value);
@@ -168,18 +200,152 @@ function renderLoading(label) {
     '</section>';
 }
 
+async function renderMarkets() {
+  document.title = 'Yerbas Markets · Explorer Light';
+  renderLoading('Reading live market feeds');
+
+  const data = await api('/api/markets');
+  setRpcState('online', 'Core online');
+
+  const rows = (data.markets || []).map((market) => {
+    const ticker = market.ticker || {};
+    const changeClass = Number(ticker.change24hPct) >= 0 ? 'market-up' : 'market-down';
+    return '<a class="market-matrix-row" href="/markets/' + encodeURIComponent(market.exchange) + '/YERB/USDT">' +
+      '<span class="market-exchange"><b>' + esc(market.exchangeName) + '</b><small>' + esc(market.exchange) + '</small></span>' +
+      '<strong>' + esc(market.pair) + '</strong>' +
+      '<span><small>LAST</small>' + marketPrice(ticker.last) + '</span>' +
+      '<span class="' + changeClass + '"><small>24H</small>' + marketPercent(ticker.change24hPct) + '</span>' +
+      '<span><small>VOL YERB</small>' + number(ticker.baseVolume, 2) + '</span>' +
+      '<span><small>VOL USDT</small>' + marketMoney(ticker.quoteVolume) + '</span>' +
+      '<span><small>MARKET CAP</small>' + marketMoney(market.valuation?.marketCapUsdt) + '</span>' +
+      '<span class="ledger-open">↗</span>' +
+    '</a>';
+  }).join('');
+
+  app.innerHTML =
+    ledgerHeader('MARKET OBSERVATORY', 'Yerbas markets', number((data.markets || []).length) + ' live market feed' + ((data.markets || []).length === 1 ? '' : 's'), '<a href="/">LIVE CHAIN</a>') +
+    '<section class="ledger-section">' +
+      railHeading('MARKET MATRIX', 'Live exchange values', 'exchange data · not consensus data') +
+      '<div class="market-matrix">' + (rows || '<div class="ledger-empty">No market feeds are currently available.</div>') + '</div>' +
+    '</section>' +
+    '<div class="market-disclaimer">Market data is informational and sourced from external exchanges. Blockchain state continues to come directly from Yerbas Core.</div>';
+}
+
+async function renderMarketDetail(exchange = 'nestex') {
+  document.title = 'NestEx YERB/USDT · Yerbas Explorer Light';
+  renderLoading('Reading NestEx YERB/USDT market');
+
+  if (String(exchange).toLowerCase() !== 'nestex') {
+    throw new Error('Unknown market exchange.');
+  }
+
+  const market = await api('/api/market/nestex/YERB/USDT');
+  setRpcState('online', 'Core online');
+
+  const ticker = market.ticker || {};
+  const bids = market.orderbook?.bids || [];
+  const asks = market.orderbook?.asks || [];
+  const trades = market.trades?.items || [];
+  const maxBidTotal = Math.max(0.00000001, ...bids.map((order) => Number(order.total || 0)));
+  const maxAskTotal = Math.max(0.00000001, ...asks.map((order) => Number(order.total || 0)));
+  const changeClass = Number(ticker.change24hPct) >= 0 ? 'market-up' : 'market-down';
+
+  const bidRows = bids.slice(0, 24).map((order) =>
+    '<div class="orderbook-row bid">' +
+      '<span>' + marketPrice(order.price) + '</span>' +
+      '<span>' + number(order.amount, 8) + '</span>' +
+      '<span>' + marketMoney(order.total) + '</span>' +
+      '<i class="order-depth level-' + scaleLevel(order.total, maxBidTotal) + '"></i>' +
+    '</div>'
+  ).join('');
+
+  const askRows = asks.slice(0, 24).map((order) =>
+    '<div class="orderbook-row ask">' +
+      '<span>' + marketPrice(order.price) + '</span>' +
+      '<span>' + number(order.amount, 8) + '</span>' +
+      '<span>' + marketMoney(order.total) + '</span>' +
+      '<i class="order-depth level-' + scaleLevel(order.total, maxAskTotal) + '"></i>' +
+    '</div>'
+  ).join('');
+
+  const tradeRows = trades.slice(0, 40).map((trade) => {
+    const side = String(trade.side || '').toLowerCase();
+    return '<div class="market-trade-row ' + esc(side) + '">' +
+      '<span class="trade-side">' + esc(trade.side || '—') + '</span>' +
+      '<span>' + marketPrice(trade.price) + '</span>' +
+      '<span>' + number(trade.amount, 8) + '</span>' +
+      '<span>' + marketMoney(trade.total) + '</span>' +
+      '<span>' + esc(marketTime(trade.timestamp)) + '</span>' +
+    '</div>';
+  }).join('');
+
+  const liquidity = market.liquidity;
+  const liquidityRail = liquidity
+    ? '<section class="market-liquidity-rail">' +
+        '<span><small>LIQUIDITY</small><b>' + marketMoney(liquidity.totalUsdt) + ' USDT</b></span>' +
+        '<span><small>SCORE</small><b>' + number(liquidity.score) + '</b></span>' +
+        '<span><small>POOLED YERB</small><b>' + number(liquidity.pooledYerb, 8) + '</b></span>' +
+        '<span><small>POOLED USDT</small><b>' + marketMoney(liquidity.pooledUsdt) + '</b></span>' +
+        '<span><small>POOL GROWTH</small><b>' + marketPercent(liquidity.growthPct) + '</b></span>' +
+      '</section>'
+    : '';
+
+  app.innerHTML =
+    ledgerHeader(
+      'MARKET · NESTEX',
+      'YERB / USDT',
+      'Live public exchange feed',
+      '<a href="/markets">ALL MARKETS</a><a href="' + esc(market.tradeUrl) + '" target="_blank" rel="noopener noreferrer">TRADE ON NESTEX ↗</a>'
+    ) +
+    telemetryRail([
+      { label: 'LAST', value: marketPrice(ticker.last) + ' USDT', note: 'last trade' },
+      { label: '24H CHANGE', value: marketPercent(ticker.change24hPct), note: 'rolling 24h' },
+      { label: 'BID', value: marketPrice(ticker.bid), note: 'highest bid' },
+      { label: 'ASK', value: marketPrice(ticker.ask), note: 'lowest ask' },
+      { label: '24H HIGH', value: marketPrice(ticker.high), note: 'USDT' },
+      { label: '24H LOW', value: marketPrice(ticker.low), note: 'USDT' }
+    ]) +
+    '<section class="market-value-rail">' +
+      '<span><small>24H VOLUME</small><b>' + number(ticker.baseVolume, 8) + ' YERB</b><em>' + marketMoney(ticker.quoteVolume) + ' USDT</em></span>' +
+      '<span><small>MARKET CAP EST.</small><b>' + marketMoney(market.valuation?.marketCapUsdt) + ' USDT</b><em>Core UTXO supply × last price</em></span>' +
+      '<span class="' + changeClass + '"><small>SPREAD</small><b>' + marketPrice(ticker.spread) + ' USDT</b><em>' + marketPercent(ticker.spreadPct) + '</em></span>' +
+      '<span><small>UPDATED</small><b>' + esc(marketTime(market.asOf)) + '</b><em>NestEx public API</em></span>' +
+    '</section>' +
+    liquidityRail +
+    '<section class="market-split">' +
+      '<div class="market-pane">' +
+        railHeading('ORDER BOOK', 'Buy orders', number(bids.length) + ' levels loaded') +
+        '<div class="orderbook-head"><span>PRICE</span><span>YERB</span><span>USDT</span><span>DEPTH</span></div>' +
+        '<div class="orderbook-list">' + (bidRows || '<div class="ledger-empty">Order book unavailable.</div>') + '</div>' +
+      '</div>' +
+      '<div class="market-pane">' +
+        railHeading('ORDER BOOK', 'Sell orders', number(asks.length) + ' levels loaded') +
+        '<div class="orderbook-head"><span>PRICE</span><span>YERB</span><span>USDT</span><span>DEPTH</span></div>' +
+        '<div class="orderbook-list">' + (askRows || '<div class="ledger-empty">Order book unavailable.</div>') + '</div>' +
+      '</div>' +
+    '</section>' +
+    '<section class="ledger-section">' +
+      railHeading('TRADE STREAM', 'Recent NestEx trades', number(trades.length) + ' loaded') +
+      '<div class="market-trade-head"><span>SIDE</span><span>PRICE</span><span>YERB</span><span>USDT</span><span>TIME</span></div>' +
+      '<div class="market-trade-list">' + (tradeRows || '<div class="ledger-empty">Trade history unavailable.</div>') + '</div>' +
+    '</section>' +
+    '<div class="market-disclaimer">Exchange prices are external market data, not Yerbas consensus data. Market-cap estimate uses the current Yerbas Core UTXO-set total amount multiplied by the NestEx last price.</div>';
+}
+
 async function renderHome() {
   document.title = 'Yerbas Explorer Light';
   renderLoading('Reading live blockchain state');
 
   const pageSize = 12;
   const requestedPage = Math.max(1, Number.parseInt(new URLSearchParams(location.search).get('page') || '1', 10) || 1);
+  const marketPromise = api('/api/v1/market-price').catch(() => null);
   const status = await api('/api/status');
   const totalBlocks = Math.max(1, Number(status.blocks || 0) + 1);
   const totalPages = Math.max(1, Math.ceil(totalBlocks / pageSize));
   const page = Math.min(requestedPage, totalPages);
   const offset = (page - 1) * pageSize;
   const blocks = await api('/api/blocks?limit=' + pageSize + '&offset=' + offset);
+  const market = await marketPromise;
 
   setRpcState('online', 'Core online');
 
@@ -190,6 +356,8 @@ async function renderHome() {
     { label: 'DIFFICULTY', value: number(status.difficulty, 6), note: 'network target' },
     { label: 'PEERS', value: number(status.network?.connections), note: 'connected' },
     { label: 'MEMPOOL', value: number(status.mempool?.transactions), note: bytes(status.mempool?.bytes) },
+    { label: 'YERB/USDT', value: market ? marketPrice(market.priceUsdt) : '—', note: market ? 'NestEx · ' + marketPercent(market.change24hPct) : 'market unavailable' },
+    { label: 'MARKET CAP', value: market ? marketMoney(market.marketCapUsdt) : '—', note: 'USDT estimate' },
     { label: 'SOURCE', value: 'RPC', note: 'Yerbas Core' }
   ]);
 
@@ -1258,6 +1426,14 @@ async function route() {
 
     if (parts[0] === 'node-map') {
       return await renderNetworkMap();
+    }
+
+    if (parts[0] === 'markets' && parts.length >= 2) {
+      return await renderMarketDetail(parts[1]);
+    }
+
+    if (parts[0] === 'markets') {
+      return await renderMarkets();
     }
 
     return await renderHome();
