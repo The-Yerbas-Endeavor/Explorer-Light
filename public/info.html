@@ -83,7 +83,9 @@
         <article class="api-row"><div><code>GET /api/v1/smartnodes?status=ENABLED&amp;page=1&amp;count=50&amp;collateral=&amp;q=</code><p>Live deterministic smartnode directory merged from Core smartnodelist and ProTx data. Defaults to active/ENABLED nodes.</p></div><a href="/api/v1/smartnodes?status=ENABLED&count=25">Try</a></article>
         <article class="api-row"><div><code>GET /api/v1/network-map?view=smartnodes</code><p>Approximate geolocated Smartnodes or connected peers for the public network map.</p></div><a href="/api/v1/network-map?view=smartnodes">Try</a></article>
         <article class="api-row"><div><code>GET /api/v1/network/peers</code><p>Current peer connections reported by this Yerbas Core node.</p></div><a href="/api/v1/network/peers">Try</a></article>
-        <article class="api-row"><div><code>GET /api/v1/market-price</code><p>Configured external market-price feed. Returns unavailable until a feed is configured.</p></div><a href="/api/v1/market-price">Try</a></article>
+        <article class="api-row"><div><code>GET /api/v1/market-price</code><p>Normalized live NestEx YERB/USDT price, 24h range/volume, bid/ask, and market-cap estimate.</p></div><a href="/api/v1/market-price">Try</a></article>
+        <article class="api-row"><div><code>GET /api/v1/markets</code><p>Configured Yerbas market feeds with normalized ticker and valuation data.</p></div><a href="/api/v1/markets">Try</a></article>
+        <article class="api-row"><div><code>GET /api/v1/market/nestex/YERB/USDT</code><p>NestEx YERB/USDT ticker, order book, recent trades, liquidity, and Core-based market-cap estimate.</p></div><a href="/api/v1/market/nestex/YERB/USDT">Try</a></article>
       </div>
     </section>
 
@@ -122,10 +124,10 @@
         <article class="api-row"><div><code>GET /ext/gettx/:txid</code><p>Decoded transaction.</p></div><span>path parameter</span></article>
         <article class="api-row"><div><code>GET /ext/getbalance/:address</code><p>Current address balance as YERB.</p></div><span>path parameter</span></article>
         <article class="api-row"><div><code>GET /ext/getnetworkpeers</code><p>Current peers only. Explorer-Light does not maintain a 24-hour peer/geolocation database.</p></div><a href="/ext/getnetworkpeers">Try</a></article>
-        <article class="api-row"><div><code>GET /ext/getbasicstats</code><p>Block count, supply, market placeholders, and smartnode total.</p></div><a href="/ext/getbasicstats">Try</a></article>
+        <article class="api-row"><div><code>GET /ext/getbasicstats</code><p>Block count, supply, live NestEx YERB/USDT price, and smartnode total.</p></div><a href="/ext/getbasicstats">Try</a></article>
         <article class="api-row"><div><code>GET /ext/getsummary</code><p>Difficulty, supply, hash rate, connections, block count, and smartnode counts.</p></div><a href="/ext/getsummary">Try</a></article>
         <article class="api-row"><div><code>GET /ext/getmasternodelist</code><p>Compatibility route returning registered smartnodes with wallet ownership metadata removed.</p></div><a href="/ext/getmasternodelist">Try</a></article>
-        <article class="api-row"><div><code>GET /ext/getcurrentprice</code><p>Market feed when configured; otherwise HTTP 503 with an explicit unavailable response.</p></div><a href="/ext/getcurrentprice">Try</a></article>
+        <article class="api-row"><div><code>GET /ext/getcurrentprice</code><p>Compatibility route returning the current NestEx YERB/USDT market price and bid/ask.</p></div><a href="/ext/getcurrentprice">Try</a></article>
       </div>
     </section>
 
