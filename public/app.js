@@ -86,6 +86,33 @@ function metricCard(index, label, value, foot = '') {
     '</article>';
 }
 
+function scaleLevel(value, max) {
+  const numeric = Number(value || 0);
+  const ceiling = Math.max(0, Number(max || 0));
+  if (!ceiling || numeric <= 0) return 1;
+  return Math.max(1, Math.min(10, Math.ceil((numeric / ceiling) * 10)));
+}
+
+function visualFact(label, value, note = '') {
+  return '<article class="visual-fact">' +
+    '<span>' + esc(label) + '</span>' +
+    '<strong>' + esc(value) + '</strong>' +
+    (note ? '<small>' + esc(note) + '</small>' : '') +
+    '</article>';
+}
+
+function recordHero(kicker, title, value, kind, actions = '') {
+  return '<section class="detail-hero record-hero">' +
+    '<div class="record-hero-copy">' +
+      '<div class="detail-kicker">' + esc(kicker) + '</div>' +
+      '<h2>' + esc(title) + '</h2>' +
+      '<div class="detail-hash">' + esc(value) + '</div>' +
+      (actions ? '<div class="detail-actions">' + actions + '</div>' : '') +
+    '</div>' +
+    '<div class="record-symbol" aria-hidden="true"><span>' + esc(kind) + '</span></div>' +
+  '</section>';
+}
+
 function panelHeading(index, eyebrow, title, meta = '') {
   return '<div class="panel-head">' +
     '<div class="panel-title">' +
@@ -115,6 +142,10 @@ async function renderHome() {
 
   setRpcState('online', 'Core online');
 
+  const latest = blocks[0] || {};
+  const maxTransactions = Math.max(1, ...blocks.map((block) => Number(block.transactions || 0)));
+  const maxSize = Math.max(1, ...blocks.map((block) => Number(block.size || 0)));
+
   const cards = [
     metricCard('01', 'Block height', number(status.blocks), status.chain || 'mainnet'),
     metricCard('02', 'Difficulty', number(status.difficulty, 4), 'network target'),
@@ -122,28 +153,59 @@ async function renderHome() {
     metricCard('04', 'Mempool', number(status.mempool?.transactions), bytes(status.mempool?.bytes))
   ].join('');
 
-  const rows = blocks.map((block) =>
-    '<tr>' +
-      '<td><a class="height-link" href="/block/' + block.height + '">' + number(block.height) + '</a></td>' +
-      '<td>' + esc(timeAgo(block.time)) + '</td>' +
-      '<td>' + number(block.transactions) + '</td>' +
-      '<td>' + bytes(block.size) + '</td>' +
-      '<td>' + hashLink('block', block.hash) + '</td>' +
-    '</tr>'
-  ).join('');
+  const pulse = blocks.slice(0, 12).reverse().map((block) => {
+    const activity = Number(block.transactions || 0) + (Number(block.size || 0) / maxSize) * maxTransactions;
+    const level = scaleLevel(activity, maxTransactions * 2);
+    return '<a class="pulse-bar level-' + level + '" href="/block/' + block.height + '" title="Block ' +
+      esc(block.height) + ' · ' + number(block.transactions) + ' transactions"><span></span></a>';
+  }).join('');
+
+  const blockCards = blocks.map((block, index) => {
+    const activity = Number(block.transactions || 0) + (Number(block.size || 0) / maxSize) * maxTransactions;
+    const level = scaleLevel(activity, maxTransactions * 2);
+    return '<a class="block-card" href="/block/' + block.height + '">' +
+      '<div class="block-card-top">' +
+        '<span class="block-sequence">' + (index === 0 ? 'CHAIN TIP' : '−' + number(index)) + '</span>' +
+        '<span class="block-age">' + esc(timeAgo(block.time)) + '</span>' +
+      '</div>' +
+      '<strong class="block-card-height">#' + number(block.height) + '</strong>' +
+      '<span class="block-card-hash mono">' + esc(compactHash(block.hash)) + '</span>' +
+      '<div class="block-card-meta">' +
+        '<span><small>TX</small><b>' + number(block.transactions) + '</b></span>' +
+        '<span><small>SIZE</small><b>' + bytes(block.size) + '</b></span>' +
+      '</div>' +
+      '<div class="activity-meter" aria-hidden="true"><span class="meter-fill level-' + level + '"></span></div>' +
+    '</a>';
+  }).join('');
 
   app.innerHTML =
-    '<section class="metric-strip">' + cards + '</section>' +
-    '<section class="panel">' +
-      panelHeading('A1', 'Live block stream', 'Recent blocks', 'Yerbas Core · direct') +
-      '<div class="table-wrap">' +
-        '<table>' +
-          '<thead><tr><th>Height</th><th>Age</th><th>Transactions</th><th>Size</th><th>Block hash</th></tr></thead>' +
-          '<tbody>' + rows + '</tbody>' +
-        '</table>' +
-      '</div>' +
-    '</section>';
+    '<section class="cockpit-grid">' +
+      '<article class="tip-card">' +
+        '<div class="tip-card-label"><span class="live-dot"></span> LIVE CHAIN TIP</div>' +
+        '<div class="tip-height">#' + number(status.blocks) + '</div>' +
+        '<div class="tip-context">' +
+          '<span>' + esc(status.chain || 'mainnet') + '</span>' +
+          '<span>' + (latest.time ? esc(timeAgo(latest.time)) : 'waiting for block') + '</span>' +
+        '</div>' +
+        '<a class="tip-hash mono" href="' + (latest.height !== undefined ? '/block/' + latest.height : '/') + '">' +
+          esc(latest.hash ? compactHash(latest.hash) : 'Yerbas Core connected') +
+        '</a>' +
+      '</article>' +
+      '<article class="pulse-card">' +
+        '<div class="pulse-head"><div><span>NETWORK RHYTHM</span><strong>Last ' + number(blocks.length) + ' blocks</strong></div>' +
+          '<span class="pulse-caption">activity / block</span></div>' +
+        '<div class="pulse-chart">' + pulse + '</div>' +
+        '<div class="pulse-foot"><span>older</span><span>live tip</span></div>' +
+      '</article>' +
+    '</section>' +
+    '<section class="metric-strip modern-metrics">' + cards + '</section>' +
+    '<section class="section-intro">' +
+      '<div><p class="eyebrow">LIVE BLOCK STREAM</p><h2>What the chain is doing now</h2></div>' +
+      '<p>Each tile is a confirmed block. Activity bars combine transaction count and block size so busy blocks stand out instantly.</p>' +
+    '</section>' +
+    '<section class="block-card-grid">' + blockCards + '</section>';
 }
+
 
 async function renderBlock(identifier) {
   renderLoading('Resolving block from Yerbas Core');
@@ -151,50 +213,47 @@ async function renderBlock(identifier) {
   setRpcState('online', 'Core online');
   document.title = 'Block ' + block.height + ' · Yerbas Explorer Light';
 
-  const txRows = (block.tx || []).map((txid, index) =>
-    '<tr>' +
-      '<td>' + number(index + 1) + '</td>' +
-      '<td><a class="mono break" href="/tx/' + encodeURIComponent(txid) +
-        '?block=' + encodeURIComponent(block.hash) + '">' + esc(txid) + '</a></td>' +
-    '</tr>'
-  ).join('');
+  const transactions = Array.isArray(block.tx) ? block.tx : [];
+  const txCards = transactions.length
+    ? transactions.map((txid, index) =>
+        '<a class="tx-chip-card" href="/tx/' + encodeURIComponent(txid) + '?block=' + encodeURIComponent(block.hash) + '">' +
+          '<span class="tx-chip-index">' + String(index + 1).padStart(2, '0') + '</span>' +
+          '<span><small>TRANSACTION</small><strong class="mono">' + esc(compactHash(txid)) + '</strong></span>' +
+          '<span class="tx-chip-arrow">↗</span>' +
+        '</a>'
+      ).join('')
+    : '<div class="empty-state">No transaction IDs were returned for this block.</div>';
+
+  const metrics = [
+    metricCard('01', 'Confirmations', number(block.confirmations), 'buried in the active chain'),
+    metricCard('02', 'Transactions', number(transactions.length), 'ledger entries'),
+    metricCard('03', 'Block size', bytes(block.size), 'serialized block'),
+    metricCard('04', 'Difficulty', number(block.difficulty, 8), 'network target')
+  ].join('');
+
+  const actions = '<a class="text-link" href="/">← Live chain</a>';
 
   app.innerHTML =
-    '<section class="detail-hero">' +
-      '<div class="detail-kicker">Block record / confirmed ledger entry</div>' +
-      '<h2>#' + number(block.height) + '</h2>' +
-      '<div class="detail-hash">' + esc(block.hash) + '</div>' +
-      '<div class="detail-actions"><a class="text-link" href="/">← Back to live chain</a></div>' +
+    recordHero('Confirmed ledger object', 'Block #' + number(block.height), block.hash, 'BLK', actions) +
+    '<section class="metric-strip modern-metrics">' + metrics + '</section>' +
+    '<section class="chain-route">' +
+      '<a class="chain-route-node' + (block.previousblockhash ? '' : ' disabled') + '" ' +
+        (block.previousblockhash ? 'href="/block/' + encodeURIComponent(block.previousblockhash) + '"' : '') + '>' +
+        '<small>PREVIOUS</small><strong>' + (block.previousblockhash ? esc(compactHash(block.previousblockhash)) : 'GENESIS') + '</strong>' +
+      '</a>' +
+      '<div class="chain-route-current"><span>BLOCK</span><strong>#' + number(block.height) + '</strong><small>' + esc(isoTime(block.time)) + '</small></div>' +
+      '<a class="chain-route-node' + (block.nextblockhash ? '' : ' disabled') + '" ' +
+        (block.nextblockhash ? 'href="/block/' + encodeURIComponent(block.nextblockhash) + '"' : '') + '>' +
+        '<small>NEXT</small><strong>' + (block.nextblockhash ? esc(compactHash(block.nextblockhash)) : 'CHAIN TIP') + '</strong>' +
+      '</a>' +
     '</section>' +
-
-    '<section class="panel">' +
-      panelHeading('B1', 'Block anatomy', 'Chain data', number(block.confirmations) + ' confirmations') +
-      '<dl class="detail-grid">' +
-        '<dt>Block hash</dt><dd class="mono break">' + esc(block.hash) + '</dd>' +
-        '<dt>Confirmations</dt><dd>' + number(block.confirmations) + '</dd>' +
-        '<dt>Timestamp</dt><dd>' + esc(isoTime(block.time)) + '</dd>' +
-        '<dt>Transactions</dt><dd>' + number(block.tx?.length) + '</dd>' +
-        '<dt>Size</dt><dd>' + bytes(block.size) + '</dd>' +
-        '<dt>Difficulty</dt><dd>' + number(block.difficulty, 8) + '</dd>' +
-        '<dt>Previous block</dt><dd>' +
-          (block.previousblockhash ? hashLink('block', block.previousblockhash, block.previousblockhash) : 'Genesis') +
-        '</dd>' +
-        '<dt>Next block</dt><dd>' +
-          (block.nextblockhash ? hashLink('block', block.nextblockhash, block.nextblockhash) : 'Current tip') +
-        '</dd>' +
-      '</dl>' +
+    '<section class="section-intro compact">' +
+      '<div><p class="eyebrow">BLOCK CONTENTS</p><h2>' + number(transactions.length) + ' transactions</h2></div>' +
+      '<p>Open any transaction to follow its value flow and destination outputs.</p>' +
     '</section>' +
-
-    '<section class="panel">' +
-      panelHeading('B2', 'Block contents', 'Transactions', number(block.tx?.length) + ' total') +
-      '<div class="table-wrap">' +
-        '<table>' +
-          '<thead><tr><th>#</th><th>Transaction ID</th></tr></thead>' +
-          '<tbody>' + txRows + '</tbody>' +
-        '</table>' +
-      '</div>' +
-    '</section>';
+    '<section class="tx-chip-grid">' + txCards + '</section>';
 }
+
 
 function outputAddresses(vout) {
   const script = vout?.scriptPubKey || {};
@@ -234,70 +293,74 @@ async function renderAddress(address) {
     : [];
 
   const cards = [
-    metricCard('01', 'Balance', yerb(balance?.balanceYerb) + ' YERB', 'current spendable index balance'),
-    metricCard('02', 'Total received', yerb(balance?.receivedYerb) + ' YERB', 'including change'),
-    metricCard('03', 'Transactions', number(txids.length), 'latest indexed transactions'),
-    metricCard('04', 'UTXOs', number(utxos.length), 'unspent outputs returned')
+    metricCard('01', 'Balance', yerb(balance?.balanceYerb) + ' YERB', 'current indexed balance'),
+    metricCard('02', 'Total received', yerb(balance?.receivedYerb) + ' YERB', 'lifetime received'),
+    metricCard('03', 'Transactions', number(txids.length), 'indexed activity'),
+    metricCard('04', 'UTXOs', number(utxos.length), 'currently unspent')
   ].join('');
 
-  const txRows = txids.length
-    ? txids.map((txid, index) =>
-        '<tr>' +
-          '<td>' + number(index + 1) + '</td>' +
-          '<td><a class="mono break" href="/tx/' + encodeURIComponent(txid) + '">' + esc(txid) + '</a></td>' +
-        '</tr>'
+  const txCards = txids.length
+    ? txids.slice(0, 24).map((txid, index) =>
+        '<a class="activity-row" href="/tx/' + encodeURIComponent(txid) + '">' +
+          '<span class="activity-index">' + String(index + 1).padStart(2, '0') + '</span>' +
+          '<span><small>TRANSACTION</small><strong class="mono">' + esc(compactHash(txid)) + '</strong></span>' +
+          '<span class="activity-arrow">↗</span>' +
+        '</a>'
       ).join('')
-    : '<tr><td colspan="2" class="muted">No indexed transactions returned for this address.</td></tr>';
+    : '<div class="empty-state">No indexed transactions returned for this address.</div>';
 
-  const utxoRows = utxos.length
-    ? utxos.map((utxo) =>
-        '<tr>' +
-          '<td><a class="mono" href="/tx/' + encodeURIComponent(utxo.txid) + '">' + esc(compactHash(utxo.txid)) + '</a></td>' +
-          '<td>' + number(utxo.outputIndex) + '</td>' +
-          '<td>' + yerb(Number(utxo.satoshis || 0) / 100000000) + ' YERB</td>' +
-          '<td>' + number(utxo.height) + '</td>' +
-        '</tr>'
+  const utxoCards = utxos.length
+    ? utxos.slice(0, 16).map((utxo) =>
+        '<a class="utxo-card" href="/tx/' + encodeURIComponent(utxo.txid) + '">' +
+          '<div><span>UNSPENT OUTPUT</span><strong>' + yerb(Number(utxo.satoshis || 0) / 100000000) + ' <small>YERB</small></strong></div>' +
+          '<div class="utxo-meta"><span>vout ' + number(utxo.outputIndex) + '</span><span>block ' + number(utxo.height) + '</span></div>' +
+          '<code>' + esc(compactHash(utxo.txid)) + '</code>' +
+        '</a>'
       ).join('')
-    : '<tr><td colspan="4" class="muted">No unspent outputs returned for this address.</td></tr>';
+    : '<div class="empty-state">No unspent outputs returned for this address.</div>';
 
-  const assetRows = assetBalances.length
+  const assetCards = assetBalances.length
     ? assetBalances.map(([name, amount]) =>
-        '<tr><td><a class="mono asset-name" href="/asset/' + encodeURIComponent(name) + '">' + esc(name) + '</a></td><td>' + esc(amount) + '</td></tr>'
+        '<a class="portfolio-card" href="/asset/' + encodeURIComponent(name) + '">' +
+          '<span class="portfolio-type">' + esc(assetType(name)) + '</span>' +
+          '<strong>' + esc(name) + '</strong>' +
+          '<span class="portfolio-balance">' + esc(amount) + '</span>' +
+        '</a>'
       ).join('')
-    : '<tr><td colspan="2" class="muted">No asset balances returned for this address.</td></tr>';
+    : '<div class="empty-state">No indexed asset balances for this address.</div>';
 
   const historyNotice = data.history?.available
     ? ''
-    : '<section class="notice error">Core recognized this address, but address history is not currently available from the address index.</section>';
+    : '<section class="notice error">Core recognized this address, but indexed address history is not currently available.</section>';
+
+  const actions = '<a class="text-link" href="/">← Live chain</a>';
 
   app.innerHTML =
-    '<section class="detail-hero">' +
-      '<div class="detail-kicker">Address record / native Core address index</div>' +
-      '<h2>Yerbas address</h2>' +
-      '<div class="detail-hash">' + esc(data.address) + '</div>' +
-      '<div class="detail-actions"><a class="text-link" href="/">← Back to live chain</a></div>' +
-    '</section>' +
+    recordHero('Native address index', 'Address portfolio', data.address, 'ADR', actions) +
     historyNotice +
-    '<section class="metric-strip">' + cards + '</section>' +
-    '<section class="panel">' +
-      panelHeading('A1', 'Address history', 'Transactions', txids.length + ' shown') +
-      '<div class="table-wrap">' +
-        '<table><thead><tr><th>#</th><th>Transaction ID</th></tr></thead><tbody>' + txRows + '</tbody></table>' +
-      '</div>' +
+    '<section class="balance-stage">' +
+      '<article class="balance-focus">' +
+        '<span>CURRENT YERB BALANCE</span>' +
+        '<strong>' + yerb(balance?.balanceYerb) + '</strong>' +
+        '<small>YERB</small>' +
+      '</article>' +
+      '<article class="balance-side">' +
+        visualFact('Total received', yerb(balance?.receivedYerb) + ' YERB', 'indexed lifetime flow') +
+        visualFact('Asset positions', number(assetBalances.length), 'native assets held') +
+      '</article>' +
     '</section>' +
-    '<section class="panel">' +
-      panelHeading('A2', 'Unspent outputs', 'UTXOs', utxos.length + ' shown') +
-      '<div class="table-wrap">' +
-        '<table><thead><tr><th>Transaction</th><th>Output</th><th>Value</th><th>Height</th></tr></thead><tbody>' + utxoRows + '</tbody></table>' +
-      '</div>' +
-    '</section>' +
-    '<section class="panel">' +
-      panelHeading('A3', 'Asset index', 'Asset balances', assetBalances.length + ' assets') +
-      '<div class="table-wrap">' +
-        '<table><thead><tr><th>Asset</th><th>Balance</th></tr></thead><tbody>' + assetRows + '</tbody></table>' +
-      '</div>' +
+    '<section class="metric-strip modern-metrics">' + cards + '</section>' +
+    '<section class="section-intro compact"><div><p class="eyebrow">PORTFOLIO</p><h2>Native asset positions</h2></div>' +
+      '<p>Holdings reported directly by Core assetindex.</p></section>' +
+    '<section class="portfolio-grid">' + assetCards + '</section>' +
+    '<section class="two-column-flow">' +
+      '<div><div class="section-intro mini"><div><p class="eyebrow">ACTIVITY</p><h2>Recent transactions</h2></div></div>' +
+        '<div class="activity-list">' + txCards + '</div></div>' +
+      '<div><div class="section-intro mini"><div><p class="eyebrow">AVAILABLE VALUE</p><h2>Unspent outputs</h2></div></div>' +
+        '<div class="utxo-grid">' + utxoCards + '</div></div>' +
     '</section>';
 }
+
 
 function assetType(name) {
   if (name.endsWith('!')) return 'Owner';
@@ -383,22 +446,30 @@ async function renderAssets() {
   setRpcState('online', 'Core online');
   document.title = 'Yerbas Assets · Explorer Light';
 
-  const rows = data.items.length
+  const assetCards = data.items.length
     ? data.items.map((asset) =>
-        '<tr>' +
-          '<td><a class="asset-name" href="/asset/' + encodeURIComponent(asset.name) + '">' + esc(asset.name) + '</a></td>' +
-          '<td><span class="asset-badge no-margin">' + esc(asset.type || assetType(asset.name)) + '</span></td>' +
-          '<td>' + assetAmount(asset.amount, asset.units) + '</td>' +
-          '<td>' + (asset.holders === null ? '—' : number(asset.holders)) + '</td>' +
-          '<td>' + number(asset.units) + '</td>' +
-          '<td>' + assetMetadataLink(asset) + '</td>' +
-          '<td>' + (Number(asset.reissuable) ? 'Yes' : 'No') + '</td>' +
-        '</tr>'
+        '<a class="asset-discovery-card" href="/asset/' + encodeURIComponent(asset.name) + '">' +
+          '<div class="asset-discovery-top">' +
+            '<span class="asset-badge no-margin">' + esc(asset.type || assetType(asset.name)) + '</span>' +
+            '<span class="asset-live-dot">INDEXED</span>' +
+          '</div>' +
+          '<strong class="asset-discovery-name">' + esc(asset.name) + '</strong>' +
+          '<div class="asset-discovery-stats">' +
+            '<span><small>SUPPLY</small><b>' + assetAmount(asset.amount, asset.units) + '</b></span>' +
+            '<span><small>HOLDERS</small><b>' + (asset.holders === null ? '—' : number(asset.holders)) + '</b></span>' +
+            '<span><small>UNITS</small><b>' + number(asset.units) + '</b></span>' +
+          '</div>' +
+          '<div class="asset-discovery-foot">' +
+            '<span>' + (asset.metadataRef?.value ? 'METADATA +' : 'NO METADATA') + '</span>' +
+            '<span>' + (Number(asset.reissuable) ? 'REISSUABLE' : 'FIXED') + '</span>' +
+            '<b>OPEN ↗</b>' +
+          '</div>' +
+        '</a>'
       ).join('')
-    : '<tr><td colspan="7" class="muted">No assets matched these filters.</td></tr>';
+    : '<div class="empty-state wide">No assets matched these filters.</div>';
 
   const pagination =
-    '<div class="asset-pagination">' +
+    '<div class="asset-pagination modern-pagination">' +
       (data.page > 1
         ? '<a class="text-link" href="' + assetListHref(params, data.page - 1) + '">← Previous</a>'
         : '<span></span>') +
@@ -410,72 +481,63 @@ async function renderAssets() {
 
   const summaryCards = [
     metricCard('01', 'Index status', 'LIVE', 'native Core assetindex'),
-    metricCard('02', 'Indexed assets', number(data.total), query || type || metadata || reissuable ? 'matching current filters' : 'current directory'),
-    metricCard('03', 'Indexed holders', '…', 'loading aggregate count'),
-    metricCard('04', 'Last index read', 'NOW', 'no explorer sync database')
+    metricCard('02', 'Assets', number(data.total), query || type || metadata || reissuable ? 'matching this view' : 'current directory'),
+    metricCard('03', 'Holders', '…', 'aggregate scan loading'),
+    metricCard('04', 'Index read', 'NOW', 'direct RPC')
   ].join('');
 
+  const actions = '<a class="text-link" href="/">← Live chain</a>';
+
   app.innerHTML =
-    '<section class="detail-hero asset-hero">' +
-      '<div class="detail-kicker">Yerbas native asset index</div>' +
-      '<h2>Yerbas Assets</h2>' +
-      '<div class="detail-hash">' + number(data.total) + ' assets in the current view · live from Yerbas Core</div>' +
-      '<div class="detail-actions"><a class="text-link" href="/">← Back to live chain</a></div>' +
+    recordHero('Native asset layer', 'Asset universe', number(data.total) + ' indexed assets', 'AST', actions) +
+    '<section id="asset-summary" class="metric-strip modern-metrics">' + summaryCards + '</section>' +
+    '<section class="filter-surface">' +
+      '<div class="filter-surface-title"><p class="eyebrow">DISCOVER ASSETS</p><h2>Search the on-chain catalog</h2></div>' +
+      '<form class="asset-filter-grid" action="/assets" method="get" role="search">' +
+        '<input name="q" value="' + esc(query) + '" autocomplete="off" spellcheck="false" placeholder="Search asset names">' +
+        '<select name="type" aria-label="Asset type">' +
+          '<option value="">All types</option>' +
+          ['Root','Sub-asset','Unique','Qualifier','Restricted','Owner'].map((value) =>
+            '<option value="' + value + '"' + (type === value ? ' selected' : '') + '>' + value + '</option>'
+          ).join('') +
+        '</select>' +
+        '<select name="metadata" aria-label="Metadata">' +
+          '<option value="">Any metadata</option>' +
+          '<option value="yes"' + (metadata === 'yes' ? ' selected' : '') + '>Has metadata</option>' +
+          '<option value="no"' + (metadata === 'no' ? ' selected' : '') + '>No metadata</option>' +
+        '</select>' +
+        '<select name="reissuable" aria-label="Reissuable">' +
+          '<option value="">Any reissuability</option>' +
+          '<option value="yes"' + (reissuable === 'yes' ? ' selected' : '') + '>Reissuable</option>' +
+          '<option value="no"' + (reissuable === 'no' ? ' selected' : '') + '>Not reissuable</option>' +
+        '</select>' +
+        '<select name="sort" aria-label="Sort">' +
+          '<option value="name"' + (sort === 'name' ? ' selected' : '') + '>Name</option>' +
+          '<option value="supply-desc"' + (sort === 'supply-desc' ? ' selected' : '') + '>Supply: high to low</option>' +
+          '<option value="supply-asc"' + (sort === 'supply-asc' ? ' selected' : '') + '>Supply: low to high</option>' +
+        '</select>' +
+        '<button type="submit">Explore</button>' +
+      '</form>' +
     '</section>' +
-
-    '<section id="asset-summary" class="metric-strip">' + summaryCards + '</section>' +
-
-    '<section class="panel">' +
-      '<div class="asset-toolbar asset-toolbar-oldstyle">' +
-        '<div><p class="eyebrow">ASSET DIRECTORY</p><h2>Browse indexed assets</h2></div>' +
-        '<form class="asset-filter-grid" action="/assets" method="get" role="search">' +
-          '<input name="q" value="' + esc(query) + '" autocomplete="off" spellcheck="false" placeholder="Search asset names">' +
-          '<select name="type" aria-label="Asset type">' +
-            '<option value="">All types</option>' +
-            ['Root','Sub-asset','Unique','Qualifier','Restricted','Owner'].map((value) =>
-              '<option value="' + value + '"' + (type === value ? ' selected' : '') + '>' + value + '</option>'
-            ).join('') +
-          '</select>' +
-          '<select name="metadata" aria-label="Metadata">' +
-            '<option value="">Any metadata</option>' +
-            '<option value="yes"' + (metadata === 'yes' ? ' selected' : '') + '>Has metadata</option>' +
-            '<option value="no"' + (metadata === 'no' ? ' selected' : '') + '>No metadata</option>' +
-          '</select>' +
-          '<select name="reissuable" aria-label="Reissuable">' +
-            '<option value="">Any reissuability</option>' +
-            '<option value="yes"' + (reissuable === 'yes' ? ' selected' : '') + '>Reissuable</option>' +
-            '<option value="no"' + (reissuable === 'no' ? ' selected' : '') + '>Not reissuable</option>' +
-          '</select>' +
-          '<select name="sort" aria-label="Sort">' +
-            '<option value="name"' + (sort === 'name' ? ' selected' : '') + '>Name</option>' +
-            '<option value="supply-desc"' + (sort === 'supply-desc' ? ' selected' : '') + '>Supply: high to low</option>' +
-            '<option value="supply-asc"' + (sort === 'supply-asc' ? ' selected' : '') + '>Supply: low to high</option>' +
-          '</select>' +
-          '<button type="submit">Search</button>' +
-        '</form>' +
-      '</div>' +
-      '<div class="table-wrap">' +
-        '<table>' +
-          '<thead><tr><th>Asset</th><th>Type</th><th>Supply</th><th>Holders</th><th>Units</th><th>Metadata</th><th>Reissuable</th></tr></thead>' +
-          '<tbody>' + rows + '</tbody>' +
-        '</table>' +
-      '</div>' +
-      pagination +
-    '</section>';
+    '<section class="section-intro compact"><div><p class="eyebrow">ASSET DIRECTORY</p><h2>' + number(data.items.length) + ' assets on this page</h2></div>' +
+      '<p>Open a card for supply, metadata, issuance details, and holder distribution.</p></section>' +
+    '<section class="asset-discovery-grid">' + assetCards + '</section>' +
+    pagination;
 
   api('/api/assets/stats').then((stats) => {
     const summary = document.querySelector('#asset-summary');
     if (!summary) return;
     summary.innerHTML = [
       metricCard('01', 'Index status', stats.ready ? 'LIVE' : 'CHECK', 'native Core assetindex'),
-      metricCard('02', 'Indexed assets', number(stats.indexedAssets), 'whole Core asset directory'),
-      metricCard('03', 'Indexed holders', number(stats.indexedHolders), 'asset/address relationships'),
-      metricCard('04', 'Last index read', 'NOW', 'live RPC · no sync database')
+      metricCard('02', 'Assets', number(stats.indexedAssets), 'whole asset directory'),
+      metricCard('03', 'Holders', number(stats.indexedHolders), 'asset/address relationships'),
+      metricCard('04', 'Index read', 'NOW', 'direct RPC')
     ].join('');
   }).catch(() => {
     // The page remains useful even if the aggregate holder-count scan is slow.
   });
 }
+
 
 async function renderAsset(name) {
   renderLoading('Reading asset data from Yerbas Core');
@@ -488,21 +550,25 @@ async function renderAsset(name) {
   const holders = data.holders?.items || [];
   const supply = Number(metadata.amount || 0);
 
-  const holderRows = holders.length
-    ? holders.map((holder, index) => {
-        const balance = Number(holder.balance || 0);
-        const ownership = supply > 0 ? (balance / supply) * 100 : 0;
-        return '<tr>' +
-          '<td>' + number(index + 1) + '</td>' +
-          '<td><a class="mono" href="/address/' + encodeURIComponent(holder.address) + '">' + esc(holder.address) + '</a> ' +
-            '<a class="portfolio-link" href="/address/' + encodeURIComponent(holder.address) + '">portfolio</a></td>' +
-          '<td>' + assetAmount(holder.balance, metadata.units) + '</td>' +
-          '<td>' + ownership.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%</td>' +
-        '</tr>';
+  const holderData = holders.map((holder, index) => {
+    const balance = Number(holder.balance || 0);
+    const ownership = supply > 0 ? (balance / supply) * 100 : 0;
+    return { holder, index, balance, ownership };
+  });
+  const maxOwnership = Math.max(0.000001, ...holderData.map((entry) => entry.ownership));
+
+  const holderCards = holderData.length
+    ? holderData.map(({ holder, index, ownership }) => {
+        const level = scaleLevel(ownership, maxOwnership);
+        return '<a class="holder-card" href="/address/' + encodeURIComponent(holder.address) + '">' +
+          '<span class="holder-rank">#' + number(index + 1) + '</span>' +
+          '<span class="holder-address mono">' + esc(compactMiddle(holder.address, 12, 10)) + '</span>' +
+          '<strong>' + assetAmount(holder.balance, metadata.units) + '</strong>' +
+          '<span class="holder-percent">' + ownership.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%</span>' +
+          '<div class="ownership-meter"><span class="meter-fill level-' + level + '"></span></div>' +
+        '</a>';
       }).join('')
-    : '<tr><td colspan="4" class="muted">' +
-        esc(data.holders?.unavailableReason || 'No holder balances returned for this asset.') +
-      '</td></tr>';
+    : '<div class="empty-state">' + esc(data.holders?.unavailableReason || 'No holder balances returned for this asset.') + '</div>';
 
   const ipfsHash = metadata.ipfs_hash || null;
   const txidHash = metadata.txid_hash || metadata.txid || null;
@@ -513,12 +579,12 @@ async function renderAsset(name) {
   const cards = [
     metricCard('01', 'Supply', assetAmount(metadata.amount, metadata.units), 'current issued amount'),
     metricCard('02', 'Units', number(metadata.units), 'decimal precision'),
-    metricCard('03', 'Holders', data.holders?.total === null ? '—' : number(data.holders?.total), 'asset-index addresses'),
+    metricCard('03', 'Holders', data.holders?.total === null ? '—' : number(data.holders?.total), 'indexed addresses'),
     metricCard('04', 'Reissuable', Number(metadata.reissuable) ? 'YES' : 'NO', assetType(data.name) + ' asset')
   ].join('');
 
   const metadataSection = metadataValue
-    ? '<section class="panel">' +
+    ? '<section class="panel modern-panel">' +
         panelHeading('AS2', metadataType + ' metadata', metadataType + ' Content', metadataType === 'IPFS' ? 'public gateway' : 'on-chain reference') +
         '<div class="asset-metadata-content">' +
           (ipfsUrl
@@ -532,60 +598,28 @@ async function renderAsset(name) {
       '</section>'
     : '';
 
+  const actions = '<a class="text-link" href="/assets">← Asset universe</a><a class="text-link" href="/">Live chain</a>';
+
   app.innerHTML =
-    '<section class="detail-hero asset-hero">' +
-      '<div class="detail-kicker">Yerbas asset / native Core metadata</div>' +
-      '<div class="asset-title-row"><h2>' + esc(data.name) + '</h2><span class="asset-badge large">' + esc(assetType(data.name)) + '</span></div>' +
-      '<div class="detail-hash">Asset data is read directly from Yerbas Core and assetindex.</div>' +
-      '<div class="detail-actions">' +
-        '<a class="text-link" href="/assets">← All assets</a>' +
-        '<a class="text-link" href="/">Live chain</a>' +
-      '</div>' +
+    recordHero('Native Core asset', data.name, assetType(data.name) + ' · on-chain asset', 'AST', actions) +
+    '<section class="metric-strip modern-metrics">' + cards + '</section>' +
+    '<section class="asset-snapshot-grid">' +
+      visualFact('Asset type', assetType(data.name), 'namespace classification') +
+      visualFact('Supply', assetAmount(metadata.amount, metadata.units), 'current issued amount') +
+      visualFact('Precision', number(metadata.units) + ' units', 'decimal places') +
+      visualFact('Issuance block', data.issuance?.blockHeight !== null && data.issuance?.blockHeight !== undefined ? number(data.issuance.blockHeight) : '—', 'origin on chain') +
+      visualFact('Reissuable', Number(metadata.reissuable) ? 'YES' : 'NO', 'supply policy') +
+      visualFact('Metadata', metadataType || 'NONE', metadataValue ? 'external/on-chain reference' : 'no metadata pointer') +
     '</section>' +
-
-    '<section class="metric-strip">' + cards + '</section>' +
-
-    '<section class="panel">' +
-      panelHeading('AS1', 'Asset anatomy', 'Metadata', 'Core getassetdata') +
-      '<dl class="detail-grid">' +
-        '<dt>Asset name</dt><dd class="mono break">' + esc(data.name) + '</dd>' +
-        '<dt>Type</dt><dd>' + esc(assetType(data.name)) + '</dd>' +
-        '<dt>Supply</dt><dd>' + assetAmount(metadata.amount, metadata.units) + '</dd>' +
-        '<dt>Units</dt><dd>' + number(metadata.units) + '</dd>' +
-        '<dt>Reissuable</dt><dd>' + (Number(metadata.reissuable) ? 'Yes' : 'No') + '</dd>' +
-        '<dt>Metadata</dt><dd class="mono break">' +
-          (metadataValue
-            ? (ipfsUrl
-              ? '<a href="' + ipfsUrl + '" target="_blank" rel="noopener noreferrer">' + esc(metadataType) + ' · ' + esc(metadataValue) + '</a>'
-              : esc(metadataType) + ' · ' + esc(metadataValue))
-            : '—') +
-        '</dd>' +
-        '<dt>Verifier</dt><dd class="mono break">' + esc(metadata.verifier_string || '—') + '</dd>' +
-        '<dt>Issuance block</dt><dd>' +
-          (data.issuance?.blockHeight !== null && data.issuance?.blockHeight !== undefined
-            ? '<a href="/block/' + encodeURIComponent(data.issuance.blockHeight) + '">' + number(data.issuance.blockHeight) + '</a>'
-            : '—') +
-        '</dd>' +
-        '<dt>Issuance block hash</dt><dd class="mono break">' +
-          (data.issuance?.blockHash
-            ? '<a href="/block/' + encodeURIComponent(data.issuance.blockHash) + '">' + esc(data.issuance.blockHash) + '</a>'
-            : '—') +
-        '</dd>' +
-      '</dl>' +
-    '</section>' +
-
     metadataSection +
-
-    '<section class="panel">' +
-      panelHeading(metadataValue ? 'AS3' : 'AS2', 'Asset index', 'Top Asset Holders', data.holders?.total === null ? 'availability unknown' : number(data.holders?.total) + ' total') +
-      '<div class="table-wrap">' +
-        '<table><thead><tr><th>Rank</th><th>Address</th><th>Balance</th><th>Ownership</th></tr></thead><tbody>' + holderRows + '</tbody></table>' +
-      '</div>' +
-      (data.holders?.total > holders.length
-        ? '<div class="panel-foot">Showing first ' + number(holders.length) + ' indexed holders.</div>'
-        : '') +
-    '</section>';
+    '<section class="section-intro compact"><div><p class="eyebrow">OWNERSHIP MAP</p><h2>Top asset holders</h2></div>' +
+      '<p>Bars are scaled against the largest visible holder so concentration is readable at a glance.</p></section>' +
+    '<section class="holder-list">' + holderCards + '</section>' +
+    (data.holders?.total > holders.length
+      ? '<div class="panel-foot modern-foot">Showing first ' + number(holders.length) + ' indexed holders of ' + number(data.holders.total) + '.</div>'
+      : '');
 }
+
 
 function shortService(value) {
   return value || '—';
@@ -733,24 +767,43 @@ async function renderSmartnodes() {
         : '<span></span>') +
     '</div>';
 
-  const cards = [
-    metricCard('01', 'Active smartnodes', number(data.network?.enabled), 'ENABLED at current chain tip'),
-    metricCard('02', 'Registered total', number(data.network?.total), 'deterministic smartnodes'),
-    metricCard('03', 'PoSe banned', number(data.network?.poseBanned), 'current Core state'),
-    metricCard('04', 'Protocol', data.protocolVersion === null ? '—' : number(data.protocolVersion), 'local Core network protocol')
-  ].join('');
+  const enabled = Number(data.network?.enabled || 0);
+  const total = Number(data.network?.total || 0);
+  const poseBanned = Number(data.network?.poseBanned || 0);
+  const enabledPct = total > 0 ? Math.max(0, Math.min(100, (enabled / total) * 100)) : 0;
+  const disabledPct = Math.max(0, 100 - enabledPct);
+
+  const collateralCards = Object.entries(data.collateralCounts || {})
+    .filter(([amount]) => amount !== 'unknown')
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .slice(0, 8)
+    .map(([amount, count]) =>
+      '<article class="collateral-card"><span>' + number(amount) + ' YERB</span><strong>' + number(count) + '</strong><small>nodes</small></article>'
+    ).join('');
 
   app.innerHTML =
-    '<section class="detail-hero smartnode-hero">' +
-      '<div class="detail-kicker">Yerbas deterministic smartnode network</div>' +
-      '<h2>Yerbas Smartnodes</h2>' +
-      '<div class="detail-hash">A listing of smartnodes known to Yerbas Core. The default view shows nodes currently reported as ENABLED.</div>' +
-      '<div class="detail-actions"><a class="text-link" href="/">← Back to live chain</a></div>' +
+    recordHero('Deterministic service layer', 'Smartnode network', number(enabled) + ' enabled · ' + number(total) + ' registered', 'SN', '<a class="text-link" href="/node-map?view=smartnodes">Open network map ↗</a><a class="text-link" href="/">Live chain</a>') +
+    '<section class="network-health-grid">' +
+      '<article class="network-ring-card">' +
+        '<div class="network-ring-wrap">' +
+          '<svg class="network-ring" viewBox="0 0 120 120" aria-hidden="true">' +
+            '<circle cx="60" cy="60" r="48" pathLength="100" class="ring-track"></circle>' +
+            '<circle cx="60" cy="60" r="48" pathLength="100" class="ring-value" stroke-dasharray="' + enabledPct.toFixed(2) + ' ' + disabledPct.toFixed(2) + '" transform="rotate(-90 60 60)"></circle>' +
+          '</svg>' +
+          '<div class="network-ring-label"><strong>' + enabledPct.toFixed(1) + '%</strong><span>ENABLED</span></div>' +
+        '</div>' +
+        '<div class="network-ring-copy"><span>NETWORK HEALTH</span><h3>' + number(enabled) + ' active smartnodes</h3><p>Deterministic nodes currently reported ENABLED by Yerbas Core.</p></div>' +
+      '</article>' +
+      '<article class="network-status-card">' +
+        visualFact('Registered', number(total), 'deterministic records') +
+        visualFact('PoSe banned', number(poseBanned), 'current Core state') +
+        visualFact('Protocol', data.protocolVersion === null ? '—' : number(data.protocolVersion), 'local network protocol') +
+      '</article>' +
     '</section>' +
-
-    '<section class="metric-strip">' + cards + '</section>' +
-
-    '<section class="panel">' +
+    '<section class="section-intro compact"><div><p class="eyebrow">COLLATERAL LANDSCAPE</p><h2>Node tiers on the network</h2></div>' +
+      '<p>Live collateral distribution from the deterministic smartnode set.</p></section>' +
+    '<section class="collateral-grid">' + (collateralCards || '<div class="empty-state">No collateral distribution returned.</div>') + '</section>' +
+    '<section class="panel modern-panel smartnode-directory-panel">' +
       '<div class="asset-toolbar smartnode-toolbar">' +
         '<div><p class="eyebrow">SMARTNODE DIRECTORY</p><h2>' + number(data.total) + ' matching nodes</h2></div>' +
         '<form class="asset-filter-grid smartnode-filter" action="/smartnodes" method="get" role="search">' +
@@ -784,12 +837,7 @@ async function renderSmartnodes() {
           '<button type="submit">Filter</button>' +
         '</form>' +
       '</div>' +
-
-      '<div class="smartnode-note">' +
-        '<strong>Pay age rank</strong> is an informational ordering by oldest last-paid block among currently ENABLED nodes. ' +
-        'It is not a prediction of the next payment winner.' +
-      '</div>' +
-
+      '<div class="smartnode-note"><strong>Pay age rank</strong> is an informational ordering by oldest last-paid block among currently ENABLED nodes. It is not a prediction of the next payment winner.</div>' +
       '<div class="table-wrap">' +
         '<table class="smartnode-table">' +
           '<thead><tr>' +
@@ -1240,59 +1288,53 @@ async function renderTransaction(txid) {
   setRpcState('online', 'Core online');
   document.title = 'Transaction · Yerbas Explorer Light';
 
-  const outputs = (tx.vout || []).map((vout) =>
-    '<tr>' +
-      '<td>' + number(vout.n) + '</td>' +
-      '<td>' + number(vout.value, 8) + ' YERB</td>' +
-      '<td class="mono">' + outputAddresses(vout) + '</td>' +
-    '</tr>'
-  ).join('');
-
   const inputCount = Array.isArray(tx.vin) ? tx.vin.length : 0;
+  const outputs = Array.isArray(tx.vout) ? tx.vout : [];
+  const totalOutput = outputs.reduce((sum, vout) => sum + Number(vout.value || 0), 0);
+  const maxOutput = Math.max(0.00000001, ...outputs.map((vout) => Number(vout.value || 0)));
+
+  const outputCards = outputs.length
+    ? outputs.map((vout) => {
+        const level = scaleLevel(Number(vout.value || 0), maxOutput);
+        return '<article class="output-card">' +
+          '<div class="output-card-head"><span>OUTPUT ' + number(vout.n) + '</span><strong>' + number(vout.value, 8) + ' YERB</strong></div>' +
+          '<div class="output-destination">' + outputAddresses(vout) + '</div>' +
+          '<div class="value-meter"><span class="meter-fill level-' + level + '"></span></div>' +
+        '</article>';
+      }).join('')
+    : '<div class="empty-state">No outputs were returned for this transaction.</div>';
+
+  const metrics = [
+    metricCard('01', 'Confirmations', number(tx.confirmations), tx.confirmations ? 'confirmed on chain' : 'mempool / unconfirmed'),
+    metricCard('02', 'Total output', number(totalOutput, 8) + ' YERB', 'sum of decoded outputs'),
+    metricCard('03', 'Inputs', number(inputCount), 'value sources'),
+    metricCard('04', 'Outputs', number(outputs.length), bytes(tx.size))
+  ].join('');
+
+  const actions = '<a class="text-link" href="/">← Live chain</a>' +
+    (tx.blockhash ? '<a class="text-link" href="/block/' + encodeURIComponent(tx.blockhash) + '">Open block ↗</a>' : '');
 
   app.innerHTML =
-    '<section class="detail-hero">' +
-      '<div class="detail-kicker">Transaction record / Yerbas Core</div>' +
-      '<h2>Transaction</h2>' +
-      '<div class="detail-hash">' + esc(tx.txid) + '</div>' +
-      '<div class="detail-actions"><a class="text-link" href="/">← Back to live chain</a></div>' +
+    recordHero(tx.confirmations ? 'Confirmed transaction' : 'Mempool transaction', 'Value transfer', tx.txid, 'TX', actions) +
+    '<section class="metric-strip modern-metrics">' + metrics + '</section>' +
+    '<section class="value-flow">' +
+      '<article class="flow-node source"><span>INPUTS</span><strong>' + number(inputCount) + '</strong><small>sources</small></article>' +
+      '<div class="flow-line"><span></span><b>→</b></div>' +
+      '<article class="flow-node transaction"><span>TRANSACTION</span><strong>' + number(totalOutput, 8) + '</strong><small>YERB decoded output</small></article>' +
+      '<div class="flow-line"><span></span><b>→</b></div>' +
+      '<article class="flow-node destination"><span>OUTPUTS</span><strong>' + number(outputs.length) + '</strong><small>destinations</small></article>' +
     '</section>' +
-
-    '<section class="panel">' +
-      panelHeading('T1', 'Transaction anatomy', 'Ledger data',
-        tx.confirmations ? number(tx.confirmations) + ' confirmations' : 'unconfirmed') +
-      '<dl class="detail-grid">' +
-        '<dt>Transaction ID</dt><dd class="mono break">' + esc(tx.txid) + '</dd>' +
-        '<dt>Block</dt><dd>' +
-          (tx.blockhash
-            ? hashLink('block', tx.blockhash, tx.blockhash)
-            : '<span class="pending">Mempool / unconfirmed</span>') +
-        '</dd>' +
-        '<dt>Confirmations</dt><dd>' + number(tx.confirmations) + '</dd>' +
-        '<dt>Size</dt><dd>' + bytes(tx.size) + '</dd>' +
-        '<dt>Inputs</dt><dd>' + number(inputCount) + '</dd>' +
-        '<dt>Outputs</dt><dd>' + number(tx.vout?.length) + '</dd>' +
-        '<dt>Time</dt><dd>' + esc(isoTime(tx.blocktime || tx.time)) + '</dd>' +
-      '</dl>' +
-    '</section>' +
-
-    '<section class="panel">' +
-      panelHeading('T2', 'Value distribution', 'Outputs', 'reported by Core') +
-      '<div class="table-wrap">' +
-        '<table>' +
-          '<thead><tr><th>#</th><th>Value</th><th>Address / script</th></tr></thead>' +
-          '<tbody>' + outputs + '</tbody>' +
-        '</table>' +
-      '</div>' +
-    '</section>' +
-
-    '<details class="panel raw">' +
+    '<section class="section-intro compact"><div><p class="eyebrow">VALUE DISTRIBUTION</p><h2>Where the transaction goes</h2></div>' +
+      '<p>Bar lengths are scaled to the largest output in this transaction.</p></section>' +
+    '<section class="output-grid">' + outputCards + '</section>' +
+    '<details class="panel raw modern-panel">' +
       '<summary>Raw RPC response</summary>' +
       '<pre id="raw-json"></pre>' +
     '</details>';
 
   document.querySelector('#raw-json').textContent = JSON.stringify(tx, null, 2);
 }
+
 
 async function route() {
   clearNotice();
