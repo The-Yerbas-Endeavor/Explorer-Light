@@ -22,6 +22,12 @@ ADMIN_USER="${EXPLORER_ADMIN_USER:-yerbasadmin}"
 HTTPS="${EXPLORER_HTTPS:-1}"
 EMAIL="${EXPLORER_EMAIL:-}"
 
+[[ "$EUID" -eq 0 ]] || {
+  echo "[Explorer-Light ERROR] Run through sudo, for example:" >&2
+  echo "curl -fsSL https://raw.githubusercontent.com/The-Yerbas-Endeavor/Explorer-Light/feature/rpc-first-test-build/install.sh | sudo bash" >&2
+  exit 1
+}
+
 DOMAIN_ARG=""
 argv=("$@")
 for (( i = 0; i < ${#argv[@]}; i++ )); do
@@ -31,7 +37,7 @@ for (( i = 0; i < ${#argv[@]}; i++ )); do
   fi
 done
 
-[[ -n "$DOMAIN" ]] || DOMAIN="$DOMAIN_ARG"
+[[ -z "$DOMAIN_ARG" ]] || DOMAIN="$DOMAIN_ARG"
 
 valid_domain() {
   local value="$1"
@@ -61,12 +67,6 @@ elif ! valid_domain "$DOMAIN"; then
   echo "[Explorer-Light ERROR] Use a hostname such as explorer.example.org." >&2
   exit 1
 fi
-
-[[ "$EUID" -eq 0 ]] || {
-  echo "[Explorer-Light ERROR] Run through sudo, for example:" >&2
-  echo "curl -fsSL https://raw.githubusercontent.com/The-Yerbas-Endeavor/Explorer-Light/feature/rpc-first-test-build/install.sh | sudo bash" >&2
-  exit 1
-}
 
 tmp="$(mktemp /tmp/yerbas-explorer-installer.XXXXXX)"
 cleanup() {
