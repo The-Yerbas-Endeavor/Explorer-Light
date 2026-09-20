@@ -5933,3 +5933,107 @@ body {
     transition: none;
   }
 }
+
+
+/* ==========================================================================
+   Explorer 3.3 — masthead refinement
+   ========================================================================== */
+
+.observatory-mast {
+  padding: 18px 0 13px;
+  align-items: center;
+}
+
+.mast-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.mast-copy .signal-line {
+  margin: 0;
+}
+
+.mast-title {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  line-height: 1;
+}
+
+.mast-title strong {
+  font-size: clamp(28px, 3vw, 40px);
+  font-weight: 760;
+  letter-spacing: .08em;
+}
+
+.mast-slash {
+  font-family: var(--mono);
+  font-size: clamp(15px, 1.6vw, 20px);
+  letter-spacing: 0;
+  color: rgba(141, 241, 158, .42);
+}
+
+.mast-channel {
+  font-family: var(--mono);
+  font-size: clamp(14px, 1.5vw, 19px);
+  font-weight: 560;
+  letter-spacing: .16em;
+  color: var(--green);
+}
+
+.mast-subtitle {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  max-width: none;
+  font-family: var(--mono);
+  font-size: 9px !important;
+  line-height: 1.35;
+  letter-spacing: .08em;
+  color: var(--muted);
+}
+
+.mast-subtitle > span {
+  padding-left: 14px;
+  border-left: 1px solid rgba(141, 241, 158, .15);
+  color: #789083;
+}
+
+.mast-telemetry > span {
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+@media (max-width: 900px) {
+  .observatory-mast {
+    padding-top: 16px;
+    padding-bottom: 12px;
+  }
+
+  .mast-title {
+    gap: 7px;
+  }
+
+  .mast-subtitle {
+    font-size: 8px !important;
+  }
+}
+
+@media (max-width: 620px) {
+  .mast-title strong {
+    font-size: 26px;
+  }
+
+  .mast-channel {
+    font-size: 13px;
+  }
+
+  .mast-subtitle > span {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
