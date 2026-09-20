@@ -94,7 +94,7 @@ Usage: sudo bash install-fresh-server.sh [options]
 Options:
   --domain NAME          Public domain. Default: nginx catch-all / server IP.
   --https                Configure Let's Encrypt HTTPS.
-  --email ADDRESS        Required with --https.
+  --email ADDRESS        Optional Let's Encrypt contact email.
   --branch REF           Explorer-Light branch.
                          Default: feature/rpc-first-test-build
   --core-ref REF         Core source fallback branch/tag. Default: main
