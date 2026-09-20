@@ -1189,6 +1189,16 @@ async function renderNetworkMap() {
     stage.style.transform =
       'translate(' + mapView.x.toFixed(2) + 'px,' + mapView.y.toFixed(2) + 'px) scale(' +
       mapView.scale.toFixed(4) + ')';
+
+    if (pinsElement) {
+      // The map stage scales geographic positions. Counter-scale the pins so
+      // they grow gently with zoom instead of ballooning by the full map scale.
+      const screenPinScale = Math.min(1.7, 1 + (mapView.scale - 1) * 0.1);
+      const localPinScale = screenPinScale / mapView.scale;
+      pinsElement.style.setProperty('--network-pin-scale', localPinScale.toFixed(4));
+      pinsElement.style.setProperty('--network-pin-hover-scale', (localPinScale * 1.16).toFixed(4));
+      pinsElement.dataset.mapZoom = mapView.scale.toFixed(2);
+    }
   }
 
   function zoomMapAt(clientX, clientY, nextScale) {
