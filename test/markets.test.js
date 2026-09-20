@@ -30,3 +30,15 @@ test('market values remain explicitly external to Yerbas consensus', async () =>
   assert.ok(app.includes('not consensus data'));
   assert.ok(app.includes('Core UTXO supply × last price'));
 });
+
+
+test('asset pages link and embed IPFS metadata', async () => {
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+
+  assert.ok(app.includes("'https://ipfs.io/ipfs/' + encodeURIComponent(ipfsHash)"));
+  assert.ok(app.includes('OPEN IPFS ↗'));
+  assert.ok(app.includes('class="ipfs-frame"'));
+  assert.ok(server.includes("img-src 'self' data: https://ipfs.io"));
+  assert.ok(server.includes('frame-src https://ipfs.io'));
+});
