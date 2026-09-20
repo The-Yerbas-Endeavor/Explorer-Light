@@ -172,10 +172,14 @@ async function renderHome() {
   document.title = 'Yerbas Explorer Light';
   renderLoading('Reading live blockchain state');
 
-  const [status, blocks] = await Promise.all([
-    api('/api/status'),
-    api('/api/blocks')
-  ]);
+  const pageSize = 12;
+  const requestedPage = Math.max(1, Number.parseInt(new URLSearchParams(location.search).get('page') || '1', 10) || 1);
+  const status = await api('/api/status');
+  const totalBlocks = Math.max(1, Number(status.blocks || 0) + 1);
+  const totalPages = Math.max(1, Math.ceil(totalBlocks / pageSize));
+  const page = Math.min(requestedPage, totalPages);
+  const offset = (page - 1) * pageSize;
+  const blocks = await api('/api/blocks?limit=' + pageSize + '&offset=' + offset);
 
   setRpcState('online', 'Core online');
 
@@ -190,7 +194,7 @@ async function renderHome() {
   ]);
 
   const tape = blocks.map((block, index) => {
-    return '<a class="chain-tape-row' + (index === 0 ? ' is-tip' : '') + '" href="/block/' + block.height + '">' +
+    return '<a class="chain-tape-row' + (page === 1 && index === 0 ? ' is-tip' : '') + '" href="/block/' + block.height + '">' +
       '<span class="tape-node" aria-hidden="true">' +
         '<svg class="tape-block-icon" viewBox="0 0 32 32" focusable="false">' +
           '<path class="chain-weave weave-back" d="M16 0C7 4 7 10 12 13"></path>' +
@@ -211,22 +215,44 @@ async function renderHome() {
     '</a>';
   }).join('');
 
-  const rhythm = blocks.slice(0, 18).reverse().map((block) => {
+  const rhythm = blocks.slice().reverse().map((block) => {
     const txCount = Number(block.transactions || 0);
     return '<i class="rhythm-tick level-' + scaleLevel(txCount, maxTx) + '" title="Block ' +
       esc(block.height) + ' · ' + number(txCount) + ' transaction' + (txCount === 1 ? '' : 's') + '"></i>';
   }).join('');
 
+  const newestHeight = blocks.length ? Number(blocks[0].height) : null;
+  const oldestHeight = blocks.length ? Number(blocks[blocks.length - 1].height) : null;
+  const rangeLabel = newestHeight === null
+    ? 'no blocks on this page'
+    : 'heights ' + number(oldestHeight) + '–' + number(newestHeight);
+
+  const pageHref = (target) => target <= 1 ? '/' : '/?page=' + target;
+  const latest = page > 1 ? '<a href="/">LATEST</a>' : '<span class="disabled">LATEST</span>';
+  const newer = page > 1 ? '<a href="' + pageHref(page - 1) + '">← NEWER</a>' : '<span class="disabled">← NEWER</span>';
+  const older = page < totalPages ? '<a href="' + pageHref(page + 1) + '">OLDER →</a>' : '<span class="disabled">OLDER →</span>';
+  const genesis = page < totalPages ? '<a href="' + pageHref(totalPages) + '">GENESIS</a>' : '<span class="disabled">GENESIS</span>';
+
+  const pagination =
+    '<nav class="chain-pagination" aria-label="Chain tape pagination">' +
+      latest +
+      newer +
+      '<span class="chain-page-status">PAGE ' + number(page) + ' / ' + number(totalPages) + '</span>' +
+      older +
+      genesis +
+    '</nav>';
+
   app.innerHTML =
     telemetry +
     '<section class="observatory-strip">' +
-      '<div class="observatory-label"><span>TX / BLOCK</span><strong>Recent transaction count</strong></div>' +
-      '<div class="rhythm-line" aria-label="Recent transactions per block">' + rhythm + '</div>' +
+      '<div class="observatory-label"><span>TX / BLOCK</span><strong>Transaction count on this page</strong></div>' +
+      '<div class="rhythm-line" aria-label="Transactions per block on the current chain tape page">' + rhythm + '</div>' +
       '<div class="observatory-source"><span class="live-dot"></span>MAX ' + number(maxTx) + ' TX</div>' +
     '</section>' +
     '<section class="ledger-section">' +
-      railHeading('CHAIN TAPE', 'Recent confirmed blocks', number(blocks.length) + ' direct from Core') +
+      railHeading('CHAIN TAPE', 'Recent confirmed blocks', rangeLabel) +
       '<div class="chain-tape">' + tape + '</div>' +
+      pagination +
     '</section>';
 }
 
