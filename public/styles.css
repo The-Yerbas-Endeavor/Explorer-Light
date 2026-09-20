@@ -7234,3 +7234,173 @@ body::after {
     font-size: 6px;
   }
 }
+
+
+/* ==========================================================================
+   Explorer 3.9 — IPFS asset display
+   ========================================================================== */
+
+.asset-ipfs-ref {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-soft);
+}
+
+.asset-ipfs-ref:hover {
+  color: var(--text);
+}
+
+.asset-ipfs-ref code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.asset-ipfs-ref span {
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: .08em;
+  color: var(--holo-cyan);
+}
+
+.ipfs-display {
+  margin-top: 18px;
+  border-top: 1px solid rgba(130, 244, 255, .12);
+  border-bottom: 1px solid rgba(130, 244, 255, .12);
+  background:
+    linear-gradient(180deg, rgba(130, 244, 255, .012), rgba(141, 241, 158, .01));
+}
+
+.ipfs-display-head {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 0 4px;
+  border-bottom: 1px solid rgba(130, 244, 255, .08);
+}
+
+.ipfs-display-head > div {
+  display: grid;
+  gap: 2px;
+}
+
+.ipfs-display-head span {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: .12em;
+  color: var(--holo-cyan);
+}
+
+.ipfs-display-head strong {
+  font-size: 18px;
+  letter-spacing: -.02em;
+}
+
+.ipfs-display-head > a {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: .08em;
+  color: var(--green-hot);
+}
+
+.ipfs-frame-shell {
+  position: relative;
+  min-height: 360px;
+  background:
+    radial-gradient(circle at 50% 0, rgba(130, 244, 255, .035), transparent 38%),
+    rgba(2, 8, 5, .72);
+  overflow: hidden;
+}
+
+.ipfs-frame-shell::before,
+.ipfs-frame-shell::after {
+  content: "";
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.ipfs-frame-shell::before {
+  left: 8px;
+  top: 8px;
+  border-left: 1px solid rgba(130, 244, 255, .28);
+  border-top: 1px solid rgba(130, 244, 255, .28);
+}
+
+.ipfs-frame-shell::after {
+  right: 8px;
+  bottom: 8px;
+  border-right: 1px solid rgba(141, 241, 158, .28);
+  border-bottom: 1px solid rgba(141, 241, 158, .28);
+}
+
+.ipfs-frame {
+  display: block;
+  width: 100%;
+  min-height: 420px;
+  border: 0;
+  background: #fff;
+}
+
+.ipfs-display-foot {
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 0 4px;
+  border-top: 1px solid rgba(130, 244, 255, .08);
+}
+
+.ipfs-display-foot code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.ipfs-display-foot span {
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: .1em;
+  color: var(--holo-cyan);
+}
+
+@media (max-width: 700px) {
+  .asset-ipfs-ref {
+    grid-template-columns: 1fr;
+  }
+
+  .asset-ipfs-ref span {
+    white-space: normal;
+  }
+
+  .ipfs-display-head {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .ipfs-frame {
+    min-height: 340px;
+  }
+
+  .ipfs-display-foot {
+    grid-template-columns: 1fr;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .ipfs-display-foot span {
+    white-space: normal;
+  }
+}
