@@ -163,7 +163,9 @@ async function statusPayload() {
 
 async function recentBlocks(limit, offset = 0) {
   const tip = await rpc.call('getblockcount');
-  const start = Math.max(0, tip - Math.max(0, offset));
+  const safeOffset = Math.max(0, offset);
+  if (safeOffset > tip) return [];
+  const start = tip - safeOffset;
   const heights = Array.from({ length: Math.min(limit, start + 1) }, (_, i) => start - i);
   const hashes = await rpc.batch(heights.map((height) => ({ method: 'getblockhash', params: [height] })));
   const blocks = await rpc.batch(hashes.map((hash) => ({ method: 'getblock', params: [hash, 1] })));
