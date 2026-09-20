@@ -757,6 +757,29 @@ async function renderAsset(name) {
   const txidHash = metadata.txid_hash || metadata.txid || null;
   const metadataValue = ipfsHash || txidHash || null;
   const metadataType = ipfsHash ? 'IPFS' : (txidHash ? 'TXID' : 'NONE');
+  const ipfsUrl = ipfsHash ? 'https://ipfs.io/ipfs/' + encodeURIComponent(ipfsHash) : null;
+  const metadataRefHtml = ipfsUrl
+    ? '<a class="asset-ipfs-ref" href="' + ipfsUrl + '" target="_blank" rel="noopener noreferrer">' +
+        '<code>' + esc(ipfsHash) + '</code><span>OPEN IPFS ↗</span>' +
+      '</a>'
+    : (txidHash && /^[0-9a-fA-F]{64}$/.test(txidHash)
+      ? '<a class="asset-ipfs-ref" href="/tx/' + encodeURIComponent(txidHash) + '">' +
+          '<code>' + esc(txidHash) + '</code><span>OPEN TX ↗</span>' +
+        '</a>'
+      : '<code>' + esc(metadataValue || '—') + '</code>');
+
+  const ipfsPreview = ipfsUrl
+    ? '<section class="ipfs-display">' +
+        '<div class="ipfs-display-head">' +
+          '<div><span>IPFS CONTENT</span><strong>Asset metadata preview</strong></div>' +
+          '<a href="' + ipfsUrl + '" target="_blank" rel="noopener noreferrer">OPEN IN IPFS ↗</a>' +
+        '</div>' +
+        '<div class="ipfs-frame-shell">' +
+          '<iframe class="ipfs-frame" src="' + ipfsUrl + '" title="' + esc(data.name) + ' IPFS content" loading="lazy" sandbox></iframe>' +
+        '</div>' +
+        '<div class="ipfs-display-foot"><code>' + esc(ipfsHash) + '</code><span>PUBLIC IPFS GATEWAY · ipfs.io</span></div>' +
+      '</section>'
+    : '';
 
   app.innerHTML =
     ledgerHeader('ASSET', data.name, assetType(data.name), '<a href="/assets">ASSET INDEX</a><a href="/">LIVE CHAIN</a>') +
@@ -770,8 +793,9 @@ async function renderAsset(name) {
     '<section class="asset-facts-rail">' +
       '<div><span>ISSUANCE BLOCK</span><strong>' + (data.issuance?.blockHeight !== null && data.issuance?.blockHeight !== undefined ? number(data.issuance.blockHeight) : '—') + '</strong></div>' +
       '<div><span>VERIFIER</span><code>' + esc(metadata.verifier_string || '—') + '</code></div>' +
-      '<div><span>METADATA REF</span><code>' + esc(metadataValue || '—') + '</code></div>' +
+      '<div><span>METADATA REF</span>' + metadataRefHtml + '</div>' +
     '</section>' +
+    ipfsPreview +
     '<section class="ledger-section">' +
       railHeading('OWNERSHIP RAIL', 'Top holders', data.holders?.total === null ? 'availability unknown' : number(data.holders?.total) + ' total') +
       '<div class="holder-rail">' + holderRows + '</div>' +
