@@ -17,3 +17,13 @@ test('home chain tape exposes full-history pagination controls', async () => {
   assert.ok(app.includes("'/api/blocks?limit=' + pageSize + '&offset=' + offset"));
   assert.ok(app.includes("page === 1 && index === 0 ? ' is-tip' : ''"));
 });
+
+
+test('chain tape uses six-confirmation maturity states', async () => {
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.ok(app.includes('confirmations >= 6'));
+  assert.ok(app.includes("' is-confirmed'"));
+  assert.ok(app.includes("' is-confirming'"));
+  assert.ok(app.includes("confirmed 6+"));
+  assert.ok(app.includes('block-check'));
+});
