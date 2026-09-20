@@ -937,6 +937,12 @@ RPC_TIMEOUT_MS=10000
 RECENT_BLOCKS=12
 CACHE_MS=5000
 
+# Live public market data. Exchange calls are server-side and cached.
+MARKETS_ENABLED=true
+NESTEX_API_BASE=https://api.nestex.one
+MARKETS_CACHE_MS=30000
+MARKETS_TIMEOUT_MS=10000
+
 # Read-only Yerbas AI gateway.
 AI_API_ENABLED=true
 AI_MAX_BODY_BYTES=32768
