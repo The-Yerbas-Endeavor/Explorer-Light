@@ -3666,3 +3666,544 @@ tbody tr:hover {
     animation: none;
   }
 }
+
+
+/* ==========================================================================
+   Explorer 2.1 compact density pass
+   Smaller surfaces, more data per viewport, explicit Yerbas addresses.
+   ========================================================================== */
+
+.hero {
+  min-height: 350px;
+  padding: 46px 0 34px;
+  grid-template-columns: minmax(0, 1.6fr) minmax(260px, .65fr);
+  gap: 34px;
+}
+
+.hero h1 {
+  margin-top: 18px;
+  font-size: clamp(42px, 5.5vw, 70px);
+  line-height: .93;
+}
+
+.hero-summary {
+  max-width: 660px;
+  margin-top: 20px;
+  font-size: clamp(14px, 1.35vw, 17px);
+  line-height: 1.6;
+}
+
+.hero-facts {
+  margin-top: 18px;
+}
+
+.chain-art {
+  transform: scale(.82);
+  transform-origin: center;
+}
+
+.search-zone {
+  padding-top: 22px;
+  padding-bottom: 22px;
+}
+
+#app {
+  gap: 16px;
+}
+
+.cockpit-grid {
+  gap: 10px;
+}
+
+.tip-card,
+.pulse-card {
+  min-height: 178px;
+  padding: 18px 20px;
+  border-radius: 14px;
+}
+
+.tip-height {
+  margin-top: 14px;
+  font-size: clamp(38px, 4.3vw, 54px);
+}
+
+.tip-context {
+  margin-top: 12px;
+}
+
+.tip-hash {
+  margin-top: 14px;
+}
+
+.pulse-head strong {
+  font-size: 19px;
+}
+
+.pulse-chart {
+  height: 82px;
+  gap: 5px;
+  padding: 4px 0;
+}
+
+.modern-metrics {
+  gap: 8px;
+}
+
+.modern-metrics .metric-card {
+  min-height: 102px;
+  padding: 14px 16px 13px;
+  border-radius: 12px;
+}
+
+.modern-metrics .metric-card::after {
+  font-size: 23px;
+  right: 10px;
+  top: 8px;
+}
+
+.modern-metrics .metric-card strong {
+  margin-top: 9px;
+  font-size: clamp(21px, 2vw, 28px);
+}
+
+.modern-metrics .metric-card small {
+  padding-top: 10px;
+  font-size: 9px;
+}
+
+.section-intro {
+  padding-top: 8px;
+  gap: 18px;
+}
+
+.section-intro h2 {
+  font-size: clamp(23px, 2.3vw, 31px);
+}
+
+.section-intro > p {
+  max-width: 460px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.block-card-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.block-card {
+  gap: 9px;
+  padding: 13px;
+  border-radius: 12px;
+}
+
+.block-card-height {
+  font-size: 22px;
+}
+
+.block-card-hash {
+  font-size: 9px;
+}
+
+.record-hero {
+  min-height: 168px;
+  padding: 22px 24px;
+  border-radius: 14px;
+  gap: 18px;
+}
+
+.record-hero h2 {
+  margin: 5px 0 8px;
+  font-size: clamp(31px, 3.6vw, 48px);
+}
+
+.record-hero .detail-hash {
+  font-size: 11px;
+}
+
+.record-symbol {
+  width: 88px;
+  height: 88px;
+  border-radius: 24px;
+}
+
+.record-symbol span {
+  font-size: 18px;
+}
+
+.chain-route {
+  grid-template-columns: minmax(0, 1fr) 160px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.chain-route-node,
+.chain-route-current {
+  min-height: 86px;
+  padding: 13px;
+  border-radius: 12px;
+}
+
+.chain-route-current strong {
+  font-size: 20px;
+}
+
+.tx-chip-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.tx-chip-card {
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 10px;
+}
+
+.tx-chip-index,
+.activity-index {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.balance-stage {
+  gap: 9px;
+}
+
+.balance-focus {
+  min-height: 165px;
+  padding: 21px;
+  border-radius: 14px;
+}
+
+.balance-focus > strong {
+  font-size: clamp(34px, 4.5vw, 52px);
+}
+
+.balance-side {
+  gap: 8px;
+}
+
+.visual-fact {
+  min-height: 78px;
+  padding: 12px 14px;
+  border-radius: 12px;
+}
+
+.visual-fact strong {
+  font-size: 17px;
+}
+
+.portfolio-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.portfolio-card {
+  min-height: 106px;
+  padding: 12px;
+  gap: 8px;
+  border-radius: 12px;
+}
+
+.portfolio-balance {
+  font-size: 18px;
+}
+
+.activity-row {
+  padding: 9px 10px;
+}
+
+.utxo-grid {
+  gap: 6px;
+}
+
+.utxo-card {
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.filter-surface {
+  padding: 15px;
+  border-radius: 14px;
+}
+
+.filter-surface-title {
+  margin-bottom: 11px;
+}
+
+.filter-surface-title h2 {
+  font-size: 22px;
+}
+
+.asset-discovery-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.asset-discovery-card {
+  min-height: 158px;
+  padding: 13px;
+  gap: 10px;
+  border-radius: 12px;
+}
+
+.asset-discovery-name {
+  font-size: 17px;
+}
+
+.asset-discovery-stats {
+  gap: 5px;
+}
+
+.asset-discovery-foot {
+  padding-top: 8px;
+}
+
+.asset-snapshot-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.holder-list {
+  gap: 5px;
+}
+
+.holder-card {
+  grid-template-columns: 42px minmax(0, 1fr) minmax(100px, auto) 62px;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+}
+
+.network-health-grid {
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, .75fr);
+  gap: 9px;
+}
+
+.network-ring-card {
+  min-height: 185px;
+  grid-template-columns: 145px minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+  border-radius: 14px;
+}
+
+.network-ring-wrap {
+  width: 136px;
+  height: 136px;
+}
+
+.network-ring-label strong {
+  font-size: 27px;
+}
+
+.network-ring-copy h3 {
+  font-size: 23px;
+}
+
+.network-ring-copy p {
+  font-size: 12px;
+}
+
+.network-status-card {
+  gap: 7px;
+  padding: 8px;
+  border-radius: 14px;
+}
+
+.collateral-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.collateral-card {
+  min-height: 78px;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.collateral-card strong {
+  font-size: 20px;
+}
+
+.value-flow {
+  grid-template-columns: minmax(120px, .65fr) 54px minmax(180px, 1fr) 54px minmax(120px, .65fr);
+  gap: 6px;
+}
+
+.flow-node {
+  min-height: 108px;
+  padding: 13px;
+  border-radius: 13px;
+}
+
+.flow-node.transaction {
+  min-height: 128px;
+}
+
+.flow-node strong {
+  font-size: 23px;
+}
+
+.output-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.output-card {
+  gap: 10px;
+  padding: 12px;
+  border-radius: 11px;
+}
+
+.output-card-head strong {
+  font-size: 15px;
+}
+
+.output-address-label,
+.cell-label {
+  display: block;
+  margin-bottom: 5px;
+  font-family: var(--mono);
+  font-size: 8px;
+  line-height: 1;
+  letter-spacing: .11em;
+  color: var(--green);
+}
+
+.output-destination {
+  min-height: 44px;
+  line-height: 1.45;
+}
+
+.output-destination a {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--text-soft);
+}
+
+.address-identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 14px;
+  border: 1px solid rgba(141, 241, 158, .18);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(141, 241, 158, .06), rgba(141, 241, 158, .015));
+}
+
+.address-identity > span {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: .13em;
+  color: var(--green);
+}
+
+.address-identity code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 12px;
+  background: transparent;
+}
+
+.address-identity a {
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: .08em;
+  color: var(--green);
+}
+
+.smartnode-address {
+  color: var(--text-soft);
+}
+
+.smartnode-table td {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+@media (max-width: 1180px) {
+  .block-card-grid,
+  .asset-discovery-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .portfolio-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .asset-snapshot-grid,
+  .collateral-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .output-grid,
+  .tx-chip-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .hero {
+    min-height: auto;
+    padding: 34px 0 26px;
+  }
+
+  .hero h1 {
+    font-size: clamp(38px, 11vw, 58px);
+  }
+
+  .chain-art {
+    transform: scale(.72);
+  }
+
+  .block-card-grid,
+  .asset-discovery-grid,
+  .portfolio-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .asset-snapshot-grid,
+  .collateral-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .network-health-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .address-identity {
+    grid-template-columns: 1fr auto;
+  }
+
+  .address-identity code {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 620px) {
+  .block-card-grid,
+  .asset-discovery-grid,
+  .portfolio-grid,
+  .asset-snapshot-grid,
+  .collateral-grid,
+  .output-grid,
+  .tx-chip-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .address-identity {
+    grid-template-columns: 1fr;
+  }
+
+  .address-identity a {
+    white-space: normal;
+  }
+}
