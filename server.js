@@ -572,6 +572,175 @@ async function supplyData() {
   return result.data;
 }
 
+function marketNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function nestexUrl(relativePath) {
+  const base = config.markets.nestexApiBase.endsWith('/')
+    ? config.markets.nestexApiBase
+    : config.markets.nestexApiBase + '/';
+  return new URL(String(relativePath).replace(/^\/+/, ''), base);
+}
+
+async function marketFetchJson(relativePath, cacheKey) {
+  if (!config.markets.enabled) {
+    throw new Error('Market data is disabled by server configuration.');
+  }
+
+  return cached('market:nestex:' + cacheKey, config.markets.cacheMs, async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), config.markets.timeoutMs);
+    try {
+      const url = nestexUrl(relativePath);
+      const response = await fetch(url, {
+        headers: {
+          accept: 'application/json',
+          'user-agent': 'Yerbas-Explorer-Light/1.0'
+        },
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        throw new Error('NestEx market source returned HTTP ' + response.status + '.');
+      }
+      return await response.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  });
+}
+
+function normalizeOrderSide(value, side) {
+  let entries = [];
+  if (Array.isArray(value)) {
+    entries = value.map((entry) => Array.isArray(entry) ? entry : [entry?.price, entry?.quantity ?? entry?.amount]);
+  } else if (value && typeof value === 'object') {
+    entries = Object.entries(value);
+  }
+
+  return entries
+    .map(([priceRaw, amountRaw]) => {
+      const price = marketNumber(priceRaw);
+      const amount = marketNumber(amountRaw);
+      if (price === null || amount === null) return null;
+      return {
+        price,
+        amount,
+        total: price * amount
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => side === 'bid' ? b.price - a.price : a.price - b.price);
+}
+
+function normalizeTrades(payload) {
+  const rows = Array.isArray(payload?.data) ? payload.data : [];
+  return rows.map((trade) => {
+    const price = marketNumber(trade?.price);
+    const amount = marketNumber(trade?.quantity ?? trade?.amount);
+    return {
+      id: trade?.trade_id ?? trade?.id ?? null,
+      side: String(trade?.side || '').toUpperCase() || null,
+      price,
+      amount,
+      total: price !== null && amount !== null ? price * amount : null,
+      timestamp: marketNumber(trade?.timestamp)
+    };
+  });
+}
+
+async function nestexMarketSummary() {
+  const tickerId = 'YERB_USDT';
+  const [ticker, supply, liquidityResult] = await Promise.all([
+    marketFetchJson('cg/tickers/' + tickerId, 'ticker:' + tickerId),
+    supplyData(),
+    marketFetchJson('v1/liquidity/YERB', 'liquidity:YERB').catch(() => null)
+  ]);
+
+  const last = marketNumber(ticker?.last_price);
+  const old24h = marketNumber(ticker?.oldltp24h);
+  const bid = marketNumber(ticker?.bid);
+  const ask = marketNumber(ticker?.ask);
+  const supplyYerb = marketNumber(supply?.totalAmountYerb);
+  const change24hPct = old24h && last !== null
+    ? ((last - old24h) / old24h) * 100
+    : null;
+  const spread = bid !== null && ask !== null ? ask - bid : null;
+  const midpoint = bid !== null && ask !== null ? (bid + ask) / 2 : null;
+  const liquidity = liquidityResult?.data && typeof liquidityResult.data === 'object'
+    ? liquidityResult.data
+    : null;
+
+  return {
+    exchange: 'nestex',
+    exchangeName: 'NestEx',
+    pair: 'YERB/USDT',
+    tickerId,
+    base: 'YERB',
+    quote: 'USDT',
+    tradeUrl: 'https://trade.nestex.one/spot/YERB_USDT',
+    source: 'https://api.nestex.one',
+    asOf: Date.now(),
+    ticker: {
+      last,
+      old24h,
+      change24hPct,
+      bid,
+      ask,
+      spread,
+      spreadPct: midpoint && spread !== null ? (spread / midpoint) * 100 : null,
+      high: marketNumber(ticker?.high),
+      low: marketNumber(ticker?.low),
+      baseVolume: marketNumber(ticker?.base_volume),
+      quoteVolume: marketNumber(ticker?.target_volume),
+      decimals: marketNumber(ticker?.decimals),
+      liquidityUsdt: marketNumber(ticker?.liquidity)
+    },
+    valuation: {
+      supplyYerb,
+      marketCapUsdt: supplyYerb !== null && last !== null ? supplyYerb * last : null,
+      basis: 'Yerbas Core UTXO-set total amount × NestEx last price'
+    },
+    liquidity: liquidity ? {
+      score: marketNumber(liquidity.score),
+      totalUsdt: marketNumber(liquidity.total),
+      pooledYerb: marketNumber(liquidity.pooledCoin),
+      pooledUsdt: marketNumber(liquidity.pooledUsdt),
+      growthPct: marketNumber(liquidity.growth),
+      dumpFee: liquidity.dump === true || String(liquidity.dump).toLowerCase() === 'true',
+      leaderboard: Array.isArray(liquidity.leaderboard)
+        ? liquidity.leaderboard.map(marketNumber).filter((value) => value !== null)
+        : []
+    } : null
+  };
+}
+
+async function nestexMarketDetail() {
+  const [summary, orderbookResult, tradebookResult] = await Promise.all([
+    nestexMarketSummary(),
+    marketFetchJson('cg/orderbook/YERB_USDT?depth=100', 'orderbook:YERB_USDT:100').catch(() => null),
+    marketFetchJson('cg/tradebook/YERB_USDT?page=1', 'tradebook:YERB_USDT:1').catch(() => null)
+  ]);
+
+  const bids = normalizeOrderSide(orderbookResult?.bids, 'bid').slice(0, 50);
+  const asks = normalizeOrderSide(orderbookResult?.asks, 'ask').slice(0, 50);
+  const trades = normalizeTrades(tradebookResult).slice(0, 100);
+
+  return {
+    ...summary,
+    orderbook: orderbookResult ? {
+      timestamp: marketNumber(orderbookResult.timestamp),
+      bids,
+      asks
+    } : null,
+    trades: tradebookResult ? {
+      page: marketNumber(tradebookResult.page) || 1,
+      items: trades
+    } : null
+  };
+}
+
 async function smartnodeData(url) {
   const result = await ai.invoke('get_smartnodes', {
     limit: apiInt(url.searchParams.get('limit'), 100, 1, 500),
