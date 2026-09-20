@@ -9,7 +9,7 @@ for (const page of pages) {
   test(`${page} references the served Yerbas logo asset`, async () => {
     const html = await readFile(new URL(`../${page}`, import.meta.url), 'utf8');
     const matches = html.split(logoPath).length - 1;
-    assert.ok(matches >= 3, `${page} should reference logo for favicon, header, and footer`);
+    assert.ok(matches >= 4, `${page} should reference logo for favicon, touch icon, header, and footer`);
   });
 }
 
