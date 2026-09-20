@@ -6680,3 +6680,81 @@ body::after {
     display: none;
   }
 }
+
+
+/* ==========================================================================
+   Explorer 3.6 — full-history chain tape pagination
+   ========================================================================== */
+
+.chain-pagination {
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: minmax(72px, .8fr) minmax(86px, 1fr) minmax(130px, 1.2fr) minmax(86px, 1fr) minmax(72px, .8fr);
+  align-items: stretch;
+  border-bottom: 1px solid rgba(130, 244, 255, .11);
+  background:
+    linear-gradient(90deg, rgba(130, 244, 255, .012), rgba(141, 241, 158, .016), rgba(130, 244, 255, .012));
+}
+
+.chain-pagination > * {
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 10px;
+  border-right: 1px solid rgba(130, 244, 255, .07);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: .10em;
+  white-space: nowrap;
+}
+
+.chain-pagination > *:last-child {
+  border-right: 0;
+}
+
+.chain-pagination a {
+  color: var(--holo-cyan);
+  transition: background .14s ease, color .14s ease, text-shadow .14s ease;
+}
+
+.chain-pagination a:hover {
+  color: #e4fff0;
+  background:
+    linear-gradient(90deg, rgba(130, 244, 255, .028), rgba(141, 241, 158, .025));
+  text-shadow: 0 0 10px rgba(130, 244, 255, .18);
+}
+
+.chain-pagination .disabled {
+  color: rgba(127, 153, 134, .36);
+}
+
+.chain-page-status {
+  color: var(--green-hot);
+  background: rgba(141, 241, 158, .018);
+}
+
+@media (max-width: 700px) {
+  .chain-pagination {
+    grid-template-columns: 1fr 1fr 1.35fr 1fr 1fr;
+  }
+
+  .chain-pagination > * {
+    padding: 0 5px;
+    font-size: 7px;
+    letter-spacing: .06em;
+  }
+}
+
+@media (max-width: 480px) {
+  .chain-pagination {
+    grid-template-columns: 1fr 1fr 1.25fr 1fr;
+  }
+
+  .chain-pagination > :first-child {
+    display: none;
+  }
+
+  .chain-pagination > :last-child {
+    border-right: 0;
+  }
+}
