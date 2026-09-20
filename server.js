@@ -1245,7 +1245,9 @@ async function handleApi(req, res, url) {
   if (url.pathname.startsWith('/api/block/')) {
     const identifier = decodeURIComponent(url.pathname.slice('/api/block/'.length));
     const hash = await blockHashFromIdentifier(identifier);
-    const block = await rpc.call('getblock', [hash, 1]);
+    const includeTransactions = url.searchParams.get('transactions') === '1'
+      || url.searchParams.get('verbose') === '2';
+    const block = await rpc.call('getblock', [hash, includeTransactions ? 2 : 1]);
     return sendJson(res, 200, block);
   }
 
