@@ -76,7 +76,7 @@ test('markets page exposes a cross-exchange reference and resilient Gatevia trad
   assert.ok(server.includes("method: 'simple mean of live exchange prices'"));
   assert.ok(server.includes("conversion = 'YERB/DOGE × DOGE/USDT'"));
   assert.ok(app.includes("'YERB REFERENCE'"));
-  assert.ok(app.includes("'TIME / ID'"));
+  assert.ok(app.includes('TIME / ID'));
   assert.ok(app.includes("'#' + trade.id"));
   assert.ok(app.includes('Gatevia public API did not return bid levels.'));
 });
