@@ -134,6 +134,7 @@ async function readResponseLimited(response, maxBytes) {
 }
 
 const IPFS_DIRECTORY_MAX_BYTES = 2 * 1024 * 1024;
+const IPFS_DIRECTORY_TAR_MAX_BYTES = 96 * 1024 * 1024;
 const IPFS_IMAGE_EXTENSIONS = /\.(?:png|jpe?g|gif|webp|avif)$/i;
 
 function ipfsDirectoryImagePath(html, cid) {
@@ -188,6 +189,84 @@ async function fetchIpfsPreviewResponse(cid, relativePath, signal) {
   });
 }
 
+function tarOctal(buffer, start, length) {
+  const raw = buffer
+    .subarray(start, start + length)
+    .toString('ascii')
+    .replace(/\0.*$/, '')
+    .trim();
+
+  if (!raw) return 0;
+  const parsed = Number.parseInt(raw, 8);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function tarString(buffer, start, length) {
+  return buffer
+    .subarray(start, start + length)
+    .toString('utf8')
+    .replace(/\0.*$/, '');
+}
+
+function ipfsTarFirstImage(buffer) {
+  let offset = 0;
+
+  while (offset + 512 <= buffer.length) {
+    const header = buffer.subarray(offset, offset + 512);
+    if (header.every((byte) => byte === 0)) break;
+
+    const name = tarString(header, 0, 100);
+    const prefix = tarString(header, 345, 155);
+    const fullName = prefix ? prefix + '/' + name : name;
+    const size = tarOctal(header, 124, 12);
+    const typeFlag = String.fromCharCode(header[156] || 0);
+
+    if (size === null || size < 0) return null;
+
+    const dataStart = offset + 512;
+    const dataEnd = dataStart + size;
+    if (dataEnd > buffer.length) return null;
+
+    const regularFile = typeFlag === '\0' || typeFlag === '0';
+    if (regularFile && IPFS_IMAGE_EXTENSIONS.test(fullName)) {
+      const data = buffer.subarray(dataStart, dataEnd);
+      const contentType = safeImageContentType(data, '');
+      if (contentType) {
+        return {
+          name: fullName,
+          contentType,
+          data
+        };
+      }
+    }
+
+    offset = dataStart + (Math.ceil(size / 512) * 512);
+  }
+
+  return null;
+}
+
+async function fetchIpfsDirectoryTarImage(cid, signal) {
+  const response = await fetch(
+    'https://ipfs.io/ipfs/' + encodeURIComponent(cid) + '?format=tar',
+    {
+      headers: {
+        accept: 'application/x-tar,application/octet-stream;q=0.9,*/*;q=0.1',
+        'user-agent': 'Yerbas-Explorer-Light/1.0'
+      },
+      redirect: 'follow',
+      signal
+    }
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const tar = await readResponseLimited(response, IPFS_DIRECTORY_TAR_MAX_BYTES);
+  return ipfsTarFirstImage(tar);
+}
+
 async function sendIpfsImagePreview(req, res, cid) {
   if (!validIpfsCid(cid)) {
     return sendJson(res, 400, { error: 'Invalid IPFS CID.' });
@@ -213,41 +292,36 @@ async function sendIpfsImagePreview(req, res, cid) {
 
     if (!contentType) {
       const upstreamType = String(response.headers.get('content-type') || '').toLowerCase();
-      if (!upstreamType.includes('text/html')) {
+      let resolved = false;
+
+      if (upstreamType.includes('text/html') && data.length <= IPFS_DIRECTORY_MAX_BYTES) {
+        const imagePath = ipfsDirectoryImagePath(data.toString('utf8'), cid);
+
+        if (imagePath) {
+          response = await fetchIpfsPreviewResponse(cid, imagePath, controller.signal);
+          if (response.ok) {
+            data = await readResponseLimited(response, IPFS_PREVIEW_MAX_BYTES);
+            contentType = safeImageContentType(
+              data,
+              response.headers.get('content-type') || ''
+            );
+            resolved = Boolean(contentType);
+          }
+        }
+      }
+
+      if (!resolved) {
+        const tarImage = await fetchIpfsDirectoryTarImage(cid, controller.signal);
+        if (tarImage) {
+          data = tarImage.data;
+          contentType = tarImage.contentType;
+          resolved = true;
+        }
+      }
+
+      if (!resolved || !contentType) {
         return sendJson(res, 415, {
-          error: 'IPFS content is not a supported image preview.'
-        });
-      }
-
-      if (data.length > IPFS_DIRECTORY_MAX_BYTES) {
-        return sendJson(res, 413, {
-          error: 'IPFS directory listing exceeds the preview size limit.'
-        });
-      }
-
-      const imagePath = ipfsDirectoryImagePath(data.toString('utf8'), cid);
-      if (!imagePath) {
-        return sendJson(res, 415, {
-          error: 'IPFS directory does not contain a supported image preview.'
-        });
-      }
-
-      response = await fetchIpfsPreviewResponse(cid, imagePath, controller.signal);
-      if (!response.ok) {
-        return sendJson(res, 502, {
-          error: 'IPFS image entry returned HTTP ' + response.status + '.'
-        });
-      }
-
-      data = await readResponseLimited(response, IPFS_PREVIEW_MAX_BYTES);
-      contentType = safeImageContentType(
-        data,
-        response.headers.get('content-type') || ''
-      );
-
-      if (!contentType) {
-        return sendJson(res, 415, {
-          error: 'IPFS directory image entry is not a supported image preview.'
+          error: 'IPFS content does not contain a supported image preview.'
         });
       }
     }

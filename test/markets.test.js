@@ -205,3 +205,15 @@ test('IPFS image preview resolves image files inside UnixFS directory listings',
   assert.ok(server.includes("error: 'IPFS directory does not contain a supported image preview.'"));
   assert.ok(server.includes("error: 'IPFS directory image entry is not a supported image preview.'"));
 });
+
+
+test('IPFS directory preview falls back to the gateway TAR representation', async () => {
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+
+  assert.ok(server.includes('IPFS_DIRECTORY_TAR_MAX_BYTES'));
+  assert.ok(server.includes('ipfsTarFirstImage'));
+  assert.ok(server.includes('fetchIpfsDirectoryTarImage'));
+  assert.ok(server.includes("'?format=tar'"));
+  assert.ok(server.includes("accept: 'application/x-tar,application/octet-stream"));
+  assert.ok(server.includes("error: 'IPFS content does not contain a supported image preview.'"));
+});
