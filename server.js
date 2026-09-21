@@ -611,10 +611,46 @@ async function marketFetchJson(relativePath, cacheKey) {
   });
 }
 
+function gateviaUrl(relativePath) {
+  const base = config.markets.gateviaApiBase.endsWith('/')
+    ? config.markets.gateviaApiBase
+    : config.markets.gateviaApiBase + '/';
+  return new URL(String(relativePath).replace(/^\\/+/, ''), base);
+}
+
+async function gateviaMarketFetchJson(relativePath, cacheKey) {
+  if (!config.markets.enabled) {
+    throw new Error('Market data is disabled by server configuration.');
+  }
+
+  return cached('market:gatevia:' + cacheKey, config.markets.cacheMs, async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), config.markets.timeoutMs);
+    try {
+      const url = gateviaUrl(relativePath);
+      const response = await fetch(url, {
+        headers: {
+          accept: 'application/json',
+          'user-agent': 'Yerbas-Explorer-Light/1.0'
+        },
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        throw new Error('Gatevia market source returned HTTP ' + response.status + '.');
+      }
+      return await response.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  });
+}
+
 function normalizeOrderSide(value, side) {
   let entries = [];
   if (Array.isArray(value)) {
-    entries = value.map((entry) => Array.isArray(entry) ? entry : [entry?.price, entry?.quantity ?? entry?.amount]);
+    entries = value.map((entry) => Array.isArray(entry)
+      ? entry
+      : [entry?.price, entry?.quantity ?? entry?.amount ?? entry?.remaining_volume ?? entry?.volume]);
   } else if (value && typeof value === 'object') {
     entries = Object.entries(value);
   }
@@ -634,54 +670,103 @@ function normalizeOrderSide(value, side) {
     .sort((a, b) => side === 'bid' ? b.price - a.price : a.price - b.price);
 }
 
+function marketPercentNumber(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(String(value).replace('%', '').trim());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function marketTimestamp(value) {
+  const numeric = marketNumber(value);
+  if (numeric !== null) return numeric;
+  const parsed = Date.parse(String(value || ''));
+  return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : null;
+}
+
 function normalizeTrades(payload) {
-  const rows = Array.isArray(payload?.data) ? payload.data : [];
+  const rows = Array.isArray(payload)
+    ? payload
+    : (Array.isArray(payload?.data) ? payload.data : []);
   return rows.map((trade) => {
     const price = marketNumber(trade?.price);
-    const amount = marketNumber(trade?.quantity ?? trade?.amount);
+    const amount = marketNumber(trade?.quantity ?? trade?.amount ?? trade?.volume);
     return {
       id: trade?.trade_id ?? trade?.id ?? null,
-      side: String(trade?.side || '').toUpperCase() || null,
+      side: String(trade?.side ?? trade?.taker_type ?? trade?.takerType ?? '').toUpperCase() || null,
       price,
       amount,
       total: price !== null && amount !== null ? price * amount : null,
-      timestamp: marketNumber(trade?.timestamp)
+      timestamp: marketTimestamp(trade?.timestamp ?? trade?.created_at ?? trade?.createdAt)
     };
   });
 }
 
-function gateviaMarketListing() {
+async function gateviaMarketSummary() {
+  const tickerId = 'YERB_DOGE';
+  const [tickerResult, dogeUsdtResult, supply, orderbookResult] = await Promise.all([
+    gateviaMarketFetchJson('public/markets/' + tickerId + '/tickers', 'ticker:' + tickerId).catch(() => null),
+    gateviaMarketFetchJson('public/markets/DOGE_USDT/tickers', 'ticker:DOGE_USDT').catch(() => null),
+    supplyData(),
+    gateviaMarketFetchJson('public/markets/' + tickerId + '/order-book?limit=5', 'orderbook:' + tickerId + ':5').catch(() => null)
+  ]);
+
+  const ticker = tickerResult?.ticker && typeof tickerResult.ticker === 'object'
+    ? tickerResult.ticker
+    : (tickerResult || {});
+  const dogeTicker = dogeUsdtResult?.ticker && typeof dogeUsdtResult.ticker === 'object'
+    ? dogeUsdtResult.ticker
+    : (dogeUsdtResult || {});
+
+  const last = marketNumber(ticker.last ?? ticker.last_price);
+  const open = marketNumber(ticker.open);
+  const bids = normalizeOrderSide(orderbookResult?.bids, 'bid');
+  const asks = normalizeOrderSide(orderbookResult?.asks, 'ask');
+  const bid = marketNumber(ticker.buy ?? ticker.bid) ?? bids[0]?.price ?? null;
+  const ask = marketNumber(ticker.sell ?? ticker.ask) ?? asks[0]?.price ?? null;
+  const spread = bid !== null && ask !== null ? ask - bid : null;
+  const midpoint = bid !== null && ask !== null ? (bid + ask) / 2 : null;
+  const change24hPct = marketPercentNumber(ticker.price_change_percent)
+    ?? (open && last !== null ? ((last - open) / open) * 100 : null);
+  const dogeUsdt = marketNumber(dogeTicker.last ?? dogeTicker.last_price);
+  const lastUsdt = last !== null && dogeUsdt !== null ? last * dogeUsdt : null;
+  const supplyYerb = marketNumber(supply?.totalAmountYerb);
+  const available = last !== null;
+
   return {
     exchange: 'gatevia',
     exchangeName: 'Gatevia',
     pair: 'YERB/DOGE',
-    tickerId: 'YERB_DOGE',
+    tickerId,
     base: 'YERB',
     quote: 'DOGE',
     tradeUrl: 'https://gatevia.io/exchange/YERB_DOGE',
-    source: 'https://api.gatevia.io/public/docs',
-    available: false,
-    status: 'external-live-market',
-    asOf: Date.now(),
+    source: 'https://api.gatevia.io/public/markets/YERB_DOGE/tickers',
+    available,
+    status: available ? 'live-api' : 'api-unavailable',
+    asOf: marketTimestamp(tickerResult?.at ?? ticker.at) || Date.now(),
     ticker: {
-      last: null,
-      old24h: null,
-      change24hPct: null,
-      bid: null,
-      ask: null,
-      spread: null,
-      spreadPct: null,
-      high: null,
-      low: null,
-      baseVolume: null,
-      quoteVolume: null,
+      last,
+      old24h: open,
+      change24hPct,
+      bid,
+      ask,
+      spread,
+      spreadPct: midpoint && spread !== null ? (spread / midpoint) * 100 : null,
+      high: marketNumber(ticker.high),
+      low: marketNumber(ticker.low),
+      baseVolume: marketNumber(ticker.amount ?? ticker.base_volume),
+      quoteVolume: marketNumber(ticker.volume ?? ticker.quote_volume),
       decimals: null,
-      liquidityUsdt: null
+      liquidityUsdt: null,
+      lastUsdt,
+      quoteUsdt: dogeUsdt
     },
     valuation: {
-      supplyYerb: null,
-      marketCapUsdt: null,
-      basis: null
+      supplyYerb,
+      marketCapUsdt: supplyYerb !== null && lastUsdt !== null ? supplyYerb * lastUsdt : null,
+      basis: lastUsdt !== null
+        ? 'Yerbas Core UTXO-set total amount × Gatevia YERB/DOGE × Gatevia DOGE/USDT'
+        : null
     },
     liquidity: null
   };
@@ -773,6 +858,32 @@ async function nestexMarketDetail() {
     } : null,
     trades: tradebookResult ? {
       page: marketNumber(tradebookResult.page) || 1,
+      items: trades
+    } : null
+  };
+}
+
+async function gateviaMarketDetail() {
+  const tickerId = 'YERB_DOGE';
+  const [summary, orderbookResult, tradesResult] = await Promise.all([
+    gateviaMarketSummary(),
+    gateviaMarketFetchJson('public/markets/' + tickerId + '/order-book?limit=100', 'orderbook:' + tickerId + ':100').catch(() => null),
+    gateviaMarketFetchJson('public/markets/' + tickerId + '/trades?limit=100&order_by=desc', 'trades:' + tickerId + ':100').catch(() => null)
+  ]);
+
+  const bids = normalizeOrderSide(orderbookResult?.bids, 'bid').slice(0, 50);
+  const asks = normalizeOrderSide(orderbookResult?.asks, 'ask').slice(0, 50);
+  const trades = normalizeTrades(tradesResult).slice(0, 100);
+
+  return {
+    ...summary,
+    orderbook: orderbookResult ? {
+      timestamp: marketTimestamp(orderbookResult.timestamp ?? orderbookResult.at) || Date.now(),
+      bids,
+      asks
+    } : null,
+    trades: tradesResult ? {
+      page: 1,
       items: trades
     } : null
   };
@@ -1258,16 +1369,24 @@ async function handleApi(req, res, url) {
   }
 
   if (url.pathname === '/api/markets') {
-    const nestex = await nestexMarketSummary();
+    const [nestex, gatevia] = await Promise.all([
+      nestexMarketSummary(),
+      gateviaMarketSummary()
+    ]);
     return sendJson(res, 200, {
       generatedAt: new Date().toISOString(),
-      markets: [nestex, gateviaMarketListing()]
+      markets: [nestex, gatevia]
     });
   }
 
   if (url.pathname === '/api/market/nestex/YERB/USDT'
     || url.pathname === '/api/market/nestex/YERB_USDT') {
     return sendJson(res, 200, await nestexMarketDetail());
+  }
+
+  if (url.pathname === '/api/market/gatevia/YERB/DOGE'
+    || url.pathname === '/api/market/gatevia/YERB_DOGE') {
+    return sendJson(res, 200, await gateviaMarketDetail());
   }
 
   if (url.pathname === '/api/blocks') {

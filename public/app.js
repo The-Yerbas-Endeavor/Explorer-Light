@@ -213,10 +213,11 @@ async function renderMarkets() {
     const changeClass = ticker.change24hPct === null || ticker.change24hPct === undefined
       ? ''
       : (Number(ticker.change24hPct) >= 0 ? 'market-up' : 'market-down');
-    const href = market.exchange === 'nestex'
-      ? '/markets/nestex/YERB/USDT'
+    const internalDetail = market.exchange === 'nestex' || market.exchange === 'gatevia';
+    const href = internalDetail
+      ? '/markets/' + encodeURIComponent(market.exchange) + '/YERB/' + encodeURIComponent(market.quote || 'USDT')
       : market.tradeUrl;
-    const external = market.exchange === 'nestex'
+    const external = internalDetail
       ? ''
       : ' target="_blank" rel="noopener noreferrer"';
     const quoteLabel = 'VOL ' + esc(market.quote || 'QUOTE');
@@ -225,7 +226,7 @@ async function renderMarkets() {
       : marketMoney(market.valuation.marketCapUsdt);
 
     return '<a class="market-matrix-row' + (hasLiveData ? '' : ' external-market') + '" href="' + esc(href) + '"' + external + '>' +
-      '<span class="market-exchange"><b>' + esc(market.exchangeName) + '</b><small>' + (hasLiveData ? 'LIVE API' : 'TRADE LINK') + '</small></span>' +
+      '<span class="market-exchange"><b>' + esc(market.exchangeName) + '</b><small>' + (hasLiveData ? 'LIVE API' : 'API OFFLINE') + '</small></span>' +
       '<strong>' + esc(market.pair) + '</strong>' +
       '<span><small>LAST ' + esc(market.quote || '') + '</small>' + marketPrice(ticker.last) + '</span>' +
       '<span class="' + changeClass + '"><small>24H</small>' + marketPercent(ticker.change24hPct) + '</span>' +
@@ -246,14 +247,21 @@ async function renderMarkets() {
 }
 
 async function renderMarketDetail(exchange = 'nestex') {
-  document.title = 'NestEx YERB/USDT · Yerbas Explorer';
-  renderLoading('Reading NestEx YERB/USDT market');
+  const exchangeId = String(exchange || '').toLowerCase();
+  const isNestex = exchangeId === 'nestex';
+  const isGatevia = exchangeId === 'gatevia';
 
-  if (String(exchange).toLowerCase() !== 'nestex') {
+  if (!isNestex && !isGatevia) {
     throw new Error('Unknown market exchange.');
   }
 
-  const market = await api('/api/market/nestex/YERB/USDT');
+  const exchangeName = isGatevia ? 'Gatevia' : 'NestEx';
+  const quote = isGatevia ? 'DOGE' : 'USDT';
+  const pair = 'YERB/' + quote;
+  document.title = exchangeName + ' ' + pair + ' · Yerbas Explorer';
+  renderLoading('Reading ' + exchangeName + ' ' + pair + ' market');
+
+  const market = await api('/api/market/' + exchangeId + '/YERB/' + quote);
   setRpcState('online', 'Core online');
 
   const ticker = market.ticker || {};
@@ -262,7 +270,9 @@ async function renderMarketDetail(exchange = 'nestex') {
   const trades = market.trades?.items || [];
   const maxBidTotal = Math.max(0.00000001, ...bids.map((order) => Number(order.total || 0)));
   const maxAskTotal = Math.max(0.00000001, ...asks.map((order) => Number(order.total || 0)));
-  const changeClass = Number(ticker.change24hPct) >= 0 ? 'market-up' : 'market-down';
+  const changeClass = ticker.change24hPct === null || ticker.change24hPct === undefined
+    ? ''
+    : (Number(ticker.change24hPct) >= 0 ? 'market-up' : 'market-down');
 
   const bidRows = bids.slice(0, 24).map((order) =>
     '<div class="orderbook-row bid">' +
@@ -304,46 +314,53 @@ async function renderMarketDetail(exchange = 'nestex') {
       '</section>'
     : '';
 
+  const usdtMirror = ticker.lastUsdt === null || ticker.lastUsdt === undefined
+    ? ''
+    : ' · ≈ ' + marketPrice(ticker.lastUsdt) + ' USDT';
+  const valuationNote = market.valuation?.basis || 'USDT conversion unavailable';
+
   app.innerHTML =
     ledgerHeader(
-      'MARKET · NESTEX',
-      'YERB / USDT',
-      'Live public exchange feed',
-      '<a href="/markets">ALL MARKETS</a><a href="' + esc(market.tradeUrl) + '" target="_blank" rel="noopener noreferrer">TRADE ON NESTEX ↗</a>'
+      'MARKET · ' + exchangeName.toUpperCase(),
+      'YERB / ' + quote,
+      market.available === false ? 'Public exchange API currently unavailable' : 'Live public exchange feed',
+      '<a href="/markets">ALL MARKETS</a><a href="' + esc(market.tradeUrl) + '" target="_blank" rel="noopener noreferrer">TRADE ON ' + esc(exchangeName.toUpperCase()) + ' ↗</a>'
     ) +
     telemetryRail([
-      { label: 'LAST', value: marketPrice(ticker.last) + ' USDT', note: 'last trade' },
+      { label: 'LAST', value: marketPrice(ticker.last) + ' ' + quote, note: 'last trade' + usdtMirror },
       { label: '24H CHANGE', value: marketPercent(ticker.change24hPct), note: 'rolling 24h' },
-      { label: 'BID', value: marketPrice(ticker.bid), note: 'highest bid' },
-      { label: 'ASK', value: marketPrice(ticker.ask), note: 'lowest ask' },
-      { label: '24H HIGH', value: marketPrice(ticker.high), note: 'USDT' },
-      { label: '24H LOW', value: marketPrice(ticker.low), note: 'USDT' }
+      { label: 'BID', value: marketPrice(ticker.bid), note: 'highest bid · ' + quote },
+      { label: 'ASK', value: marketPrice(ticker.ask), note: 'lowest ask · ' + quote },
+      { label: '24H HIGH', value: marketPrice(ticker.high), note: quote },
+      { label: '24H LOW', value: marketPrice(ticker.low), note: quote }
     ]) +
     '<section class="market-value-rail">' +
-      '<span><small>24H VOLUME</small><b>' + number(ticker.baseVolume, 8) + ' YERB</b><em>' + marketMoney(ticker.quoteVolume) + ' USDT</em></span>' +
-      '<span><small>MARKET CAP EST.</small><b>' + marketMoney(market.valuation?.marketCapUsdt) + ' USDT</b><em>Core UTXO supply × last price</em></span>' +
-      '<span class="' + changeClass + '"><small>SPREAD</small><b>' + marketPrice(ticker.spread) + ' USDT</b><em>' + marketPercent(ticker.spreadPct) + '</em></span>' +
-      '<span><small>UPDATED</small><b>' + esc(marketTime(market.asOf)) + '</b><em>NestEx public API</em></span>' +
+      '<span><small>24H VOLUME</small><b>' + number(ticker.baseVolume, 8) + ' YERB</b><em>' + marketMoney(ticker.quoteVolume) + ' ' + quote + '</em></span>' +
+      '<span><small>MARKET CAP EST.</small><b>' + marketMoney(market.valuation?.marketCapUsdt) + ' USDT</b><em>' + esc(valuationNote) + '</em></span>' +
+      '<span class="' + changeClass + '"><small>SPREAD</small><b>' + marketPrice(ticker.spread) + ' ' + quote + '</b><em>' + marketPercent(ticker.spreadPct) + '</em></span>' +
+      '<span><small>UPDATED</small><b>' + esc(marketTime(market.asOf)) + '</b><em>' + esc(exchangeName) + ' public API</em></span>' +
     '</section>' +
     liquidityRail +
     '<section class="market-split">' +
       '<div class="market-pane">' +
         railHeading('ORDER BOOK', 'Buy orders', number(bids.length) + ' levels loaded') +
-        '<div class="orderbook-head"><span>PRICE</span><span>YERB</span><span>USDT</span><span>DEPTH</span></div>' +
+        '<div class="orderbook-head"><span>PRICE</span><span>YERB</span><span>' + quote + '</span><span>DEPTH</span></div>' +
         '<div class="orderbook-list">' + (bidRows || '<div class="ledger-empty">Order book unavailable.</div>') + '</div>' +
       '</div>' +
       '<div class="market-pane">' +
         railHeading('ORDER BOOK', 'Sell orders', number(asks.length) + ' levels loaded') +
-        '<div class="orderbook-head"><span>PRICE</span><span>YERB</span><span>USDT</span><span>DEPTH</span></div>' +
+        '<div class="orderbook-head"><span>PRICE</span><span>YERB</span><span>' + quote + '</span><span>DEPTH</span></div>' +
         '<div class="orderbook-list">' + (askRows || '<div class="ledger-empty">Order book unavailable.</div>') + '</div>' +
       '</div>' +
     '</section>' +
     '<section class="ledger-section">' +
-      railHeading('TRADE STREAM', 'Recent NestEx trades', number(trades.length) + ' loaded') +
-      '<div class="market-trade-head"><span>SIDE</span><span>PRICE</span><span>YERB</span><span>USDT</span><span>TIME</span></div>' +
+      railHeading('TRADE STREAM', 'Recent ' + exchangeName + ' trades', number(trades.length) + ' loaded') +
+      '<div class="market-trade-head"><span>SIDE</span><span>PRICE</span><span>YERB</span><span>' + quote + '</span><span>TIME</span></div>' +
       '<div class="market-trade-list">' + (tradeRows || '<div class="ledger-empty">Trade history unavailable.</div>') + '</div>' +
     '</section>' +
-    '<div class="market-disclaimer">Exchange prices are external market data, not Yerbas consensus data. Market-cap estimate uses the current Yerbas Core UTXO-set total amount multiplied by the NestEx last price.</div>';
+    '<div class="market-disclaimer">Exchange prices are external market data, not Yerbas consensus data. ' +
+      (market.valuation?.basis ? 'Market-cap estimate: ' + esc(market.valuation.basis) + '.' : 'USDT market-cap conversion is unavailable when the quote conversion feed is unavailable.') +
+    '</div>';
 }
 
 async function renderHome() {

@@ -61,6 +61,7 @@ export const config = Object.freeze({
   markets: Object.freeze({
     enabled: boolEnv('MARKETS_ENABLED', true),
     nestexApiBase: process.env.NESTEX_API_BASE || 'https://api.nestex.one',
+    gateviaApiBase: process.env.GATEVIA_API_BASE || 'https://api.gatevia.io',
     cacheMs: intEnv('MARKETS_CACHE_MS', 30000, 5000, 300000),
     timeoutMs: intEnv('MARKETS_TIMEOUT_MS', 10000, 1000, 30000)
   }),
