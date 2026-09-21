@@ -203,7 +203,7 @@ test('IPFS image preview resolves image files inside UnixFS directory listings',
   assert.ok(server.includes('fetchIpfsPreviewResponse'));
   assert.ok(server.includes("upstreamType.includes('text/html')"));
   assert.ok(server.includes("error: 'IPFS content does not contain a supported image preview.'"));
-  assert.ok(server.includes("error: 'IPFS directory image entry is not a supported image preview.'"));
+  assert.ok(server.includes("error: 'IPFS content does not contain a supported image preview.'"));
 });
 
 
