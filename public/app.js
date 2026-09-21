@@ -209,21 +209,35 @@ async function renderMarkets() {
 
   const rows = (data.markets || []).map((market) => {
     const ticker = market.ticker || {};
-    const changeClass = Number(ticker.change24hPct) >= 0 ? 'market-up' : 'market-down';
-    return '<a class="market-matrix-row" href="/markets/' + encodeURIComponent(market.exchange) + '/YERB/USDT">' +
-      '<span class="market-exchange"><b>' + esc(market.exchangeName) + '</b><small>' + esc(market.exchange) + '</small></span>' +
+    const hasLiveData = market.available !== false;
+    const changeClass = ticker.change24hPct === null || ticker.change24hPct === undefined
+      ? ''
+      : (Number(ticker.change24hPct) >= 0 ? 'market-up' : 'market-down');
+    const href = market.exchange === 'nestex'
+      ? '/markets/nestex/YERB/USDT'
+      : market.tradeUrl;
+    const external = market.exchange === 'nestex'
+      ? ''
+      : ' target="_blank" rel="noopener noreferrer"';
+    const quoteLabel = 'VOL ' + esc(market.quote || 'QUOTE');
+    const valuation = market.valuation?.marketCapUsdt === null || market.valuation?.marketCapUsdt === undefined
+      ? (hasLiveData ? '—' : 'EXTERNAL')
+      : marketMoney(market.valuation.marketCapUsdt);
+
+    return '<a class="market-matrix-row' + (hasLiveData ? '' : ' external-market') + '" href="' + esc(href) + '"' + external + '>' +
+      '<span class="market-exchange"><b>' + esc(market.exchangeName) + '</b><small>' + (hasLiveData ? 'LIVE API' : 'TRADE LINK') + '</small></span>' +
       '<strong>' + esc(market.pair) + '</strong>' +
-      '<span><small>LAST</small>' + marketPrice(ticker.last) + '</span>' +
+      '<span><small>LAST ' + esc(market.quote || '') + '</small>' + marketPrice(ticker.last) + '</span>' +
       '<span class="' + changeClass + '"><small>24H</small>' + marketPercent(ticker.change24hPct) + '</span>' +
       '<span><small>VOL YERB</small>' + number(ticker.baseVolume, 2) + '</span>' +
-      '<span><small>VOL USDT</small>' + marketMoney(ticker.quoteVolume) + '</span>' +
-      '<span><small>MARKET CAP</small>' + marketMoney(market.valuation?.marketCapUsdt) + '</span>' +
-      '<span class="ledger-open">↗</span>' +
+      '<span><small>' + quoteLabel + '</small>' + marketMoney(ticker.quoteVolume) + '</span>' +
+      '<span><small>VALUATION</small>' + valuation + '</span>' +
+      '<span class="ledger-open">' + (hasLiveData ? '↗' : 'TRADE ↗') + '</span>' +
     '</a>';
   }).join('');
 
   app.innerHTML =
-    ledgerHeader('MARKET OBSERVATORY', 'Yerbas markets', number((data.markets || []).length) + ' live market feed' + ((data.markets || []).length === 1 ? '' : 's'), '<a href="/">LIVE CHAIN</a>') +
+    ledgerHeader('MARKET OBSERVATORY', 'Yerbas markets', number((data.markets || []).length) + ' listed market' + ((data.markets || []).length === 1 ? '' : 's'), '<a href="/">LIVE CHAIN</a>') +
     '<section class="ledger-section">' +
       railHeading('MARKET MATRIX', 'Live exchange values', 'exchange data · not consensus data') +
       '<div class="market-matrix">' + (rows || '<div class="ledger-empty">No market feeds are currently available.</div>') + '</div>' +
