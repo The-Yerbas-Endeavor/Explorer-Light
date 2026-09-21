@@ -937,6 +937,9 @@ RPC_TIMEOUT_MS=10000
 RECENT_BLOCKS=12
 CACHE_MS=5000
 
+# Same-origin IPFS image previews. Gateways are tried sequentially.
+IPFS_PREVIEW_GATEWAYS=https://ipfs.io,https://ipfs.filebase.io,https://gateway.pinata.cloud
+
 # Live public market data. Exchange calls are server-side and cached.
 MARKETS_ENABLED=true
 NESTEX_API_BASE=https://api.nestex.one

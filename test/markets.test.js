@@ -190,7 +190,8 @@ test('IPFS preview proxy accepts only bounded raster image responses', async () 
   assert.ok(server.includes("return 'image/webp'"));
   assert.ok(server.includes("return 'image/avif'"));
   assert.ok(server.includes("error: 'IPFS content does not contain a supported image preview.'"));
-  assert.ok(server.includes("fetch('https://ipfs.io/ipfs/' + encodeURIComponent(cid)"));
+  assert.ok(server.includes('fetchIpfsPreviewResponse'));
+  assert.ok(server.includes('config.ipfs.previewGateways'));
 });
 
 
@@ -216,4 +217,18 @@ test('IPFS directory preview falls back to the gateway TAR representation', asyn
   assert.ok(server.includes("'?format=tar'"));
   assert.ok(server.includes("accept: 'application/x-tar,application/octet-stream"));
   assert.ok(server.includes("error: 'IPFS content does not contain a supported image preview.'"));
+});
+
+
+test('IPFS preview retries independent public gateways after rate limits or gateway errors', async () => {
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+  const config = await readFile(new URL('../src/config.js', import.meta.url), 'utf8');
+  const env = await readFile(new URL('../.env.example', import.meta.url), 'utf8');
+
+  assert.ok(config.includes('IPFS_PREVIEW_GATEWAYS'));
+  assert.ok(config.includes('https://ipfs.io,https://ipfs.filebase.io,https://gateway.pinata.cloud'));
+  assert.ok(server.includes('for (const gateway of config.ipfs.previewGateways)'));
+  assert.ok(server.includes('All IPFS gateways failed; last HTTP'));
+  assert.ok(server.includes("'x-ipfs-gateway': new URL(gatewayUsed).host"));
+  assert.ok(env.includes('IPFS_PREVIEW_GATEWAYS=https://ipfs.io,https://ipfs.filebase.io,https://gateway.pinata.cloud'));
 });

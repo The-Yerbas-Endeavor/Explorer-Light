@@ -259,6 +259,7 @@ Market-price retrieval remains disabled until a source is explicitly configured.
 | \`RPC_TIMEOUT_MS\` | \`7000\` | RPC timeout |
 | \`RECENT_BLOCKS\` | \`12\` | Blocks shown on home page |
 | \`CACHE_MS\` | \`5000\` | In-memory live-data cache |
+| \`IPFS_PREVIEW_GATEWAYS\` | \`https://ipfs.io,https://ipfs.filebase.io,https://gateway.pinata.cloud\` | Sequential public gateway fallback pool for same-origin IPFS image previews |
 | \`MARKETS_ENABLED\` | \`true\` | Enable external exchange market feeds |
 | \`NESTEX_API_BASE\` | \`https://api.nestex.one\` | NestEx public API base |
 | \`GATEVIA_API_BASE\` | \`https://api.gatevia.io\` | Gatevia public API base |

@@ -138,33 +138,37 @@ const IPFS_DIRECTORY_TAR_MAX_BYTES = 96 * 1024 * 1024;
 const IPFS_IMAGE_EXTENSIONS = /\.(?:png|jpe?g|gif|webp|avif)$/i;
 
 function ipfsDirectoryImagePath(html, cid) {
-  const base = 'https://ipfs.io/ipfs/' + encodeURIComponent(cid) + '/';
   const hrefPattern = /href\s*=\s*["']([^"'#]+)["']/gi;
+  const expectedPrefix = '/ipfs/' + cid + '/';
   let match;
 
   while ((match = hrefPattern.exec(String(html))) !== null) {
-    const rawHref = match[1].replace(/&amp;/g, '&');
-    let url;
+    let rawHref = match[1].replace(/&amp;/g, '&').trim();
+    if (!rawHref) continue;
+
+    let relativePath = null;
 
     try {
-      url = new URL(rawHref, base);
+      const absolute = new URL(rawHref);
+      let pathname = decodeURIComponent(absolute.pathname);
+      if (pathname.startsWith(expectedPrefix)) {
+        relativePath = pathname.slice(expectedPrefix.length);
+      }
     } catch {
-      continue;
+      rawHref = rawHref.split(/[?#]/, 1)[0];
+      try {
+        rawHref = decodeURIComponent(rawHref);
+      } catch {
+        continue;
+      }
+
+      if (rawHref.startsWith(expectedPrefix)) {
+        relativePath = rawHref.slice(expectedPrefix.length);
+      } else if (!rawHref.startsWith('/') && !rawHref.includes('://')) {
+        relativePath = rawHref.replace(/^\.\//, '');
+      }
     }
 
-    if (url.origin !== 'https://ipfs.io') continue;
-
-    const expectedPrefix = '/ipfs/' + cid + '/';
-    let pathname;
-    try {
-      pathname = decodeURIComponent(url.pathname);
-    } catch {
-      continue;
-    }
-
-    if (!pathname.startsWith(expectedPrefix)) continue;
-
-    const relativePath = pathname.slice(expectedPrefix.length);
     if (!relativePath || relativePath.includes('..')) continue;
     if (!IPFS_IMAGE_EXTENSIONS.test(relativePath)) continue;
 
@@ -174,19 +178,62 @@ function ipfsDirectoryImagePath(html, cid) {
   return null;
 }
 
-async function fetchIpfsPreviewResponse(cid, relativePath, signal) {
+function ipfsGatewayUrl(gateway, cid, relativePath = null, format = null) {
   const suffix = relativePath
     ? '/' + relativePath.split('/').map((part) => encodeURIComponent(part)).join('/')
     : '';
+  const url = new URL(
+    String(gateway).replace(/\/+$/, '')
+      + '/ipfs/'
+      + encodeURIComponent(cid)
+      + suffix
+  );
+  if (format) url.searchParams.set('format', format);
+  return url;
+}
 
-  return fetch('https://ipfs.io/ipfs/' + encodeURIComponent(cid) + suffix, {
-    headers: {
-      accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.9,text/html;q=0.2,*/*;q=0.1',
-      'user-agent': 'Yerbas-Explorer-Light/1.0'
-    },
-    redirect: 'follow',
-    signal
-  });
+async function cancelResponseBody(response) {
+  try {
+    await response?.body?.cancel();
+  } catch {
+    // Ignore cleanup failures while trying the next public gateway.
+  }
+}
+
+async function fetchIpfsPreviewResponse(cid, relativePath, signal) {
+  let lastStatus = null;
+  let lastError = null;
+
+  for (const gateway of config.ipfs.previewGateways) {
+    try {
+      const response = await fetch(ipfsGatewayUrl(gateway, cid, relativePath), {
+        headers: {
+          accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.9,text/html;q=0.2,*/*;q=0.1',
+          'user-agent': 'Yerbas-Explorer-Light/1.0'
+        },
+        redirect: 'follow',
+        signal
+      });
+
+      if (response.ok) {
+        return { response, gateway };
+      }
+
+      lastStatus = response.status;
+      await cancelResponseBody(response);
+    } catch (error) {
+      if (error?.name === 'AbortError') throw error;
+      lastError = error;
+    }
+  }
+
+  const error = new Error(
+    lastStatus !== null
+      ? 'All IPFS gateways failed; last HTTP ' + lastStatus + '.'
+      : (lastError?.message || 'All IPFS gateways failed.')
+  );
+  error.status = 502;
+  throw error;
 }
 
 function tarOctal(buffer, start, length) {
@@ -247,24 +294,38 @@ function ipfsTarFirstImage(buffer) {
 }
 
 async function fetchIpfsDirectoryTarImage(cid, signal) {
-  const response = await fetch(
-    'https://ipfs.io/ipfs/' + encodeURIComponent(cid) + '?format=tar',
-    {
-      headers: {
-        accept: 'application/x-tar,application/octet-stream;q=0.9,*/*;q=0.1',
-        'user-agent': 'Yerbas-Explorer-Light/1.0'
-      },
-      redirect: 'follow',
-      signal
-    }
-  );
+  for (const gateway of config.ipfs.previewGateways) {
+    let response;
 
-  if (!response.ok) {
-    return null;
+    try {
+      response = await fetch(ipfsGatewayUrl(gateway, cid, null, 'tar'), {
+        headers: {
+          accept: 'application/x-tar,application/octet-stream;q=0.9,*/*;q=0.1',
+          'user-agent': 'Yerbas-Explorer-Light/1.0'
+        },
+        redirect: 'follow',
+        signal
+      });
+
+      if (!response.ok) {
+        await cancelResponseBody(response);
+        continue;
+      }
+
+      const tar = await readResponseLimited(response, IPFS_DIRECTORY_TAR_MAX_BYTES);
+      const image = ipfsTarFirstImage(tar);
+      if (image) {
+        return {
+          ...image,
+          gateway
+        };
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') throw error;
+    }
   }
 
-  const tar = await readResponseLimited(response, IPFS_DIRECTORY_TAR_MAX_BYTES);
-  return ipfsTarFirstImage(tar);
+  return null;
 }
 
 async function sendIpfsImagePreview(req, res, cid) {
@@ -276,13 +337,9 @@ async function sendIpfsImagePreview(req, res, cid) {
   const timer = setTimeout(() => controller.abort(), IPFS_PREVIEW_TIMEOUT_MS);
 
   try {
-    let response = await fetchIpfsPreviewResponse(cid, null, controller.signal);
-
-    if (!response.ok) {
-      return sendJson(res, 502, {
-        error: 'IPFS gateway returned HTTP ' + response.status + '.'
-      });
-    }
+    let fetchResult = await fetchIpfsPreviewResponse(cid, null, controller.signal);
+    let response = fetchResult.response;
+    let gatewayUsed = fetchResult.gateway;
 
     let data = await readResponseLimited(response, IPFS_PREVIEW_MAX_BYTES);
     let contentType = safeImageContentType(
@@ -298,15 +355,15 @@ async function sendIpfsImagePreview(req, res, cid) {
         const imagePath = ipfsDirectoryImagePath(data.toString('utf8'), cid);
 
         if (imagePath) {
-          response = await fetchIpfsPreviewResponse(cid, imagePath, controller.signal);
-          if (response.ok) {
-            data = await readResponseLimited(response, IPFS_PREVIEW_MAX_BYTES);
-            contentType = safeImageContentType(
-              data,
-              response.headers.get('content-type') || ''
-            );
-            resolved = Boolean(contentType);
-          }
+          fetchResult = await fetchIpfsPreviewResponse(cid, imagePath, controller.signal);
+          response = fetchResult.response;
+          gatewayUsed = fetchResult.gateway;
+          data = await readResponseLimited(response, IPFS_PREVIEW_MAX_BYTES);
+          contentType = safeImageContentType(
+            data,
+            response.headers.get('content-type') || ''
+          );
+          resolved = Boolean(contentType);
         }
       }
 
@@ -315,6 +372,7 @@ async function sendIpfsImagePreview(req, res, cid) {
         if (tarImage) {
           data = tarImage.data;
           contentType = tarImage.contentType;
+          gatewayUsed = tarImage.gateway;
           resolved = true;
         }
       }
@@ -331,7 +389,8 @@ async function sendIpfsImagePreview(req, res, cid) {
       'cache-control': 'public, max-age=86400, immutable',
       'content-length': data.length,
       'content-disposition': 'inline',
-      'cross-origin-resource-policy': 'same-origin'
+      'cross-origin-resource-policy': 'same-origin',
+      'x-ipfs-gateway': new URL(gatewayUsed).host
     }));
 
     if (req.method === 'HEAD') return res.end();

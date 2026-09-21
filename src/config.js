@@ -33,6 +33,14 @@ function boolEnv(name, fallback) {
   return !['0', 'false', 'no', 'off'].includes(String(raw).trim().toLowerCase());
 }
 
+function csvEnv(name, fallback) {
+  const raw = process.env[name] || fallback;
+  return String(raw)
+    .split(',')
+    .map((value) => value.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
+}
+
 function defaultMarketHistoryFile() {
   const stateDir = '/var/lib/yerbas-explorer-light';
   if (fs.existsSync(stateDir)) {
@@ -65,6 +73,12 @@ export const config = Object.freeze({
     geoUrl: process.env.NETWORK_MAP_GEO_URL || 'https://hackmyip.com/api/bulk',
     geoCacheMs: intEnv('NETWORK_MAP_GEO_CACHE_MS', 86400000, 60000, 604800000),
     geoTimeoutMs: intEnv('NETWORK_MAP_GEO_TIMEOUT_MS', 12000, 1000, 60000)
+  }),
+  ipfs: Object.freeze({
+    previewGateways: Object.freeze(csvEnv(
+      'IPFS_PREVIEW_GATEWAYS',
+      'https://ipfs.io,https://ipfs.filebase.io,https://gateway.pinata.cloud'
+    ))
   }),
   markets: Object.freeze({
     enabled: boolEnv('MARKETS_ENABLED', true),
