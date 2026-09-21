@@ -2462,7 +2462,8 @@ async function handleApi(req, res, url) {
 const staticFiles = new Map([
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
-  ['/yerbas-logo.png', ['yerbas-logo.png', 'image/png']]
+  ['/yerbas-logo.png', ['yerbas-logo.png', 'image/png']],
+  ['/robots.txt', ['robots.txt', 'text/plain; charset=utf-8']]
 ]);
 
 async function sendFile(req, res, fileName, contentType, cacheControl = 'public, max-age=300') {

@@ -47,6 +47,21 @@ Changing index settings on an existing node can require a Core reindex.
 
 If Explorer Light runs as the same OS user as \`yerbasd\`, it automatically tries the RPC cookie at \`~/.yerbascore/.cookie\`. Otherwise configure an RPC user/password in \`.env\`.
 
+## Bot and scraper protection
+
+Explorer-Light ships with `scripts/install-nginx-bot-guard.sh` for existing deployments. The guard mirrors the production GeoWeedo approach while accounting for Explorer-Light's heavier IPFS preview endpoint:
+
+- GPTBot: HTTP 403.
+- OAI-SearchBot, Googlebot, Bingbot: permitted and subject to normal client limits.
+- Obvious crawlers/scrapers: 1 request/second per IP, burst 5.
+- All clients: 10 requests/second per IP, burst 40.
+- All clients: maximum 20 concurrent requests per IP.
+- `/api/ipfs-preview/`: 2 requests/second, burst 4, maximum 4 concurrent requests per IP.
+- Repeated nginx rate-limit violations can trigger a one-hour Fail2ban ban after 30 logged violations within 10 minutes.
+- `robots.txt` disallows GPTBot and generic API crawling while allowing the public Explorer pages.
+
+The installer script backs up the active nginx site, validates changes with `nginx -t`, and restores the previous configuration automatically if validation or reload fails.
+
 ## Fresh-server installer
 
 The complete hardened install is one generic command:
@@ -71,6 +86,10 @@ The default installation performs the **entire explorer-node bootstrap and host 
 - Enables UFW with inbound deny-by-default.
 - Opens only SSH, HTTP, HTTPS, and Yerbas mainnet P2P `15420/tcp`; Core RPC `9998` is never opened publicly.
 - Enables Fail2ban SSH protection.
+- Adds an nginx bot guard: GPTBot is denied, obvious scrapers are throttled to 1 req/s per IP with burst 5, normal clients to 10 req/s with burst 40, and each IP is capped at 20 concurrent requests.
+- Applies a tighter IPFS-preview guard of 2 req/s with burst 4 and 4 concurrent preview requests per IP.
+- Keeps OAI-SearchBot, Googlebot, and Bingbot out of the scraper-specific throttle while they remain subject to the normal per-IP limits.
+- Adds a Fail2ban jail for repeated nginx rate-limit violations.
 - Enables unattended security upgrades.
 - Applies conservative kernel/network sysctl hardening.
 - If SSH key migration is verified, disables root SSH login, password login, keyboard-interactive login, and restricts SSH access to the new administrator.
