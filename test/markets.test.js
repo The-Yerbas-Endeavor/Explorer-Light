@@ -57,11 +57,12 @@ test('Gatevia YERB DOGE uses the public API with a safe degraded mode', async ()
   assert.ok(server.includes("pair: 'YERB/DOGE'"));
   assert.ok(server.includes("public/markets/' + tickerId + '/tickers"));
   assert.ok(server.includes("public/markets/DOGE_USDT/tickers"));
-  assert.ok(server.includes("public/markets/' + tickerId + '/order-book?limit=100"));
+  assert.ok(server.includes("public/markets/' + tickerId + '/depth?limit=100"));
   assert.ok(server.includes("public/markets/' + tickerId + '/trades?limit=100&order_by=desc"));
   assert.ok(server.includes("tradeUrl: 'https://gatevia.io/exchange/YERB_DOGE'"));
   assert.ok(server.includes("available ? 'live-api' : 'api-unavailable'"));
   assert.ok(server.includes("reportedSpreadPct"));
+  assert.ok(server.includes("public/markets/' + tickerId + '/depth?limit=5"));
   assert.ok(server.includes("reference: marketReferenceSummary(markets)"));
   assert.ok(server.includes("'/api/market/gatevia/YERB/DOGE'"));
   assert.ok(app.includes("exchangeId === 'gatevia'"));
@@ -92,4 +93,13 @@ test('market detail URLs are served through the Explorer SPA shell', async () =>
 
   assert.ok(server.includes("url.pathname.startsWith('/markets/')"));
   assert.ok(server.includes("'/api/market/gatevia/YERB/DOGE'"));
+});
+
+
+test('Gatevia order books use the Peatio depth endpoint', async () => {
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+
+  assert.ok(server.includes("public/markets/' + tickerId + '/depth?limit=5"));
+  assert.ok(server.includes("public/markets/' + tickerId + '/depth?limit=100"));
+  assert.ok(!server.includes("public/markets/' + tickerId + '/order-book"));
 });
