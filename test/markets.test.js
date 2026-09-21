@@ -20,6 +20,7 @@ test('market browser and API routes are exposed', async () => {
   assert.ok(server.includes("'/api/markets'"));
   assert.ok(server.includes("'/api/market/nestex/YERB/USDT'"));
   assert.ok(server.includes("url.pathname === '/markets'"));
+  assert.ok(server.includes("url.pathname.startsWith('/markets/')"));
   assert.ok(app.includes('async function renderMarkets()'));
   assert.ok(app.includes('async function renderMarketDetail'));
   assert.ok(html.includes('href="/markets"'));
@@ -83,4 +84,12 @@ test('markets page exposes a cross-exchange reference and resilient Gatevia trad
   assert.ok(app.includes('TIME / ID'));
   assert.ok(app.includes("'#' + trade.id"));
   assert.ok(app.includes('Gatevia public API did not return bid levels.'));
+});
+
+
+test('market detail URLs are served through the Explorer SPA shell', async () => {
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+
+  assert.ok(server.includes("url.pathname.startsWith('/markets/')"));
+  assert.ok(server.includes("'/api/market/gatevia/YERB/DOGE'"));
 });
