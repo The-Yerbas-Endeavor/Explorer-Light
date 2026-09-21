@@ -36,15 +36,19 @@ test('market values remain explicitly external to Yerbas consensus', async () =>
 });
 
 
-test('asset pages link and embed IPFS metadata', async () => {
+test('asset pages link and safely preview IPFS image metadata', async () => {
   const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
   const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
 
   assert.ok(app.includes("'https://ipfs.io/ipfs/' + encodeURIComponent(ipfsHash)"));
   assert.ok(app.includes('OPEN IPFS ↗'));
-  assert.ok(app.includes('class="ipfs-frame"'));
+  assert.ok(app.includes('OPEN IN IPFS ↗'));
+  assert.ok(app.includes('class="ipfs-image"'));
+  assert.ok(!app.includes('class="ipfs-frame"'));
+  assert.ok(css.includes('.ipfs-image'));
+  assert.ok(css.includes('object-fit: contain'));
   assert.ok(server.includes("img-src 'self' data: https://ipfs.io"));
-  assert.ok(server.includes('frame-src https://ipfs.io'));
 });
 
 

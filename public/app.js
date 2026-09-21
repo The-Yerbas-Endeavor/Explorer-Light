@@ -932,8 +932,8 @@ async function renderAsset(name) {
           '<div><span>IPFS CONTENT</span><strong>Asset metadata preview</strong></div>' +
           '<a href="' + ipfsUrl + '" target="_blank" rel="noopener noreferrer">OPEN IN IPFS ↗</a>' +
         '</div>' +
-        '<div class="ipfs-frame-shell">' +
-          '<iframe class="ipfs-frame" src="' + ipfsUrl + '" title="' + esc(data.name) + ' IPFS content" loading="lazy" sandbox></iframe>' +
+        '<div class="ipfs-frame-shell ipfs-image-shell">' +
+          '<img class="ipfs-image" src="' + ipfsUrl + '" alt="' + esc(data.name) + ' IPFS asset content" loading="lazy" decoding="async">' +
         '</div>' +
         '<div class="ipfs-display-foot"><code>' + esc(ipfsHash) + '</code><span>PUBLIC IPFS GATEWAY · ipfs.io</span></div>' +
       '</section>'

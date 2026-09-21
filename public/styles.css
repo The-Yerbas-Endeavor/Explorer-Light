@@ -7420,12 +7420,21 @@ body::after {
   border-bottom: 1px solid rgba(141, 241, 158, .28);
 }
 
-.ipfs-frame {
+.ipfs-image-shell {
+  min-height: 360px;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.ipfs-image {
   display: block;
-  width: 100%;
-  min-height: 420px;
+  max-width: 100%;
+  max-height: min(680px, 70vh);
+  width: auto;
+  height: auto;
+  object-fit: contain;
   border: 0;
-  background: #fff;
 }
 
 .ipfs-display-foot {
