@@ -224,9 +224,9 @@ async function renderMarkets() {
     const changeClass = ticker.change24hPct === null || ticker.change24hPct === undefined
       ? ''
       : (Number(ticker.change24hPct) >= 0 ? 'market-up' : 'market-down');
-    const internalDetail = market.exchange === 'nestex';
+    const internalDetail = market.exchange === 'nestex' || market.exchange === 'gatevia';
     const href = internalDetail
-      ? '/markets/nestex/YERB/USDT'
+      ? '/markets/' + encodeURIComponent(market.exchange) + '/YERB/' + encodeURIComponent(market.quote || 'USDT')
       : market.tradeUrl;
     const external = internalDetail
       ? ''
