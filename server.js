@@ -133,6 +133,61 @@ async function readResponseLimited(response, maxBytes) {
   return Buffer.concat(chunks, total);
 }
 
+const IPFS_DIRECTORY_MAX_BYTES = 2 * 1024 * 1024;
+const IPFS_IMAGE_EXTENSIONS = /\.(?:png|jpe?g|gif|webp|avif)$/i;
+
+function ipfsDirectoryImagePath(html, cid) {
+  const base = 'https://ipfs.io/ipfs/' + encodeURIComponent(cid) + '/';
+  const hrefPattern = /href\s*=\s*["']([^"'#]+)["']/gi;
+  let match;
+
+  while ((match = hrefPattern.exec(String(html))) !== null) {
+    const rawHref = match[1].replace(/&amp;/g, '&');
+    let url;
+
+    try {
+      url = new URL(rawHref, base);
+    } catch {
+      continue;
+    }
+
+    if (url.origin !== 'https://ipfs.io') continue;
+
+    const expectedPrefix = '/ipfs/' + cid + '/';
+    let pathname;
+    try {
+      pathname = decodeURIComponent(url.pathname);
+    } catch {
+      continue;
+    }
+
+    if (!pathname.startsWith(expectedPrefix)) continue;
+
+    const relativePath = pathname.slice(expectedPrefix.length);
+    if (!relativePath || relativePath.includes('..')) continue;
+    if (!IPFS_IMAGE_EXTENSIONS.test(relativePath)) continue;
+
+    return relativePath;
+  }
+
+  return null;
+}
+
+async function fetchIpfsPreviewResponse(cid, relativePath, signal) {
+  const suffix = relativePath
+    ? '/' + relativePath.split('/').map((part) => encodeURIComponent(part)).join('/')
+    : '';
+
+  return fetch('https://ipfs.io/ipfs/' + encodeURIComponent(cid) + suffix, {
+    headers: {
+      accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.9,text/html;q=0.2,*/*;q=0.1',
+      'user-agent': 'Yerbas-Explorer-Light/1.0'
+    },
+    redirect: 'follow',
+    signal
+  });
+}
+
 async function sendIpfsImagePreview(req, res, cid) {
   if (!validIpfsCid(cid)) {
     return sendJson(res, 400, { error: 'Invalid IPFS CID.' });
@@ -142,14 +197,7 @@ async function sendIpfsImagePreview(req, res, cid) {
   const timer = setTimeout(() => controller.abort(), IPFS_PREVIEW_TIMEOUT_MS);
 
   try {
-    const response = await fetch('https://ipfs.io/ipfs/' + encodeURIComponent(cid), {
-      headers: {
-        accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.9,*/*;q=0.1',
-        'user-agent': 'Yerbas-Explorer-Light/1.0'
-      },
-      redirect: 'follow',
-      signal: controller.signal
-    });
+    let response = await fetchIpfsPreviewResponse(cid, null, controller.signal);
 
     if (!response.ok) {
       return sendJson(res, 502, {
@@ -157,16 +205,51 @@ async function sendIpfsImagePreview(req, res, cid) {
       });
     }
 
-    const data = await readResponseLimited(response, IPFS_PREVIEW_MAX_BYTES);
-    const contentType = safeImageContentType(
+    let data = await readResponseLimited(response, IPFS_PREVIEW_MAX_BYTES);
+    let contentType = safeImageContentType(
       data,
       response.headers.get('content-type') || ''
     );
 
     if (!contentType) {
-      return sendJson(res, 415, {
-        error: 'IPFS content is not a supported image preview.'
-      });
+      const upstreamType = String(response.headers.get('content-type') || '').toLowerCase();
+      if (!upstreamType.includes('text/html')) {
+        return sendJson(res, 415, {
+          error: 'IPFS content is not a supported image preview.'
+        });
+      }
+
+      if (data.length > IPFS_DIRECTORY_MAX_BYTES) {
+        return sendJson(res, 413, {
+          error: 'IPFS directory listing exceeds the preview size limit.'
+        });
+      }
+
+      const imagePath = ipfsDirectoryImagePath(data.toString('utf8'), cid);
+      if (!imagePath) {
+        return sendJson(res, 415, {
+          error: 'IPFS directory does not contain a supported image preview.'
+        });
+      }
+
+      response = await fetchIpfsPreviewResponse(cid, imagePath, controller.signal);
+      if (!response.ok) {
+        return sendJson(res, 502, {
+          error: 'IPFS image entry returned HTTP ' + response.status + '.'
+        });
+      }
+
+      data = await readResponseLimited(response, IPFS_PREVIEW_MAX_BYTES);
+      contentType = safeImageContentType(
+        data,
+        response.headers.get('content-type') || ''
+      );
+
+      if (!contentType) {
+        return sendJson(res, 415, {
+          error: 'IPFS directory image entry is not a supported image preview.'
+        });
+      }
     }
 
     res.writeHead(200, securityHeaders({

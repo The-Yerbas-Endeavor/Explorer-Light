@@ -192,3 +192,16 @@ test('IPFS preview proxy accepts only bounded raster image responses', async () 
   assert.ok(server.includes("error: 'IPFS content is not a supported image preview.'"));
   assert.ok(server.includes("fetch('https://ipfs.io/ipfs/' + encodeURIComponent(cid)"));
 });
+
+
+test('IPFS image preview resolves image files inside UnixFS directory listings', async () => {
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+
+  assert.ok(server.includes('IPFS_DIRECTORY_MAX_BYTES'));
+  assert.ok(server.includes('IPFS_IMAGE_EXTENSIONS'));
+  assert.ok(server.includes('ipfsDirectoryImagePath'));
+  assert.ok(server.includes('fetchIpfsPreviewResponse'));
+  assert.ok(server.includes("upstreamType.includes('text/html')"));
+  assert.ok(server.includes("error: 'IPFS directory does not contain a supported image preview.'"));
+  assert.ok(server.includes("error: 'IPFS directory image entry is not a supported image preview.'"));
+});
