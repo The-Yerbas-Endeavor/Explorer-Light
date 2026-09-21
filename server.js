@@ -615,7 +615,7 @@ function gateviaUrl(relativePath) {
   const base = config.markets.gateviaApiBase.endsWith('/')
     ? config.markets.gateviaApiBase
     : config.markets.gateviaApiBase + '/';
-  return new URL(String(relativePath).replace(/^\\/+/, ''), base);
+  return new URL(String(relativePath).replace(/^\/+/, ''), base);
 }
 
 async function gateviaMarketFetchJson(relativePath, cacheKey) {
