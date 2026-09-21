@@ -6774,7 +6774,7 @@ body::after {
 .market-matrix-row {
   min-height: 50px;
   display: grid;
-  grid-template-columns: 110px 120px 110px 80px 120px 100px 130px 18px;
+  grid-template-columns: 110px 120px 110px 80px 120px 100px 130px 72px;
   gap: 10px;
   align-items: center;
   padding: 0 4px;
@@ -7015,7 +7015,7 @@ body::after {
 
 @media (max-width: 1100px) {
   .market-matrix-row {
-    grid-template-columns: 90px 100px 100px 72px 100px 90px 18px;
+    grid-template-columns: 90px 100px 100px 72px 100px 90px 66px;
   }
 
   .market-matrix-row > span:nth-of-type(5) {
@@ -7048,7 +7048,7 @@ body::after {
 
 @media (max-width: 700px) {
   .market-matrix-row {
-    grid-template-columns: 74px 88px minmax(84px, 1fr) 64px 18px;
+    grid-template-columns: 74px 88px minmax(84px, 1fr) 64px 62px;
   }
 
   .market-matrix-row > span:nth-of-type(3),
@@ -7640,4 +7640,21 @@ body::after {
   .block-output-row {
     grid-template-columns: 42px minmax(92px, auto) minmax(0, 1fr);
   }
+}
+
+
+.market-matrix-row.external-market {
+  background:
+    linear-gradient(90deg, rgba(130, 244, 255, .012), rgba(141, 241, 158, .008), transparent 76%);
+}
+
+.market-matrix-row.external-market .market-exchange small {
+  color: var(--holo-cyan);
+}
+
+.market-matrix-row.external-market .ledger-open {
+  white-space: nowrap;
+  color: var(--holo-cyan);
+  font-size: 8px;
+  letter-spacing: .06em;
 }
