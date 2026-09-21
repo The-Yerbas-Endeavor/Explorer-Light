@@ -1230,6 +1230,43 @@ function marketHistoryWindow(now = Math.floor(Date.now() / 1000)) {
   };
 }
 
+function marketSparkPoints(normalized, currentPrice, window, maxPoints = 72) {
+  const points = (Array.isArray(normalized) ? normalized : [])
+    .filter((entry) => entry.timestamp >= window.start && entry.timestamp <= window.now)
+    .map((entry) => ({
+      timestamp: entry.timestamp,
+      price: entry.price,
+      observed: true
+    }));
+
+  const livePrice = marketNumber(currentPrice);
+  if (livePrice !== null && livePrice > 0) {
+    const last = points[points.length - 1];
+    if (!last || last.timestamp !== window.now || last.price !== livePrice) {
+      points.push({
+        timestamp: window.now,
+        price: livePrice,
+        observed: true
+      });
+    }
+  }
+
+  if (points.length <= maxPoints) return points;
+
+  const sampled = [];
+  const lastIndex = points.length - 1;
+  for (let i = 0; i < maxPoints; i += 1) {
+    const index = Math.round((i / (maxPoints - 1)) * lastIndex);
+    const point = points[index];
+    if (!sampled.length
+        || sampled[sampled.length - 1].timestamp !== point.timestamp
+        || sampled[sampled.length - 1].price !== point.price) {
+      sampled.push(point);
+    }
+  }
+  return sampled;
+}
+
 function marketHistory7d(entries, currentPrice, quote, source) {
   const window = marketHistoryWindow();
   const normalized = (Array.isArray(entries) ? entries : [])
@@ -1278,6 +1315,7 @@ function marketHistory7d(entries, currentPrice, quote, source) {
     points[points.length - 1].observed = true;
   }
 
+  const sparkPoints = marketSparkPoints(normalized, currentPrice, window);
   const pricedDays = points.filter((point) => point.price !== null).length;
   const observedDays = points.filter((point) => point.observed).length;
   const first = points[0]?.price ?? null;
@@ -1294,7 +1332,11 @@ function marketHistory7d(entries, currentPrice, quote, source) {
     changePct,
     pricedDays,
     observedDays,
+    sparkObservations: sparkPoints.length,
     completeWindow,
+    windowStart: window.start,
+    windowEnd: window.now,
+    sparkPoints,
     points
   };
 }

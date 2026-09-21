@@ -82,10 +82,19 @@ function marketTime(value) {
 }
 
 function marketSparkline(history, fallbackQuote = '') {
-  const rawPoints = Array.isArray(history?.points) ? history.points : [];
+  const sparkPoints = Array.isArray(history?.sparkPoints) ? history.sparkPoints : [];
+  const dailyPoints = Array.isArray(history?.points) ? history.points : [];
+  const rawPoints = sparkPoints.length >= 2 ? sparkPoints : dailyPoints;
+  const windowStart = Number(history?.windowStart);
+  const windowEnd = Number(history?.windowEnd);
+  const useTimeScale = Number.isFinite(windowStart)
+    && Number.isFinite(windowEnd)
+    && windowEnd > windowStart;
+
   const plotted = rawPoints
     .map((point, index) => ({
       index,
+      timestamp: Number(point?.timestamp),
       price: Number(point?.price),
       observed: point?.observed === true
     }))
@@ -98,6 +107,7 @@ function marketSparkline(history, fallbackQuote = '') {
     && Number.isFinite(change);
   const pricedDays = Number(history?.pricedDays || 0);
   const observedDays = Number(history?.observedDays || 0);
+  const sparkObservations = Number(history?.sparkObservations || plotted.length || 0);
   const totalDays = Number(history?.days || 7);
   const completeWindow = history?.completeWindow === true;
   const changeClass = hasChange
@@ -107,8 +117,8 @@ function marketSparkline(history, fallbackQuote = '') {
   if (plotted.length < 2) {
     return '<span class="market-sparkline market-sparkline-empty">' +
       '<small>7D · ' + esc(quote) + '</small>' +
-      '<span class="sparkline-placeholder">NO HISTORY</span>' +
-      '<em>' + esc(pricedDays + '/' + totalDays + ' DAYS · ' + observedDays + ' OBS') + '</em>' +
+      '<span class="sparkline-placeholder">BUILDING HISTORY</span>' +
+      '<em>' + esc(pricedDays + '/' + totalDays + 'D · ' + sparkObservations + ' OBS') + '</em>' +
     '</span>';
   }
 
@@ -121,7 +131,10 @@ function marketSparkline(history, fallbackQuote = '') {
   const span = max - min;
   const denominator = Math.max(1, rawPoints.length - 1);
   const coords = plotted.map((point) => {
-    const x = pad + ((point.index / denominator) * (width - (pad * 2)));
+    const timeRatio = useTimeScale && Number.isFinite(point.timestamp)
+      ? Math.max(0, Math.min(1, (point.timestamp - windowStart) / (windowEnd - windowStart)))
+      : (point.index / denominator);
+    const x = pad + (timeRatio * (width - (pad * 2)));
     const y = span === 0
       ? height / 2
       : pad + (((max - point.price) / span) * (height - (pad * 2)));
@@ -152,8 +165,8 @@ function marketSparkline(history, fallbackQuote = '') {
   const coverageLabel = (
     hasChange
       ? marketPercent(change)
-      : (completeWindow ? '—' : pricedDays + '/' + totalDays + ' DAYS')
-  ) + ' · ' + observedDays + ' OBS';
+      : (completeWindow ? '—' : pricedDays + '/' + totalDays + 'D')
+  ) + ' · ' + sparkObservations + ' OBS';
 
   return '<span class="market-sparkline ' + changeClass + '">' +
     '<small>7D · ' + esc(quote) + '</small>' +
@@ -337,13 +350,15 @@ async function renderMarkets() {
   }).join('');
 
   app.innerHTML =
-    ledgerHeader('MARKET OBSERVATORY', 'Yerbas markets', number((data.markets || []).length) + ' listed market' + ((data.markets || []).length === 1 ? '' : 's'), '<a href="/">LIVE CHAIN</a>') +
-    referenceRail +
-    '<section class="ledger-section">' +
-      railHeading('MARKET MATRIX', 'Live exchange values', 'exchange data · not consensus data') +
-      '<div class="market-matrix">' + (rows || '<div class="ledger-empty">No market feeds are currently available.</div>') + '</div>' +
-    '</section>' +
-    '<div class="market-disclaimer">Market data is informational and sourced from external exchanges. Blockchain state continues to come directly from Yerbas Core.</div>';
+    '<div class="market-page">' +
+      ledgerHeader('MARKET OBSERVATORY', 'Yerbas markets', number((data.markets || []).length) + ' listed market' + ((data.markets || []).length === 1 ? '' : 's'), '<a href="/">LIVE CHAIN</a>') +
+      referenceRail +
+      '<section class="ledger-section">' +
+        railHeading('MARKET MATRIX', 'Live exchange values', 'exchange data · not consensus data') +
+        '<div class="market-matrix">' + (rows || '<div class="ledger-empty">No market feeds are currently available.</div>') + '</div>' +
+      '</section>' +
+      '<div class="market-disclaimer">Market data is informational and sourced from external exchanges. Blockchain state continues to come directly from Yerbas Core.</div>' +
+    '</div>';
 }
 
 async function renderMarketDetail(exchange = 'nestex') {

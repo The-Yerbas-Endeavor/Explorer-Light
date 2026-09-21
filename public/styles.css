@@ -6765,6 +6765,40 @@ body::after {
    Explorer 3.7 — Market observatory
    ========================================================================== */
 
+.market-page .telemetry-cell {
+  min-height: 76px;
+  padding: 12px 14px;
+}
+
+.market-page .telemetry-cell > span,
+.market-page .telemetry-cell > small {
+  font-size: 9px;
+  letter-spacing: .10em;
+}
+
+.market-page .telemetry-cell > strong {
+  font-size: clamp(17px, 1.35vw, 21px);
+}
+
+.market-page .rail-heading span,
+.market-page .rail-heading small,
+.market-page .market-disclaimer {
+  font-size: 10px;
+}
+
+.market-page .rail-heading h3 {
+  font-size: 22px;
+}
+
+.market-page .market-matrix-row {
+  min-height: 56px;
+}
+
+.market-page .ledger-identity {
+  font-size: 11px;
+}
+
+
 .market-matrix,
 .market-trade-list,
 .orderbook-list {
@@ -6794,13 +6828,13 @@ body::after {
 }
 
 .market-exchange b {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .market-exchange small,
 .market-matrix-row small {
   font-family: var(--mono);
-  font-size: 7px;
+  font-size: 9px;
   letter-spacing: .08em;
   color: var(--muted);
 }
@@ -6809,7 +6843,7 @@ body::after {
   display: grid;
   gap: 2px;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .market-sparkline {
@@ -6819,7 +6853,7 @@ body::after {
   gap: 7px;
   align-items: center;
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: 10px;
   color: var(--holo-cyan);
 }
 
@@ -6873,7 +6907,7 @@ body::after {
 }
 
 .sparkline-placeholder {
-  font-size: 7px;
+  font-size: 9px;
   letter-spacing: .08em;
   color: var(--muted);
   text-align: center;
@@ -6881,7 +6915,7 @@ body::after {
 }
 
 .market-matrix-row > strong {
-  font-size: 14px;
+  font-size: 16px;
   letter-spacing: -.02em;
 }
 

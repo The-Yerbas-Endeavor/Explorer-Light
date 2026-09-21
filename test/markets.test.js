@@ -130,6 +130,9 @@ test('market matrix exposes cached seven-day price sparklines', async () => {
   assert.ok(server.includes("'NestEx public tradebook'"));
   assert.ok(server.includes("'Gatevia daily k-line'"));
   assert.ok(server.includes('history7d: marketHistory7d('));
+  assert.ok(server.includes('marketSparkPoints'));
+  assert.ok(server.includes('sparkPoints'));
+  assert.ok(server.includes('sparkObservations'));
   assert.ok(app.includes('function marketSparkline('));
   assert.ok(app.includes('marketSparkline(market.history7d, market.quote)'));
   assert.ok(app.includes('7D · '));
@@ -231,4 +234,31 @@ test('IPFS preview retries independent public gateways after rate limits or gate
   assert.ok(server.includes('All IPFS gateways failed; last HTTP'));
   assert.ok(server.includes("'x-ipfs-gateway': new URL(gatewayUsed).host"));
   assert.ok(env.includes('IPFS_PREVIEW_GATEWAYS=https://ipfs.io,https://ipfs.filebase.io,https://gateway.pinata.cloud'));
+});
+
+
+test('market sparklines use real intraday observations while seven-day coverage builds', async () => {
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+
+  assert.ok(server.includes('function marketSparkPoints('));
+  assert.ok(server.includes('maxPoints = 72'));
+  assert.ok(server.includes('windowStart: window.start'));
+  assert.ok(server.includes('windowEnd: window.now'));
+  assert.ok(app.includes('sparkPoints.length >= 2 ? sparkPoints : dailyPoints'));
+  assert.ok(app.includes('(point.timestamp - windowStart) / (windowEnd - windowStart)'));
+  assert.ok(app.includes('BUILDING HISTORY'));
+});
+
+test('market overview uses larger readable typography without returning to oversized rows', async () => {
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
+
+  assert.ok(app.includes('<div class="market-page">'));
+  assert.ok(css.includes('.market-page .telemetry-cell > span'));
+  assert.ok(css.includes('font-size: 9px'));
+  assert.ok(css.includes('.market-page .market-matrix-row'));
+  assert.ok(css.includes('min-height: 56px'));
+  assert.ok(css.includes('.market-matrix-row > strong'));
+  assert.ok(css.includes('font-size: 16px'));
 });
