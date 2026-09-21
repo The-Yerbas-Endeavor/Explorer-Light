@@ -92,7 +92,12 @@ function marketSparkline(history, fallbackQuote = '') {
 
   const quote = history?.quote || fallbackQuote || '';
   const change = Number(history?.changePct);
-  const hasChange = Number.isFinite(change);
+  const hasChange = history?.changePct !== null
+    && history?.changePct !== undefined
+    && Number.isFinite(change);
+  const pricedDays = Number(history?.pricedDays || 0);
+  const totalDays = Number(history?.days || 7);
+  const completeWindow = history?.completeWindow === true;
   const changeClass = hasChange
     ? (change > 0 ? 'market-up' : (change < 0 ? 'market-down' : ''))
     : '';
@@ -101,7 +106,7 @@ function marketSparkline(history, fallbackQuote = '') {
     return '<span class="market-sparkline market-sparkline-empty">' +
       '<small>7D · ' + esc(quote) + '</small>' +
       '<span class="sparkline-placeholder">NO HISTORY</span>' +
-      '<em>—</em>' +
+      '<em>' + esc(pricedDays + '/' + totalDays + ' DAYS') + '</em>' +
     '</span>';
   }
 
@@ -131,7 +136,11 @@ function marketSparkline(history, fallbackQuote = '') {
       '<line class="sparkline-guide" x1="0" y1="' + (height / 2) + '" x2="' + width + '" y2="' + (height / 2) + '"></line>' +
       '<polyline class="sparkline-line" points="' + coords + '"></polyline>' +
     '</svg>' +
-    '<em>' + (hasChange ? marketPercent(change) : '—') + '</em>' +
+    '<em>' + (
+      hasChange
+        ? marketPercent(change)
+        : (completeWindow ? '—' : esc(pricedDays + '/' + totalDays + ' DAYS'))
+    ) + '</em>' +
   '</span>';
 }
 
