@@ -709,13 +709,206 @@ function normalizeTrades(payload) {
   });
 }
 
+const MARKET_HISTORY_DAYS = 7;
+const MARKET_HISTORY_DAY_SECONDS = 24 * 60 * 60;
+const MARKET_HISTORY_CACHE_MS = 5 * 60 * 1000;
+
+function marketEpochSeconds(value) {
+  const timestamp = marketTimestamp(value);
+  if (timestamp === null) return null;
+  return Math.floor(timestamp > 100000000000 ? timestamp / 1000 : timestamp);
+}
+
+function marketDayStart(timestamp) {
+  const date = new Date(Number(timestamp) * 1000);
+  return Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate()
+  ) / 1000;
+}
+
+function marketHistoryWindow(now = Math.floor(Date.now() / 1000)) {
+  const today = marketDayStart(now);
+  const start = today - ((MARKET_HISTORY_DAYS - 1) * MARKET_HISTORY_DAY_SECONDS);
+  return {
+    now,
+    today,
+    start,
+    fetchFrom: start - MARKET_HISTORY_DAY_SECONDS
+  };
+}
+
+function marketHistory7d(entries, currentPrice, quote, source) {
+  const window = marketHistoryWindow();
+  const normalized = (Array.isArray(entries) ? entries : [])
+    .map((entry) => ({
+      timestamp: marketEpochSeconds(entry?.timestamp),
+      price: marketNumber(entry?.price)
+    }))
+    .filter((entry) =>
+      entry.timestamp !== null
+      && entry.price !== null
+      && entry.price > 0
+      && entry.timestamp <= window.now
+    )
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  const points = [];
+  let index = 0;
+  let carry = null;
+
+  while (index < normalized.length && normalized[index].timestamp < window.start) {
+    carry = normalized[index].price;
+    index += 1;
+  }
+
+  for (let day = 0; day < MARKET_HISTORY_DAYS; day += 1) {
+    const timestamp = window.start + (day * MARKET_HISTORY_DAY_SECONDS);
+    const end = timestamp + MARKET_HISTORY_DAY_SECONDS;
+
+    while (index < normalized.length && normalized[index].timestamp < end) {
+      carry = normalized[index].price;
+      index += 1;
+    }
+
+    points.push({
+      timestamp,
+      price: carry
+    });
+  }
+
+  const livePrice = marketNumber(currentPrice);
+  if (livePrice !== null && livePrice > 0 && points.length) {
+    points[points.length - 1].price = livePrice;
+  }
+
+  const usable = points.filter((point) => point.price !== null);
+  const first = usable[0]?.price ?? null;
+  const last = usable[usable.length - 1]?.price ?? null;
+  const changePct = first && last !== null
+    ? ((last - first) / first) * 100
+    : null;
+
+  return {
+    days: MARKET_HISTORY_DAYS,
+    quote,
+    source,
+    changePct,
+    points
+  };
+}
+
+async function nestexMarketHistoryEntries7d() {
+  return cached(
+    'market:nestex:history7d:YERB_USDT',
+    Math.max(config.markets.cacheMs, MARKET_HISTORY_CACHE_MS),
+    async () => {
+      const window = marketHistoryWindow();
+      const entries = [];
+      const seen = new Set();
+      let previousSignature = null;
+
+      for (let page = 1; page <= 6; page += 1) {
+        const payload = await marketFetchJson(
+          'cg/tradebook/YERB_USDT?page=' + page,
+          'tradebook:YERB_USDT:history:' + page
+        );
+        const trades = normalizeTrades(payload)
+          .map((trade) => ({
+            id: trade.id,
+            timestamp: marketEpochSeconds(trade.timestamp),
+            price: marketNumber(trade.price)
+          }))
+          .filter((trade) =>
+            trade.timestamp !== null
+            && trade.price !== null
+            && trade.price > 0
+          );
+
+        if (!trades.length) break;
+
+        const signature = [
+          trades.length,
+          trades[0]?.id ?? '',
+          trades[0]?.timestamp ?? '',
+          trades[trades.length - 1]?.id ?? '',
+          trades[trades.length - 1]?.timestamp ?? ''
+        ].join(':');
+
+        if (previousSignature && signature === previousSignature) break;
+        previousSignature = signature;
+
+        for (const trade of trades) {
+          const key = [
+            trade.id ?? '',
+            trade.timestamp,
+            trade.price
+          ].join(':');
+          if (seen.has(key)) continue;
+          seen.add(key);
+          entries.push({
+            timestamp: trade.timestamp,
+            price: trade.price
+          });
+        }
+
+        const oldest = Math.min(...trades.map((trade) => trade.timestamp));
+        if (oldest <= window.fetchFrom) break;
+
+        const currentPage = marketNumber(payload?.page);
+        const totalPages = marketNumber(
+          payload?.total_pages
+          ?? payload?.totalPages
+          ?? payload?.pages
+        );
+        if (currentPage !== null && totalPages !== null && currentPage >= totalPages) break;
+      }
+
+      return entries;
+    }
+  );
+}
+
+async function gateviaMarketHistoryEntries7d() {
+  return cached(
+    'market:gatevia:history7d:YERB_DOGE',
+    Math.max(config.markets.cacheMs, MARKET_HISTORY_CACHE_MS),
+    async () => {
+      const window = marketHistoryWindow();
+      const payload = await gateviaMarketFetchJson(
+        'public/markets/YERB_DOGE/k-line?period=1440&time_from='
+          + window.fetchFrom
+          + '&time_to='
+          + window.now,
+        'k-line:YERB_DOGE:1440:' + window.start
+      );
+      const rows = Array.isArray(payload)
+        ? payload
+        : (Array.isArray(payload?.data) ? payload.data : []);
+
+      return rows
+        .map((row) => ({
+          timestamp: marketEpochSeconds(Array.isArray(row) ? row[0] : row?.timestamp),
+          price: marketNumber(Array.isArray(row) ? row[4] : (row?.close ?? row?.last))
+        }))
+        .filter((entry) =>
+          entry.timestamp !== null
+          && entry.price !== null
+          && entry.price > 0
+        );
+    }
+  );
+}
+
 async function gateviaMarketSummary() {
   const tickerId = 'YERB_DOGE';
-  const [tickerResult, dogeUsdtResult, supply, orderbookResult] = await Promise.all([
+  const [tickerResult, dogeUsdtResult, supply, orderbookResult, historyEntries] = await Promise.all([
     gateviaMarketFetchJson('public/markets/' + tickerId + '/tickers', 'ticker:' + tickerId).catch(() => null),
     gateviaMarketFetchJson('public/markets/DOGE_USDT/tickers', 'ticker:DOGE_USDT').catch(() => null),
     supplyData(),
-    gateviaMarketFetchJson('public/markets/' + tickerId + '/depth?limit=5', 'depth:' + tickerId + ':5').catch(() => null)
+    gateviaMarketFetchJson('public/markets/' + tickerId + '/depth?limit=5', 'depth:' + tickerId + ':5').catch(() => null),
+    gateviaMarketHistoryEntries7d().catch(() => [])
   ]);
 
   const ticker = tickerResult?.ticker && typeof tickerResult.ticker === 'object'
@@ -777,6 +970,12 @@ async function gateviaMarketSummary() {
         ? 'Yerbas Core UTXO-set total amount × Gatevia YERB/DOGE × Gatevia DOGE/USDT'
         : null
     },
+    history7d: marketHistory7d(
+      historyEntries,
+      last,
+      'DOGE',
+      'Gatevia daily k-line'
+    ),
     liquidity: null
   };
 }
@@ -835,10 +1034,11 @@ function marketReferenceSummary(markets) {
 
 async function nestexMarketSummary() {
   const tickerId = 'YERB_USDT';
-  const [ticker, supply, liquidityResult] = await Promise.all([
+  const [ticker, supply, liquidityResult, historyEntries] = await Promise.all([
     marketFetchJson('cg/tickers/' + tickerId, 'ticker:' + tickerId),
     supplyData(),
-    marketFetchJson('v1/liquidity/YERB', 'liquidity:YERB').catch(() => null)
+    marketFetchJson('v1/liquidity/YERB', 'liquidity:YERB').catch(() => null),
+    nestexMarketHistoryEntries7d().catch(() => [])
   ]);
 
   const last = marketNumber(ticker?.last_price);
@@ -885,6 +1085,12 @@ async function nestexMarketSummary() {
       marketCapUsdt: supplyYerb !== null && last !== null ? supplyYerb * last : null,
       basis: 'Yerbas Core UTXO-set total amount × NestEx last price'
     },
+    history7d: marketHistory7d(
+      historyEntries,
+      last,
+      'USDT',
+      'NestEx public tradebook'
+    ),
     liquidity: liquidity ? {
       score: marketNumber(liquidity.score),
       totalUsdt: marketNumber(liquidity.total),

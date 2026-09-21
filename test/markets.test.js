@@ -103,3 +103,22 @@ test('Gatevia order books use the Peatio depth endpoint', async () => {
   assert.ok(server.includes("public/markets/' + tickerId + '/depth?limit=100"));
   assert.ok(!server.includes("public/markets/' + tickerId + '/order-book"));
 });
+
+
+test('market matrix exposes cached seven-day price sparklines', async () => {
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
+
+  assert.ok(server.includes('MARKET_HISTORY_DAYS = 7'));
+  assert.ok(server.includes("'cg/tradebook/YERB_USDT?page=' + page"));
+  assert.ok(server.includes("public/markets/YERB_DOGE/k-line?period=1440&time_from="));
+  assert.ok(server.includes("'NestEx public tradebook'"));
+  assert.ok(server.includes("'Gatevia daily k-line'"));
+  assert.ok(server.includes('history7d: marketHistory7d('));
+  assert.ok(app.includes('function marketSparkline('));
+  assert.ok(app.includes('marketSparkline(market.history7d, market.quote)'));
+  assert.ok(app.includes('7D · '));
+  assert.ok(css.includes('.market-sparkline'));
+  assert.ok(css.includes('.sparkline-line'));
+});

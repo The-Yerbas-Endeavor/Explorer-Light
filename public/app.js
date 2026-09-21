@@ -81,6 +81,60 @@ function marketTime(value) {
   return new Date(epochMs).toLocaleString();
 }
 
+function marketSparkline(history, fallbackQuote = '') {
+  const rawPoints = Array.isArray(history?.points) ? history.points : [];
+  const plotted = rawPoints
+    .map((point, index) => ({
+      index,
+      price: Number(point?.price)
+    }))
+    .filter((point) => Number.isFinite(point.price) && point.price > 0);
+
+  const quote = history?.quote || fallbackQuote || '';
+  const change = Number(history?.changePct);
+  const hasChange = Number.isFinite(change);
+  const changeClass = hasChange
+    ? (change > 0 ? 'market-up' : (change < 0 ? 'market-down' : ''))
+    : '';
+
+  if (plotted.length < 2) {
+    return '<span class="market-sparkline market-sparkline-empty">' +
+      '<small>7D · ' + esc(quote) + '</small>' +
+      '<span class="sparkline-placeholder">NO HISTORY</span>' +
+      '<em>—</em>' +
+    '</span>';
+  }
+
+  const width = 180;
+  const height = 32;
+  const pad = 2;
+  const prices = plotted.map((point) => point.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const span = max - min;
+  const denominator = Math.max(1, rawPoints.length - 1);
+  const coords = plotted.map((point) => {
+    const x = pad + ((point.index / denominator) * (width - (pad * 2)));
+    const y = span === 0
+      ? height / 2
+      : pad + (((max - point.price) / span) * (height - (pad * 2)));
+    return x.toFixed(2) + ',' + y.toFixed(2);
+  }).join(' ');
+
+  const rangeTitle = '7-day ' + quote + ' range: '
+    + marketPrice(min) + ' to ' + marketPrice(max);
+
+  return '<span class="market-sparkline ' + changeClass + '">' +
+    '<small>7D · ' + esc(quote) + '</small>' +
+    '<svg viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none" role="img" aria-label="' + esc(rangeTitle) + '">' +
+      '<title>' + esc(rangeTitle) + '</title>' +
+      '<line class="sparkline-guide" x1="0" y1="' + (height / 2) + '" x2="' + width + '" y2="' + (height / 2) + '"></line>' +
+      '<polyline class="sparkline-line" points="' + coords + '"></polyline>' +
+    '</svg>' +
+    '<em>' + (hasChange ? marketPercent(change) : '—') + '</em>' +
+  '</span>';
+}
+
 function bytes(value) {
   if (!Number.isFinite(Number(value))) return '—';
   const n = Number(value);
@@ -244,6 +298,7 @@ async function renderMarkets() {
       '<span><small>VOL YERB</small>' + number(ticker.baseVolume, 2) + '</span>' +
       '<span><small>' + quoteLabel + '</small>' + marketMoney(ticker.quoteVolume) + '</span>' +
       '<span><small>VALUATION</small>' + valuation + '</span>' +
+      marketSparkline(market.history7d, market.quote) +
       '<span class="ledger-open">' + (hasLiveData ? '↗' : 'TRADE ↗') + '</span>' +
     '</a>';
   }).join('');

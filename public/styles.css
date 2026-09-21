@@ -6774,7 +6774,7 @@ body::after {
 .market-matrix-row {
   min-height: 50px;
   display: grid;
-  grid-template-columns: 110px 120px 110px 80px 120px 100px 130px 72px;
+  grid-template-columns: 110px 120px 110px 80px 120px 100px 130px minmax(180px, 1fr) 34px;
   gap: 10px;
   align-items: center;
   padding: 0 4px;
@@ -6805,11 +6805,65 @@ body::after {
   color: var(--muted);
 }
 
-.market-matrix-row > span:not(.market-exchange):not(.ledger-open) {
+.market-matrix-row > span:not(.market-exchange):not(.market-sparkline):not(.ledger-open) {
   display: grid;
   gap: 2px;
   font-family: var(--mono);
   font-size: 10px;
+}
+
+.market-sparkline {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 38px minmax(90px, 1fr) 52px;
+  gap: 7px;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--holo-cyan);
+}
+
+.market-sparkline small {
+  white-space: nowrap;
+}
+
+.market-sparkline svg {
+  width: 100%;
+  height: 30px;
+  display: block;
+  overflow: visible;
+}
+
+.market-sparkline .sparkline-guide {
+  stroke: rgba(130, 244, 255, .10);
+  stroke-width: .7;
+  vector-effect: non-scaling-stroke;
+}
+
+.market-sparkline .sparkline-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.market-sparkline em {
+  min-width: 44px;
+  font-style: normal;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.market-sparkline-empty {
+  color: var(--muted);
+}
+
+.sparkline-placeholder {
+  font-size: 7px;
+  letter-spacing: .08em;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
 }
 
 .market-matrix-row > strong {
@@ -7015,7 +7069,12 @@ body::after {
 
 @media (max-width: 1100px) {
   .market-matrix-row {
-    grid-template-columns: 90px 100px 100px 72px 100px 90px 66px;
+    grid-template-columns: 90px 100px 100px 72px 100px 90px minmax(120px, 1fr) 34px;
+  }
+
+  .market-sparkline {
+    grid-template-columns: 30px minmax(70px, 1fr) 46px;
+    gap: 5px;
   }
 
   .market-matrix-row > span:nth-of-type(5) {
@@ -7053,7 +7112,8 @@ body::after {
 
   .market-matrix-row > span:nth-of-type(3),
   .market-matrix-row > span:nth-of-type(4),
-  .market-matrix-row > span:nth-of-type(5) {
+  .market-matrix-row > span:nth-of-type(5),
+  .market-matrix-row > span:nth-of-type(7) {
     display: none;
   }
 
