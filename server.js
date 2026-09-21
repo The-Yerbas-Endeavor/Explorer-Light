@@ -766,27 +766,33 @@ function marketHistory7d(entries, currentPrice, quote, source) {
   for (let day = 0; day < MARKET_HISTORY_DAYS; day += 1) {
     const timestamp = window.start + (day * MARKET_HISTORY_DAY_SECONDS);
     const end = timestamp + MARKET_HISTORY_DAY_SECONDS;
+    let observed = false;
 
     while (index < normalized.length && normalized[index].timestamp < end) {
       carry = normalized[index].price;
+      observed = true;
       index += 1;
     }
 
     points.push({
       timestamp,
-      price: carry
+      price: carry,
+      observed
     });
   }
 
   const livePrice = marketNumber(currentPrice);
   if (livePrice !== null && livePrice > 0 && points.length) {
     points[points.length - 1].price = livePrice;
+    points[points.length - 1].observed = true;
   }
 
-  const usable = points.filter((point) => point.price !== null);
-  const first = usable[0]?.price ?? null;
-  const last = usable[usable.length - 1]?.price ?? null;
-  const changePct = first && last !== null
+  const pricedDays = points.filter((point) => point.price !== null).length;
+  const observedDays = points.filter((point) => point.observed).length;
+  const first = points[0]?.price ?? null;
+  const last = points[points.length - 1]?.price ?? null;
+  const completeWindow = first !== null;
+  const changePct = completeWindow && first && last !== null
     ? ((last - first) / first) * 100
     : null;
 
@@ -795,6 +801,9 @@ function marketHistory7d(entries, currentPrice, quote, source) {
     quote,
     source,
     changePct,
+    pricedDays,
+    observedDays,
+    completeWindow,
     points
   };
 }
