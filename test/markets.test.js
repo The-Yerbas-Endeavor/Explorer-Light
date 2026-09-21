@@ -122,3 +122,15 @@ test('market matrix exposes cached seven-day price sparklines', async () => {
   assert.ok(css.includes('.market-sparkline'));
   assert.ok(css.includes('.sparkline-line'));
 });
+
+
+test('seven-day market history reports coverage before showing a weekly change', async () => {
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+
+  assert.ok(server.includes('pricedDays'));
+  assert.ok(server.includes('observedDays'));
+  assert.ok(server.includes('completeWindow'));
+  assert.ok(server.includes('const changePct = completeWindow'));
+  assert.ok(app.includes("pricedDays + '/' + totalDays + ' DAYS'"));
+});
