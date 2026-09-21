@@ -42,3 +42,17 @@ test('asset pages link and embed IPFS metadata', async () => {
   assert.ok(server.includes("img-src 'self' data: https://ipfs.io"));
   assert.ok(server.includes('frame-src https://ipfs.io'));
 });
+
+
+test('Gatevia YERB DOGE is listed without inventing unverified market data', async () => {
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+
+  assert.ok(server.includes("exchange: 'gatevia'"));
+  assert.ok(server.includes("pair: 'YERB/DOGE'"));
+  assert.ok(server.includes("tradeUrl: 'https://gatevia.io/exchange/YERB_DOGE'"));
+  assert.ok(server.includes("available: false"));
+  assert.ok(server.includes("markets: [nestex, gateviaMarketListing()]"));
+  assert.ok(app.includes("TRADE LINK"));
+  assert.ok(app.includes("target=\"_blank\" rel=\"noopener noreferrer\""));
+});
