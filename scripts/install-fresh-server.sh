@@ -943,6 +943,9 @@ NESTEX_API_BASE=https://api.nestex.one
 GATEVIA_API_BASE=https://api.gatevia.io
 MARKETS_CACHE_MS=30000
 MARKETS_TIMEOUT_MS=10000
+MARKETS_HISTORY_FILE=/var/lib/yerbas-explorer-light/market-history.json
+MARKETS_HISTORY_SNAPSHOT_MS=3600000
+MARKETS_HISTORY_RETENTION_DAYS=30
 
 # Read-only Yerbas AI gateway.
 AI_API_ENABLED=true
@@ -992,6 +995,8 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
+StateDirectory=yerbas-explorer-light
+StateDirectoryMode=0750
 
 [Install]
 WantedBy=multi-user.target

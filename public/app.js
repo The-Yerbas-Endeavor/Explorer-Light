@@ -86,7 +86,8 @@ function marketSparkline(history, fallbackQuote = '') {
   const plotted = rawPoints
     .map((point, index) => ({
       index,
-      price: Number(point?.price)
+      price: Number(point?.price),
+      observed: point?.observed === true
     }))
     .filter((point) => Number.isFinite(point.price) && point.price > 0);
 
@@ -96,6 +97,7 @@ function marketSparkline(history, fallbackQuote = '') {
     && history?.changePct !== undefined
     && Number.isFinite(change);
   const pricedDays = Number(history?.pricedDays || 0);
+  const observedDays = Number(history?.observedDays || 0);
   const totalDays = Number(history?.days || 7);
   const completeWindow = history?.completeWindow === true;
   const changeClass = hasChange
@@ -106,7 +108,7 @@ function marketSparkline(history, fallbackQuote = '') {
     return '<span class="market-sparkline market-sparkline-empty">' +
       '<small>7D · ' + esc(quote) + '</small>' +
       '<span class="sparkline-placeholder">NO HISTORY</span>' +
-      '<em>' + esc(pricedDays + '/' + totalDays + ' DAYS') + '</em>' +
+      '<em>' + esc(pricedDays + '/' + totalDays + ' DAYS · ' + observedDays + ' OBS') + '</em>' +
     '</span>';
   }
 
@@ -123,24 +125,45 @@ function marketSparkline(history, fallbackQuote = '') {
     const y = span === 0
       ? height / 2
       : pad + (((max - point.price) / span) * (height - (pad * 2)));
-    return x.toFixed(2) + ',' + y.toFixed(2);
-  }).join(' ');
+    return {
+      ...point,
+      x: x.toFixed(2),
+      y: y.toFixed(2)
+    };
+  });
+
+  const segments = coords.slice(1).map((point, index) => {
+    const previous = coords[index];
+    const segmentClass = point.observed ? 'observed' : 'carried';
+    return '<line class="sparkline-segment ' + segmentClass + '" '
+      + 'x1="' + previous.x + '" y1="' + previous.y + '" '
+      + 'x2="' + point.x + '" y2="' + point.y + '"></line>';
+  }).join('');
+
+  const observations = coords
+    .filter((point) => point.observed)
+    .map((point) =>
+      '<circle class="sparkline-observation" cx="' + point.x + '" cy="' + point.y + '" r="1.7"></circle>'
+    )
+    .join('');
 
   const rangeTitle = '7-day ' + quote + ' range: '
     + marketPrice(min) + ' to ' + marketPrice(max);
+  const coverageLabel = (
+    hasChange
+      ? marketPercent(change)
+      : (completeWindow ? '—' : pricedDays + '/' + totalDays + ' DAYS')
+  ) + ' · ' + observedDays + ' OBS';
 
   return '<span class="market-sparkline ' + changeClass + '">' +
     '<small>7D · ' + esc(quote) + '</small>' +
     '<svg viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none" role="img" aria-label="' + esc(rangeTitle) + '">' +
       '<title>' + esc(rangeTitle) + '</title>' +
       '<line class="sparkline-guide" x1="0" y1="' + (height / 2) + '" x2="' + width + '" y2="' + (height / 2) + '"></line>' +
-      '<polyline class="sparkline-line" points="' + coords + '"></polyline>' +
+      segments +
+      observations +
     '</svg>' +
-    '<em>' + (
-      hasChange
-        ? marketPercent(change)
-        : (completeWindow ? '—' : esc(pricedDays + '/' + totalDays + ' DAYS'))
-    ) + '</em>' +
+    '<em>' + esc(coverageLabel) + '</em>' +
   '</span>';
 }
 

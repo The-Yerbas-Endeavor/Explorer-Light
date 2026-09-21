@@ -33,6 +33,14 @@ function boolEnv(name, fallback) {
   return !['0', 'false', 'no', 'off'].includes(String(raw).trim().toLowerCase());
 }
 
+function defaultMarketHistoryFile() {
+  const stateDir = '/var/lib/yerbas-explorer-light';
+  if (fs.existsSync(stateDir)) {
+    return path.join(stateDir, 'market-history.json');
+  }
+  return path.join(os.tmpdir(), 'yerbas-explorer-light-market-history.json');
+}
+
 loadDotEnv();
 
 export const config = Object.freeze({
@@ -63,7 +71,10 @@ export const config = Object.freeze({
     nestexApiBase: process.env.NESTEX_API_BASE || 'https://api.nestex.one',
     gateviaApiBase: process.env.GATEVIA_API_BASE || 'https://api.gatevia.io',
     cacheMs: intEnv('MARKETS_CACHE_MS', 30000, 5000, 300000),
-    timeoutMs: intEnv('MARKETS_TIMEOUT_MS', 10000, 1000, 30000)
+    timeoutMs: intEnv('MARKETS_TIMEOUT_MS', 10000, 1000, 30000),
+    historyFile: process.env.MARKETS_HISTORY_FILE || defaultMarketHistoryFile(),
+    historySnapshotMs: intEnv('MARKETS_HISTORY_SNAPSHOT_MS', 3600000, 600000, 21600000),
+    historyRetentionDays: intEnv('MARKETS_HISTORY_RETENTION_DAYS', 30, 7, 90)
   }),
   recentBlocks: intEnv('RECENT_BLOCKS', 12, 5, 25),
   cacheMs: intEnv('CACHE_MS', 5000, 0, 60000)

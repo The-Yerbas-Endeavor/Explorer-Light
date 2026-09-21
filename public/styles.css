@@ -6815,7 +6815,7 @@ body::after {
 .market-sparkline {
   min-width: 0;
   display: grid;
-  grid-template-columns: 38px minmax(90px, 1fr) 52px;
+  grid-template-columns: 38px minmax(90px, 1fr) 96px;
   gap: 7px;
   align-items: center;
   font-family: var(--mono);
@@ -6840,15 +6840,29 @@ body::after {
   vector-effect: non-scaling-stroke;
 }
 
-.market-sparkline .sparkline-line {
-  fill: none;
+.market-sparkline .sparkline-segment {
   stroke: currentColor;
   stroke-width: 1.4;
   vector-effect: non-scaling-stroke;
 }
 
+.market-sparkline .sparkline-segment.carried {
+  opacity: .28;
+  stroke-dasharray: 2.5 2.5;
+}
+
+.market-sparkline .sparkline-segment.observed {
+  opacity: .95;
+}
+
+.market-sparkline .sparkline-observation {
+  fill: currentColor;
+  opacity: .95;
+  vector-effect: non-scaling-stroke;
+}
+
 .market-sparkline em {
-  min-width: 44px;
+  min-width: 88px;
   font-style: normal;
   text-align: right;
   white-space: nowrap;
@@ -7073,8 +7087,12 @@ body::after {
   }
 
   .market-sparkline {
-    grid-template-columns: 30px minmax(70px, 1fr) 46px;
+    grid-template-columns: 30px minmax(70px, 1fr);
     gap: 5px;
+  }
+
+  .market-sparkline em {
+    display: none;
   }
 
   .market-matrix-row > span:nth-of-type(5) {

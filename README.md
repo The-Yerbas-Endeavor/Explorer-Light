@@ -89,6 +89,7 @@ The default installation performs the **entire explorer-node bootstrap and host 
 - Writes the matching RPC host, port, username, and generated password to `/opt/yerbas-explorer-light/.env`.
 - Runs `npm test` and `npm run check` as the non-root build administrator, then locks the deployed tree down for the service account.
 - Installs and starts the Explorer Light systemd service.
+- Uses systemd `StateDirectory=yerbas-explorer-light` for a small writable rolling market-history file while keeping the deployed application tree read-only.
 - Configures nginx as the only public HTTP entry point.
 - Requests a Let's Encrypt certificate by default when the generic one-click wrapper is used with a public domain.
 
@@ -258,6 +259,14 @@ Market-price retrieval remains disabled until a source is explicitly configured.
 | \`RPC_TIMEOUT_MS\` | \`7000\` | RPC timeout |
 | \`RECENT_BLOCKS\` | \`12\` | Blocks shown on home page |
 | \`CACHE_MS\` | \`5000\` | In-memory live-data cache |
+| \`MARKETS_ENABLED\` | \`true\` | Enable external exchange market feeds |
+| \`NESTEX_API_BASE\` | \`https://api.nestex.one\` | NestEx public API base |
+| \`GATEVIA_API_BASE\` | \`https://api.gatevia.io\` | Gatevia public API base |
+| \`MARKETS_CACHE_MS\` | \`30000\` | External market response cache |
+| \`MARKETS_TIMEOUT_MS\` | \`10000\` | External market request timeout |
+| \`MARKETS_HISTORY_FILE\` | \`/var/lib/yerbas-explorer-light/market-history.json\` on hardened installs | Rolling market snapshot file |
+| \`MARKETS_HISTORY_SNAPSHOT_MS\` | \`3600000\` | Rolling market snapshot interval |
+| \`MARKETS_HISTORY_RETENTION_DAYS\` | \`30\` | Rolling market history retention |
 | \`AI_API_ENABLED\` | \`true\` | Enable read-only AI endpoints |
 | \`AI_MAX_BODY_BYTES\` | \`32768\` | AI query body limit |
 | \`AI_MARKET_PRICE_URL\` | empty | Optional trusted JSON market endpoint |

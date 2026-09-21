@@ -712,6 +712,137 @@ function normalizeTrades(payload) {
 const MARKET_HISTORY_DAYS = 7;
 const MARKET_HISTORY_DAY_SECONDS = 24 * 60 * 60;
 const MARKET_HISTORY_CACHE_MS = 5 * 60 * 1000;
+const MARKET_HISTORY_STORE_VERSION = 1;
+
+let marketHistoryState = null;
+let marketHistoryLoadPromise = null;
+let marketHistoryWriteChain = Promise.resolve();
+
+function emptyMarketHistoryState() {
+  return {
+    version: MARKET_HISTORY_STORE_VERSION,
+    updatedAt: null,
+    markets: {}
+  };
+}
+
+async function loadMarketHistoryState() {
+  if (marketHistoryState) return marketHistoryState;
+  if (marketHistoryLoadPromise) return marketHistoryLoadPromise;
+
+  marketHistoryLoadPromise = (async () => {
+    try {
+      const raw = await fs.readFile(config.markets.historyFile, 'utf8');
+      const parsed = JSON.parse(raw);
+      const markets = parsed?.markets && typeof parsed.markets === 'object'
+        ? parsed.markets
+        : {};
+
+      marketHistoryState = {
+        version: MARKET_HISTORY_STORE_VERSION,
+        updatedAt: parsed?.updatedAt || null,
+        markets
+      };
+    } catch (error) {
+      if (error?.code !== 'ENOENT') {
+        console.warn('Market history state load failed:', error.message);
+      }
+      marketHistoryState = emptyMarketHistoryState();
+    }
+
+    return marketHistoryState;
+  })();
+
+  return marketHistoryLoadPromise;
+}
+
+async function persistedMarketHistoryEntries(exchange) {
+  const state = await loadMarketHistoryState();
+  const rows = Array.isArray(state.markets?.[exchange])
+    ? state.markets[exchange]
+    : [];
+
+  return rows
+    .map((row) => ({
+      timestamp: marketEpochSeconds(row?.timestamp),
+      price: marketNumber(row?.price)
+    }))
+    .filter((row) =>
+      row.timestamp !== null
+      && row.price !== null
+      && row.price > 0
+    );
+}
+
+async function writeMarketHistoryState(state) {
+  const filePath = config.markets.historyFile;
+  const directory = path.dirname(filePath);
+  const tempPath = filePath + '.tmp-' + process.pid;
+
+  await fs.mkdir(directory, { recursive: true });
+  await fs.writeFile(
+    tempPath,
+    JSON.stringify(state, null, 2) + '\n',
+    { encoding: 'utf8', mode: 0o640 }
+  );
+  await fs.rename(tempPath, filePath);
+}
+
+function recordMarketHistorySnapshot(markets, now = Math.floor(Date.now() / 1000)) {
+  marketHistoryWriteChain = marketHistoryWriteChain
+    .then(async () => {
+      const state = await loadMarketHistoryState();
+      const bucketSeconds = Math.max(
+        600,
+        Math.floor(config.markets.historySnapshotMs / 1000)
+      );
+      const bucket = Math.floor(now / bucketSeconds) * bucketSeconds;
+      const cutoff = now - (
+        config.markets.historyRetentionDays * MARKET_HISTORY_DAY_SECONDS
+      );
+      let changed = false;
+
+      for (const market of Array.isArray(markets) ? markets : []) {
+        if (!market || market.available === false) continue;
+
+        const exchange = String(market.exchange || '').trim().toLowerCase();
+        const price = marketNumber(market.ticker?.last);
+        if (!exchange || price === null || price <= 0) continue;
+
+        const rows = Array.isArray(state.markets[exchange])
+          ? state.markets[exchange]
+          : [];
+
+        const retained = rows.filter((row) =>
+          marketEpochSeconds(row?.timestamp) >= cutoff
+        );
+        const last = retained[retained.length - 1];
+
+        if (!last || marketEpochSeconds(last.timestamp) !== bucket) {
+          retained.push({
+            timestamp: bucket,
+            price,
+            quote: market.quote || null
+          });
+          changed = true;
+        }
+
+        if (retained.length !== rows.length) changed = true;
+        state.markets[exchange] = retained;
+      }
+
+      if (!changed) return;
+
+      state.version = MARKET_HISTORY_STORE_VERSION;
+      state.updatedAt = new Date(now * 1000).toISOString();
+      await writeMarketHistoryState(state);
+    })
+    .catch((error) => {
+      console.warn('Market history snapshot failed:', error.message);
+    });
+
+  return marketHistoryWriteChain;
+}
 
 function marketEpochSeconds(value) {
   const timestamp = marketTimestamp(value);
@@ -874,7 +1005,8 @@ async function nestexMarketHistoryEntries7d() {
         if (currentPage !== null && totalPages !== null && currentPage >= totalPages) break;
       }
 
-      return entries;
+      const localEntries = await persistedMarketHistoryEntries('nestex');
+      return entries.concat(localEntries);
     }
   );
 }
@@ -896,7 +1028,7 @@ async function gateviaMarketHistoryEntries7d() {
         ? payload
         : (Array.isArray(payload?.data) ? payload.data : []);
 
-      return rows
+      const exchangeEntries = rows
         .map((row) => ({
           timestamp: marketEpochSeconds(Array.isArray(row) ? row[0] : row?.timestamp),
           price: marketNumber(Array.isArray(row) ? row[4] : (row?.close ?? row?.last))
@@ -906,6 +1038,9 @@ async function gateviaMarketHistoryEntries7d() {
           && entry.price !== null
           && entry.price > 0
         );
+
+      const localEntries = await persistedMarketHistoryEntries('gatevia');
+      return exchangeEntries.concat(localEntries);
     }
   );
 }
@@ -1163,6 +1298,39 @@ async function gateviaMarketDetail() {
       items: trades
     } : null
   };
+}
+
+async function snapshotMarketHistoryFromFeeds() {
+  if (!config.markets.enabled) return;
+
+  const results = await Promise.allSettled([
+    nestexMarketSummary(),
+    gateviaMarketSummary()
+  ]);
+
+  const markets = results
+    .filter((result) => result.status === 'fulfilled')
+    .map((result) => result.value);
+
+  if (markets.length) {
+    await recordMarketHistorySnapshot(markets);
+  }
+}
+
+function startMarketHistorySnapshots() {
+  if (!config.markets.enabled) return;
+
+  const run = () => {
+    snapshotMarketHistoryFromFeeds().catch((error) => {
+      console.warn('Market history background snapshot failed:', error.message);
+    });
+  };
+
+  const warmup = setTimeout(run, 15000);
+  warmup.unref?.();
+
+  const interval = setInterval(run, config.markets.historySnapshotMs);
+  interval.unref?.();
 }
 
 async function smartnodeData(url) {
@@ -1650,6 +1818,7 @@ async function handleApi(req, res, url) {
       gateviaMarketSummary()
     ]);
     const markets = [nestex, gatevia];
+    void recordMarketHistorySnapshot(markets);
     return sendJson(res, 200, {
       generatedAt: new Date().toISOString(),
       reference: marketReferenceSummary(markets),
@@ -2013,6 +2182,8 @@ server.listen(config.port, config.host, () => {
   console.log('Yerbas RPC target: ' + config.rpc.protocol + '://' + config.rpc.host + ':' + config.rpc.port);
   console.log('Database: disabled (RPC-only mode)');
   console.log('AI gateway: ' + (config.ai.enabled ? 'enabled (read-only)' : 'disabled'));
+  console.log('Market history: ' + config.markets.historyFile);
+  startMarketHistorySnapshots();
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {

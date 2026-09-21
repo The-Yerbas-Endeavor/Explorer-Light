@@ -134,3 +134,33 @@ test('seven-day market history reports coverage before showing a weekly change',
   assert.ok(server.includes('const changePct = completeWindow'));
   assert.ok(app.includes("pricedDays + '/' + totalDays + ' DAYS'"));
 });
+
+
+test('market history persists hourly snapshots in a hardened systemd state directory', async () => {
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+  const config = await readFile(new URL('../src/config.js', import.meta.url), 'utf8');
+  const installer = await readFile(new URL('../scripts/install-fresh-server.sh', import.meta.url), 'utf8');
+
+  assert.ok(server.includes('recordMarketHistorySnapshot'));
+  assert.ok(server.includes('snapshotMarketHistoryFromFeeds'));
+  assert.ok(server.includes('startMarketHistorySnapshots'));
+  assert.ok(server.includes('persistedMarketHistoryEntries'));
+  assert.ok(server.includes('MARKET_HISTORY_STORE_VERSION'));
+  assert.ok(config.includes('MARKETS_HISTORY_FILE'));
+  assert.ok(config.includes('MARKETS_HISTORY_SNAPSHOT_MS'));
+  assert.ok(config.includes('MARKETS_HISTORY_RETENTION_DAYS'));
+  assert.ok(installer.includes('StateDirectory=yerbas-explorer-light'));
+  assert.ok(installer.includes('StateDirectoryMode=0750'));
+});
+
+test('market sparklines distinguish observed prices from carried values', async () => {
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
+
+  assert.ok(app.includes('sparkline-segment'));
+  assert.ok(app.includes('sparkline-observation'));
+  assert.ok(app.includes("observedDays + ' OBS'"));
+  assert.ok(css.includes('.sparkline-segment.carried'));
+  assert.ok(css.includes('stroke-dasharray'));
+  assert.ok(css.includes('.sparkline-observation'));
+});
