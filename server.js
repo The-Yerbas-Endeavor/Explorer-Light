@@ -650,6 +650,43 @@ function normalizeTrades(payload) {
   });
 }
 
+function gateviaMarketListing() {
+  return {
+    exchange: 'gatevia',
+    exchangeName: 'Gatevia',
+    pair: 'YERB/DOGE',
+    tickerId: 'YERB_DOGE',
+    base: 'YERB',
+    quote: 'DOGE',
+    tradeUrl: 'https://gatevia.io/exchange/YERB_DOGE',
+    source: 'https://api.gatevia.io/public/docs',
+    available: false,
+    status: 'external-live-market',
+    asOf: Date.now(),
+    ticker: {
+      last: null,
+      old24h: null,
+      change24hPct: null,
+      bid: null,
+      ask: null,
+      spread: null,
+      spreadPct: null,
+      high: null,
+      low: null,
+      baseVolume: null,
+      quoteVolume: null,
+      decimals: null,
+      liquidityUsdt: null
+    },
+    valuation: {
+      supplyYerb: null,
+      marketCapUsdt: null,
+      basis: null
+    },
+    liquidity: null
+  };
+}
+
 async function nestexMarketSummary() {
   const tickerId = 'YERB_USDT';
   const [ticker, supply, liquidityResult] = await Promise.all([
@@ -1221,10 +1258,10 @@ async function handleApi(req, res, url) {
   }
 
   if (url.pathname === '/api/markets') {
-    const market = await nestexMarketSummary();
+    const nestex = await nestexMarketSummary();
     return sendJson(res, 200, {
       generatedAt: new Date().toISOString(),
-      markets: [market]
+      markets: [nestex, gateviaMarketListing()]
     });
   }
 
