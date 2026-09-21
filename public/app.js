@@ -297,6 +297,7 @@ async function renderMarkets() {
   const referenceRail = reference.sourceCount
     ? telemetryRail([
         { label: 'YERB REFERENCE', value: marketPrice(reference.priceUsdt) + ' USDT', note: reference.method || 'live mean' },
+        { label: 'MARKET CAP', value: marketMoney(reference.marketCapUsdt) + ' USDT', note: 'reference price × Core supply' },
         { label: 'SOURCES', value: number(reference.sourceCount), note: 'live exchanges' },
         { label: 'LOW', value: marketPrice(reference.lowUsdt) + ' USDT', note: 'cross-exchange' },
         { label: 'HIGH', value: marketPrice(reference.highUsdt) + ' USDT', note: 'cross-exchange' },

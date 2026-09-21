@@ -1162,12 +1162,20 @@ function marketReferenceSummary(markets) {
   const rangePct = priceUsdt && lowUsdt !== null && highUsdt !== null
     ? ((highUsdt - lowUsdt) / priceUsdt) * 100
     : null;
+  const supplyYerb = (markets || [])
+    .map((market) => marketNumber(market?.valuation?.supplyYerb))
+    .find((value) => value !== null && value > 0) ?? null;
+  const marketCapUsdt = supplyYerb !== null && priceUsdt !== null
+    ? supplyYerb * priceUsdt
+    : null;
 
   return {
     base: 'YERB',
     quote: 'USDT',
     method: 'simple mean of live exchange prices',
     priceUsdt,
+    marketCapUsdt,
+    supplyYerb,
     lowUsdt,
     highUsdt,
     rangePct,
