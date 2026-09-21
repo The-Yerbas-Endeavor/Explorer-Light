@@ -1765,7 +1765,7 @@ async function requestHandler(req, res) {
       || url.pathname === '/masternodes'
       || url.pathname === '/node-map'
       || url.pathname === '/markets'
-      || url.pathname === '/markets/nestex/YERB/USDT') {
+      || url.pathname.startsWith('/markets/')) {
       return await sendFile(req, res, 'index.html', 'text/html; charset=utf-8', 'no-cache');
     }
 
