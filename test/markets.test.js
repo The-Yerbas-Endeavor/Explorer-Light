@@ -60,9 +60,23 @@ test('Gatevia YERB DOGE uses the public API with a safe degraded mode', async ()
   assert.ok(server.includes("public/markets/' + tickerId + '/trades?limit=100&order_by=desc"));
   assert.ok(server.includes("tradeUrl: 'https://gatevia.io/exchange/YERB_DOGE'"));
   assert.ok(server.includes("available ? 'live-api' : 'api-unavailable'"));
-  assert.ok(server.includes("markets: [nestex, gatevia]"));
+  assert.ok(server.includes("reportedSpreadPct"));
+  assert.ok(server.includes("reference: marketReferenceSummary(markets)"));
   assert.ok(server.includes("'/api/market/gatevia/YERB/DOGE'"));
   assert.ok(app.includes("exchangeId === 'gatevia'"));
   assert.ok(app.includes("'API OFFLINE'"));
   assert.ok(config.includes("GATEVIA_API_BASE"));
+});
+
+
+test('markets page exposes a cross-exchange reference and resilient Gatevia trade labels', async () => {
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+
+  assert.ok(server.includes("method: 'simple mean of live exchange prices'"));
+  assert.ok(server.includes("conversion = 'YERB/DOGE × DOGE/USDT'"));
+  assert.ok(app.includes("'YERB REFERENCE'"));
+  assert.ok(app.includes("'TIME / ID'"));
+  assert.ok(app.includes("'#' + trade.id"));
+  assert.ok(app.includes('Gatevia public API did not return bid levels.'));
 });

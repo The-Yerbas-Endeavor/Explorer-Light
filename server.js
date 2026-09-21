@@ -696,7 +696,15 @@ function normalizeTrades(payload) {
       price,
       amount,
       total: price !== null && amount !== null ? price * amount : null,
-      timestamp: marketTimestamp(trade?.timestamp ?? trade?.created_at ?? trade?.createdAt)
+      timestamp: marketTimestamp(
+        trade?.timestamp
+        ?? trade?.created_at
+        ?? trade?.createdAt
+        ?? trade?.traded_at
+        ?? trade?.tradedAt
+        ?? trade?.time
+        ?? trade?.date
+      )
     };
   });
 }
@@ -725,6 +733,7 @@ async function gateviaMarketSummary() {
   const ask = marketNumber(ticker.sell ?? ticker.ask) ?? asks[0]?.price ?? null;
   const spread = bid !== null && ask !== null ? ask - bid : null;
   const midpoint = bid !== null && ask !== null ? (bid + ask) / 2 : null;
+  const reportedSpreadPct = marketPercentNumber(ticker.spread);
   const change24hPct = marketPercentNumber(ticker.price_change_percent)
     ?? (open && last !== null ? ((last - open) / open) * 100 : null);
   const dogeUsdt = marketNumber(dogeTicker.last ?? dogeTicker.last_price);
@@ -751,7 +760,7 @@ async function gateviaMarketSummary() {
       bid,
       ask,
       spread,
-      spreadPct: midpoint && spread !== null ? (spread / midpoint) * 100 : null,
+      spreadPct: midpoint && spread !== null ? (spread / midpoint) * 100 : reportedSpreadPct,
       high: marketNumber(ticker.high),
       low: marketNumber(ticker.low),
       baseVolume: marketNumber(ticker.amount ?? ticker.base_volume),
@@ -769,6 +778,58 @@ async function gateviaMarketSummary() {
         : null
     },
     liquidity: null
+  };
+}
+
+function marketReferenceSummary(markets) {
+  const sources = [];
+
+  for (const market of markets || []) {
+    if (!market || market.available === false) continue;
+
+    let priceUsdt = null;
+    let conversion = 'direct';
+
+    if (market.exchange === 'nestex') {
+      priceUsdt = marketNumber(market.ticker?.last);
+    } else if (market.exchange === 'gatevia') {
+      priceUsdt = marketNumber(market.ticker?.lastUsdt);
+      conversion = 'YERB/DOGE × DOGE/USDT';
+    }
+
+    if (priceUsdt === null || priceUsdt <= 0) continue;
+
+    sources.push({
+      exchange: market.exchange,
+      exchangeName: market.exchangeName,
+      pair: market.pair,
+      priceUsdt,
+      nativeLast: marketNumber(market.ticker?.last),
+      nativeQuote: market.quote,
+      conversion
+    });
+  }
+
+  const prices = sources.map((source) => source.priceUsdt);
+  const priceUsdt = prices.length
+    ? prices.reduce((sum, value) => sum + value, 0) / prices.length
+    : null;
+  const lowUsdt = prices.length ? Math.min(...prices) : null;
+  const highUsdt = prices.length ? Math.max(...prices) : null;
+  const rangePct = priceUsdt && lowUsdt !== null && highUsdt !== null
+    ? ((highUsdt - lowUsdt) / priceUsdt) * 100
+    : null;
+
+  return {
+    base: 'YERB',
+    quote: 'USDT',
+    method: 'simple mean of live exchange prices',
+    priceUsdt,
+    lowUsdt,
+    highUsdt,
+    rangePct,
+    sourceCount: sources.length,
+    sources
   };
 }
 
@@ -1373,9 +1434,11 @@ async function handleApi(req, res, url) {
       nestexMarketSummary(),
       gateviaMarketSummary()
     ]);
+    const markets = [nestex, gatevia];
     return sendJson(res, 200, {
       generatedAt: new Date().toISOString(),
-      markets: [nestex, gatevia]
+      reference: marketReferenceSummary(markets),
+      markets
     });
   }
 

@@ -207,6 +207,17 @@ async function renderMarkets() {
   const data = await api('/api/markets');
   setRpcState('online', 'Core online');
 
+  const reference = data.reference || {};
+  const referenceRail = reference.sourceCount
+    ? telemetryRail([
+        { label: 'YERB REFERENCE', value: marketPrice(reference.priceUsdt) + ' USDT', note: reference.method || 'live mean' },
+        { label: 'SOURCES', value: number(reference.sourceCount), note: 'live exchanges' },
+        { label: 'LOW', value: marketPrice(reference.lowUsdt) + ' USDT', note: 'cross-exchange' },
+        { label: 'HIGH', value: marketPrice(reference.highUsdt) + ' USDT', note: 'cross-exchange' },
+        { label: 'RANGE', value: marketPercent(reference.rangePct), note: 'high vs low around mean' }
+      ])
+    : '';
+
   const rows = (data.markets || []).map((market) => {
     const ticker = market.ticker || {};
     const hasLiveData = market.available !== false;
@@ -239,6 +250,7 @@ async function renderMarkets() {
 
   app.innerHTML =
     ledgerHeader('MARKET OBSERVATORY', 'Yerbas markets', number((data.markets || []).length) + ' listed market' + ((data.markets || []).length === 1 ? '' : 's'), '<a href="/">LIVE CHAIN</a>') +
+    referenceRail +
     '<section class="ledger-section">' +
       railHeading('MARKET MATRIX', 'Live exchange values', 'exchange data · not consensus data') +
       '<div class="market-matrix">' + (rows || '<div class="ledger-empty">No market feeds are currently available.</div>') + '</div>' +
@@ -294,12 +306,15 @@ async function renderMarketDetail(exchange = 'nestex') {
 
   const tradeRows = trades.slice(0, 40).map((trade) => {
     const side = String(trade.side || '').toLowerCase();
+    const timeOrId = trade.timestamp
+      ? marketTime(trade.timestamp)
+      : (trade.id === null || trade.id === undefined ? '—' : '#' + trade.id);
     return '<div class="market-trade-row ' + esc(side) + '">' +
       '<span class="trade-side">' + esc(trade.side || '—') + '</span>' +
       '<span>' + marketPrice(trade.price) + '</span>' +
       '<span>' + number(trade.amount, 8) + '</span>' +
       '<span>' + marketMoney(trade.total) + '</span>' +
-      '<span>' + esc(marketTime(trade.timestamp)) + '</span>' +
+      '<span>' + esc(timeOrId) + '</span>' +
     '</div>';
   }).join('');
 
@@ -345,17 +360,17 @@ async function renderMarketDetail(exchange = 'nestex') {
       '<div class="market-pane">' +
         railHeading('ORDER BOOK', 'Buy orders', number(bids.length) + ' levels loaded') +
         '<div class="orderbook-head"><span>PRICE</span><span>YERB</span><span>' + quote + '</span><span>DEPTH</span></div>' +
-        '<div class="orderbook-list">' + (bidRows || '<div class="ledger-empty">Order book unavailable.</div>') + '</div>' +
+        '<div class="orderbook-list">' + (bidRows || '<div class="ledger-empty">' + (isGatevia ? 'Gatevia public API did not return bid levels.' : 'Order book unavailable.') + '</div>') + '</div>' +
       '</div>' +
       '<div class="market-pane">' +
         railHeading('ORDER BOOK', 'Sell orders', number(asks.length) + ' levels loaded') +
         '<div class="orderbook-head"><span>PRICE</span><span>YERB</span><span>' + quote + '</span><span>DEPTH</span></div>' +
-        '<div class="orderbook-list">' + (askRows || '<div class="ledger-empty">Order book unavailable.</div>') + '</div>' +
+        '<div class="orderbook-list">' + (askRows || '<div class="ledger-empty">' + (isGatevia ? 'Gatevia public API did not return ask levels.' : 'Order book unavailable.') + '</div>') + '</div>' +
       '</div>' +
     '</section>' +
     '<section class="ledger-section">' +
       railHeading('TRADE STREAM', 'Recent ' + exchangeName + ' trades', number(trades.length) + ' loaded') +
-      '<div class="market-trade-head"><span>SIDE</span><span>PRICE</span><span>YERB</span><span>' + quote + '</span><span>TIME</span></div>' +
+      '<div class="market-trade-head"><span>SIDE</span><span>PRICE</span><span>YERB</span><span>' + quote + '</span><span>TIME / ID</span></div>' +
       '<div class="market-trade-list">' + (tradeRows || '<div class="ledger-empty">Trade history unavailable.</div>') + '</div>' +
     '</section>' +
     '<div class="market-disclaimer">Exchange prices are external market data, not Yerbas consensus data. ' +
