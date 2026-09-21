@@ -120,7 +120,7 @@ test('market matrix exposes cached seven-day price sparklines', async () => {
   assert.ok(app.includes('marketSparkline(market.history7d, market.quote)'));
   assert.ok(app.includes('7D · '));
   assert.ok(css.includes('.market-sparkline'));
-  assert.ok(css.includes('.sparkline-line'));
+  assert.ok(css.includes('.sparkline-segment'));
 });
 
 
