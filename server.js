@@ -715,7 +715,7 @@ async function gateviaMarketSummary() {
     gateviaMarketFetchJson('public/markets/' + tickerId + '/tickers', 'ticker:' + tickerId).catch(() => null),
     gateviaMarketFetchJson('public/markets/DOGE_USDT/tickers', 'ticker:DOGE_USDT').catch(() => null),
     supplyData(),
-    gateviaMarketFetchJson('public/markets/' + tickerId + '/order-book?limit=5', 'orderbook:' + tickerId + ':5').catch(() => null)
+    gateviaMarketFetchJson('public/markets/' + tickerId + '/depth?limit=5', 'depth:' + tickerId + ':5').catch(() => null)
   ]);
 
   const ticker = tickerResult?.ticker && typeof tickerResult.ticker === 'object'
@@ -928,7 +928,7 @@ async function gateviaMarketDetail() {
   const tickerId = 'YERB_DOGE';
   const [summary, orderbookResult, tradesResult] = await Promise.all([
     gateviaMarketSummary(),
-    gateviaMarketFetchJson('public/markets/' + tickerId + '/order-book?limit=100', 'orderbook:' + tickerId + ':100').catch(() => null),
+    gateviaMarketFetchJson('public/markets/' + tickerId + '/depth?limit=100', 'depth:' + tickerId + ':100').catch(() => null),
     gateviaMarketFetchJson('public/markets/' + tickerId + '/trades?limit=100&order_by=desc', 'trades:' + tickerId + ':100').catch(() => null)
   ]);
 
