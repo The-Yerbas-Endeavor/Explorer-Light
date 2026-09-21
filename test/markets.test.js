@@ -149,7 +149,7 @@ test('seven-day market history reports coverage before showing a weekly change',
   assert.ok(server.includes('observedDays'));
   assert.ok(server.includes('completeWindow'));
   assert.ok(server.includes('const changePct = completeWindow'));
-  assert.ok(app.includes("pricedDays + '/' + totalDays + ' DAYS'"));
+  assert.ok(app.includes("pricedDays + '/' + totalDays + 'D'"));
 });
 
 
@@ -176,7 +176,7 @@ test('market sparklines distinguish observed prices from carried values', async 
 
   assert.ok(app.includes('sparkline-segment'));
   assert.ok(app.includes('sparkline-observation'));
-  assert.ok(app.includes("observedDays + ' OBS'"));
+  assert.ok(app.includes("sparkObservations + ' OBS'"));
   assert.ok(css.includes('.sparkline-segment.carried'));
   assert.ok(css.includes('stroke-dasharray'));
   assert.ok(css.includes('.sparkline-observation'));
