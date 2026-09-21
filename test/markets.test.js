@@ -27,8 +27,11 @@ test('market browser and API routes are exposed', async () => {
 
 test('market values remain explicitly external to Yerbas consensus', async () => {
   const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+
   assert.ok(app.includes('not consensus data'));
-  assert.ok(app.includes('Core UTXO supply × last price'));
+  assert.ok(server.includes('Yerbas Core UTXO-set total amount × NestEx last price'));
+  assert.ok(server.includes('Yerbas Core UTXO-set total amount × Gatevia YERB/DOGE × Gatevia DOGE/USDT'));
 });
 
 
