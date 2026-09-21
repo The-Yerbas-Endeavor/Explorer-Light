@@ -47,6 +47,150 @@ function sendText(res, status, data) {
   res.end(body);
 }
 
+const IPFS_PREVIEW_MAX_BYTES = 64 * 1024 * 1024;
+const IPFS_PREVIEW_TIMEOUT_MS = 45000;
+
+function validIpfsCid(value) {
+  return /^[A-Za-z0-9]{32,128}$/.test(String(value || ''));
+}
+
+function safeImageContentType(buffer, upstreamType = '') {
+  const reported = String(upstreamType).split(';', 1)[0].trim().toLowerCase();
+  const allowed = new Set([
+    'image/png',
+    'image/jpeg',
+    'image/gif',
+    'image/webp',
+    'image/avif'
+  ]);
+  if (allowed.has(reported)) return reported;
+
+  if (buffer.length >= 8
+      && buffer[0] === 0x89
+      && buffer[1] === 0x50
+      && buffer[2] === 0x4e
+      && buffer[3] === 0x47
+      && buffer[4] === 0x0d
+      && buffer[5] === 0x0a
+      && buffer[6] === 0x1a
+      && buffer[7] === 0x0a) {
+    return 'image/png';
+  }
+
+  if (buffer.length >= 3
+      && buffer[0] === 0xff
+      && buffer[1] === 0xd8
+      && buffer[2] === 0xff) {
+    return 'image/jpeg';
+  }
+
+  if (buffer.length >= 6) {
+    const signature = buffer.subarray(0, 6).toString('ascii');
+    if (signature === 'GIF87a' || signature === 'GIF89a') {
+      return 'image/gif';
+    }
+  }
+
+  if (buffer.length >= 12
+      && buffer.subarray(0, 4).toString('ascii') === 'RIFF'
+      && buffer.subarray(8, 12).toString('ascii') === 'WEBP') {
+    return 'image/webp';
+  }
+
+  if (buffer.length >= 12
+      && buffer.subarray(4, 8).toString('ascii') === 'ftyp') {
+    const brand = buffer.subarray(8, 12).toString('ascii');
+    if (brand === 'avif' || brand === 'avis') {
+      return 'image/avif';
+    }
+  }
+
+  return null;
+}
+
+async function readResponseLimited(response, maxBytes) {
+  const declared = Number.parseInt(response.headers.get('content-length') || '', 10);
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    const error = new Error('IPFS image exceeds the preview size limit.');
+    error.status = 413;
+    throw error;
+  }
+
+  const chunks = [];
+  let total = 0;
+
+  for await (const chunk of response.body || []) {
+    const buffer = Buffer.from(chunk);
+    total += buffer.length;
+    if (total > maxBytes) {
+      const error = new Error('IPFS image exceeds the preview size limit.');
+      error.status = 413;
+      throw error;
+    }
+    chunks.push(buffer);
+  }
+
+  return Buffer.concat(chunks, total);
+}
+
+async function sendIpfsImagePreview(req, res, cid) {
+  if (!validIpfsCid(cid)) {
+    return sendJson(res, 400, { error: 'Invalid IPFS CID.' });
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), IPFS_PREVIEW_TIMEOUT_MS);
+
+  try {
+    const response = await fetch('https://ipfs.io/ipfs/' + encodeURIComponent(cid), {
+      headers: {
+        accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.9,*/*;q=0.1',
+        'user-agent': 'Yerbas-Explorer-Light/1.0'
+      },
+      redirect: 'follow',
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      return sendJson(res, 502, {
+        error: 'IPFS gateway returned HTTP ' + response.status + '.'
+      });
+    }
+
+    const data = await readResponseLimited(response, IPFS_PREVIEW_MAX_BYTES);
+    const contentType = safeImageContentType(
+      data,
+      response.headers.get('content-type') || ''
+    );
+
+    if (!contentType) {
+      return sendJson(res, 415, {
+        error: 'IPFS content is not a supported image preview.'
+      });
+    }
+
+    res.writeHead(200, securityHeaders({
+      'content-type': contentType,
+      'cache-control': 'public, max-age=86400, immutable',
+      'content-length': data.length,
+      'content-disposition': 'inline',
+      'cross-origin-resource-policy': 'same-origin'
+    }));
+
+    if (req.method === 'HEAD') return res.end();
+    return res.end(data);
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      return sendJson(res, 504, { error: 'IPFS gateway request timed out.' });
+    }
+    return sendJson(res, error?.status || 502, {
+      error: error?.message || 'Unable to load IPFS image preview.'
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function apiInt(value, fallback, min, max) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
   if (!Number.isSafeInteger(parsed)) return fallback;
@@ -1570,6 +1714,11 @@ async function addressData(address, txLimit = 100, utxoLimit = 100) {
 
 async function handlePublicApi(req, res, url) {
   const path = url.pathname;
+
+  if (path.startsWith('/api/ipfs-preview/')) {
+    const cid = decodeURIComponent(path.slice('/api/ipfs-preview/'.length)).trim();
+    return sendIpfsImagePreview(req, res, cid);
+  }
 
   if (path === '/api/v1') {
     return sendJson(res, 200, {

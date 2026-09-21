@@ -36,19 +36,25 @@ test('market values remain explicitly external to Yerbas consensus', async () =>
 });
 
 
-test('asset pages link and safely preview IPFS image metadata', async () => {
+test('asset pages proxy IPFS image previews through the Explorer origin', async () => {
   const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
   const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
   const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
 
   assert.ok(app.includes("'https://ipfs.io/ipfs/' + encodeURIComponent(ipfsHash)"));
+  assert.ok(app.includes("'/api/ipfs-preview/' + encodeURIComponent(ipfsHash)"));
   assert.ok(app.includes('OPEN IPFS ↗'));
   assert.ok(app.includes('OPEN IN IPFS ↗'));
   assert.ok(app.includes('class="ipfs-image"'));
+  assert.ok(app.includes('SAME-ORIGIN PREVIEW · IPFS.IO SOURCE'));
   assert.ok(!app.includes('class="ipfs-frame"'));
   assert.ok(css.includes('.ipfs-image'));
   assert.ok(css.includes('object-fit: contain'));
-  assert.ok(server.includes("img-src 'self' data: https://ipfs.io"));
+  assert.ok(server.includes("path.startsWith('/api/ipfs-preview/')"));
+  assert.ok(server.includes('sendIpfsImagePreview'));
+  assert.ok(server.includes('IPFS_PREVIEW_MAX_BYTES'));
+  assert.ok(server.includes("'cross-origin-resource-policy': 'same-origin'"));
+  assert.ok(server.includes('safeImageContentType'));
 });
 
 
@@ -171,4 +177,18 @@ test('market sparklines distinguish observed prices from carried values', async 
   assert.ok(css.includes('.sparkline-segment.carried'));
   assert.ok(css.includes('stroke-dasharray'));
   assert.ok(css.includes('.sparkline-observation'));
+});
+
+
+test('IPFS preview proxy accepts only bounded raster image responses', async () => {
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+
+  assert.ok(server.includes("const IPFS_PREVIEW_MAX_BYTES = 64 * 1024 * 1024"));
+  assert.ok(server.includes("return 'image/png'"));
+  assert.ok(server.includes("return 'image/jpeg'"));
+  assert.ok(server.includes("return 'image/gif'"));
+  assert.ok(server.includes("return 'image/webp'"));
+  assert.ok(server.includes("return 'image/avif'"));
+  assert.ok(server.includes("error: 'IPFS content is not a supported image preview.'"));
+  assert.ok(server.includes("fetch('https://ipfs.io/ipfs/' + encodeURIComponent(cid)"));
 });

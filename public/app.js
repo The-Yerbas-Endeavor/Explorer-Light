@@ -916,6 +916,7 @@ async function renderAsset(name) {
   const metadataValue = ipfsHash || txidHash || null;
   const metadataType = ipfsHash ? 'IPFS' : (txidHash ? 'TXID' : 'NONE');
   const ipfsUrl = ipfsHash ? 'https://ipfs.io/ipfs/' + encodeURIComponent(ipfsHash) : null;
+  const ipfsPreviewUrl = ipfsHash ? '/api/ipfs-preview/' + encodeURIComponent(ipfsHash) : null;
   const metadataRefHtml = ipfsUrl
     ? '<a class="asset-ipfs-ref" href="' + ipfsUrl + '" target="_blank" rel="noopener noreferrer">' +
         '<code>' + esc(ipfsHash) + '</code><span>OPEN IPFS ↗</span>' +
@@ -933,9 +934,9 @@ async function renderAsset(name) {
           '<a href="' + ipfsUrl + '" target="_blank" rel="noopener noreferrer">OPEN IN IPFS ↗</a>' +
         '</div>' +
         '<div class="ipfs-frame-shell ipfs-image-shell">' +
-          '<img class="ipfs-image" src="' + ipfsUrl + '" alt="' + esc(data.name) + ' IPFS asset content" loading="lazy" decoding="async">' +
+          '<img class="ipfs-image" src="' + ipfsPreviewUrl + '" alt="' + esc(data.name) + ' IPFS asset content" loading="lazy" decoding="async">' +
         '</div>' +
-        '<div class="ipfs-display-foot"><code>' + esc(ipfsHash) + '</code><span>PUBLIC IPFS GATEWAY · ipfs.io</span></div>' +
+        '<div class="ipfs-display-foot"><code>' + esc(ipfsHash) + '</code><span>SAME-ORIGIN PREVIEW · IPFS.IO SOURCE</span></div>' +
       '</section>'
     : '';
 
