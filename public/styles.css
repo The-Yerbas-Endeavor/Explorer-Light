@@ -8952,3 +8952,110 @@ html[data-layout-theme="original"] .site-footer {
 html[data-layout-theme="original"] .footer-brand strong {
   color: #ffffff;
 }
+
+
+/* ==========================================================================
+   New layout — transaction index readability
+   ========================================================================== */
+
+html[data-layout-theme="new"] .transactions-page .ledger-kind {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .transactions-page .ledger-identity {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+html[data-layout-theme="new"] .transactions-page .ledger-actions a {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .transactions-page .telemetry-cell {
+  min-height: 76px;
+  padding: 12px 14px;
+}
+
+html[data-layout-theme="new"] .transactions-page .telemetry-cell > span,
+html[data-layout-theme="new"] .transactions-page .telemetry-cell > small {
+  font-size: 10px;
+  letter-spacing: .10em;
+}
+
+html[data-layout-theme="new"] .transactions-page .telemetry-cell > strong {
+  font-size: clamp(18px, 1.75vw, 25px);
+}
+
+html[data-layout-theme="new"] .transactions-page .rail-heading {
+  min-height: 54px;
+  padding-bottom: 11px;
+}
+
+html[data-layout-theme="new"] .transactions-page .rail-heading span {
+  font-size: 10px;
+  letter-spacing: .12em;
+}
+
+html[data-layout-theme="new"] .transactions-page .rail-heading h3 {
+  font-size: 23px;
+}
+
+html[data-layout-theme="new"] .transactions-page .rail-heading small {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .transactions-page .recent-tx-row {
+  min-height: 58px;
+  grid-template-columns: 38px 86px minmax(220px, 1fr) 102px 92px 98px 132px 24px;
+  gap: 12px;
+}
+
+html[data-layout-theme="new"] .transactions-page .ledger-index {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .transactions-page .recent-tx-kind {
+  font-size: 11px;
+}
+
+html[data-layout-theme="new"] .transactions-page .recent-tx-id {
+  font-size: 12px;
+}
+
+html[data-layout-theme="new"] .transactions-page .recent-tx-row small {
+  font-size: 10px;
+  letter-spacing: .07em;
+}
+
+html[data-layout-theme="new"] .transactions-page .recent-tx-row b {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+html[data-layout-theme="new"] .transactions-page .ledger-open {
+  font-size: 11px;
+}
+
+@media (max-width: 1050px) {
+  html[data-layout-theme="new"] .transactions-page .recent-tx-row {
+    grid-template-columns: 34px 78px minmax(180px, 1fr) 96px 86px 24px;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 640px) {
+  html[data-layout-theme="new"] .transactions-page .recent-tx-row {
+    min-height: 54px;
+    grid-template-columns: 30px 68px minmax(120px, 1fr) 76px 22px;
+    gap: 8px;
+  }
+
+  html[data-layout-theme="new"] .transactions-page .recent-tx-id {
+    font-size: 10px;
+  }
+
+  html[data-layout-theme="new"] .transactions-page .recent-tx-kind,
+  html[data-layout-theme="new"] .transactions-page .recent-tx-row b {
+    font-size: 11px;
+  }
+}

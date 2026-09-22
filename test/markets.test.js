@@ -332,3 +332,17 @@ test('every listed exchange exposes an explicit external trade link', async () =
   assert.ok(server.includes("tradeUrl: 'https://gatevia.io/exchange/YERB_DOGE'"));
   assert.ok(server.includes("tradeUrl: 'https://spotex.trade/trade/YERB-USDT'"));
 });
+
+
+test('New transaction index uses larger readable typography', async () => {
+  const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
+
+  assert.ok(css.includes('New layout — transaction index readability'));
+  assert.ok(css.includes('html[data-layout-theme="new"] .transactions-page .recent-tx-id'));
+  assert.ok(css.includes('font-size: 12px'));
+  assert.ok(css.includes('html[data-layout-theme="new"] .transactions-page .recent-tx-row b'));
+  assert.ok(css.includes('font-size: 13px'));
+  assert.ok(css.includes('html[data-layout-theme="new"] .transactions-page .telemetry-cell > span'));
+  assert.ok(css.includes('font-size: 10px'));
+  assert.ok(css.includes('min-height: 58px'));
+});
