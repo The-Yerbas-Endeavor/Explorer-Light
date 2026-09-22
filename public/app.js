@@ -336,8 +336,12 @@ async function renderMarkets() {
       ? (hasLiveData ? '—' : 'EXTERNAL')
       : marketMoney(market.valuation.marketCapUsdt);
 
+    const sourceLabel = hasLiveData
+      ? 'LIVE API'
+      : (market.status === 'external-live-market' ? 'TRADE LINK' : 'API OFFLINE');
+
     return '<a class="market-matrix-row' + (hasLiveData ? '' : ' external-market') + '" href="' + esc(href) + '"' + external + '>' +
-      '<span class="market-exchange"><b>' + esc(market.exchangeName) + '</b><small>' + (hasLiveData ? 'LIVE API' : 'API OFFLINE') + '</small></span>' +
+      '<span class="market-exchange"><b>' + esc(market.exchangeName) + '</b><small>' + sourceLabel + '</small></span>' +
       '<strong>' + esc(market.pair) + '</strong>' +
       '<span><small>LAST ' + esc(market.quote || '') + '</small>' + marketPrice(ticker.last) + '</span>' +
       '<span class="' + changeClass + '"><small>24H</small>' + marketPercent(ticker.change24hPct) + '</span>' +

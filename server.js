@@ -1586,6 +1586,45 @@ async function gateviaMarketSummary() {
   };
 }
 
+function spotexMarketListing() {
+  return {
+    exchange: 'spotex',
+    exchangeName: 'SpotEx',
+    pair: 'YERB',
+    tickerId: 'YERB',
+    base: 'YERB',
+    quote: null,
+    tradeUrl: 'https://spotex.trade/coins/YERB',
+    source: 'https://spotex.trade/docs/api',
+    available: false,
+    status: 'external-live-market',
+    asOf: Date.now(),
+    ticker: {
+      last: null,
+      old24h: null,
+      change24hPct: null,
+      bid: null,
+      ask: null,
+      spread: null,
+      spreadPct: null,
+      high: null,
+      low: null,
+      baseVolume: null,
+      quoteVolume: null,
+      decimals: null,
+      liquidityUsdt: null
+    },
+    valuation: {
+      supplyYerb: null,
+      marketCapUsdt: null,
+      basis: null
+    },
+    history7d: null,
+    liquidity: null,
+    apiDocsUrl: 'https://spotex.trade/docs/api'
+  };
+}
+
 function marketReferenceSummary(markets) {
   const sources = [];
 
@@ -2292,7 +2331,7 @@ async function handleApi(req, res, url) {
       nestexMarketSummary(),
       gateviaMarketSummary()
     ]);
-    const markets = [nestex, gatevia];
+    const markets = [nestex, gatevia, spotexMarketListing()];
     void recordMarketHistorySnapshot(markets);
     return sendJson(res, 200, {
       generatedAt: new Date().toISOString(),

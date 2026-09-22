@@ -301,3 +301,18 @@ test('blocks and address index routes are served through the Explorer shell', as
   assert.ok(app.includes('async function renderAddresses()'));
   assert.ok(app.includes("result.type !== 'address'"));
 });
+
+
+test('SpotEx YERB is listed without inventing unverified ticker data', async () => {
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+
+  assert.ok(server.includes("exchange: 'spotex'"));
+  assert.ok(server.includes("exchangeName: 'SpotEx'"));
+  assert.ok(server.includes("tradeUrl: 'https://spotex.trade/coins/YERB'"));
+  assert.ok(server.includes("source: 'https://spotex.trade/docs/api'"));
+  assert.ok(server.includes("available: false"));
+  assert.ok(server.includes("status: 'external-live-market'"));
+  assert.ok(server.includes('const markets = [nestex, gatevia, spotexMarketListing()]'));
+  assert.ok(app.includes("'TRADE LINK'"));
+});
