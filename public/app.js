@@ -554,8 +554,9 @@ async function renderHome() {
     ? 'no blocks on this page'
     : 'heights ' + number(oldestHeight) + '–' + number(newestHeight);
 
-  const pageHref = (target) => target <= 1 ? '/' : '/?page=' + target;
-  const latest = page > 1 ? '<a href="/">LATEST</a>' : '<span class="disabled">LATEST</span>';
+  const blockBase = location.pathname === '/blocks' ? '/blocks' : '/';
+  const pageHref = (target) => target <= 1 ? blockBase : blockBase + '?page=' + target;
+  const latest = page > 1 ? '<a href="' + blockBase + '">LATEST</a>' : '<span class="disabled">LATEST</span>';
   const newer = page > 1 ? '<a href="' + pageHref(page - 1) + '">← NEWER</a>' : '<span class="disabled">← NEWER</span>';
   const older = page < totalPages ? '<a href="' + pageHref(page + 1) + '">OLDER →</a>' : '<span class="disabled">OLDER →</span>';
   const genesis = page < totalPages ? '<a href="' + pageHref(totalPages) + '">GENESIS</a>' : '<span class="disabled">GENESIS</span>';
@@ -674,6 +675,111 @@ function yerb(value) {
     maximumFractionDigits: 8
   });
 }
+
+async function renderTransactions() {
+  document.title = 'Transactions · Yerbas Explorer';
+  renderLoading('Reading recent confirmed transactions from Yerbas Core');
+
+  const data = await api('/api/transactions?limit=60&blocks=10');
+  setRpcState('online', 'Core online');
+
+  const items = Array.isArray(data.items) ? data.items : [];
+  const rows = items.length
+    ? items.map((tx, index) =>
+        '<a class="recent-tx-row" href="/tx/' + encodeURIComponent(tx.txid) + '?block=' + encodeURIComponent(tx.blockHash) + '">' +
+          '<span class="ledger-index">' + String(index + 1).padStart(2, '0') + '</span>' +
+          '<span class="recent-tx-kind">' + (tx.coinbase ? 'COINBASE' : 'TX') + '</span>' +
+          '<code class="recent-tx-id">' + esc(tx.txid) + '</code>' +
+          '<span><small>BLOCK</small><b>#' + number(tx.blockHeight) + '</b></span>' +
+          '<span><small>AGE</small><b>' + esc(timeAgo(tx.blockTime)) + '</b></span>' +
+          '<span><small>IN / OUT</small><b>' + number(tx.inputs) + ' / ' + number(tx.outputs) + '</b></span>' +
+          '<span><small>TOTAL OUT</small><b>' + yerb(tx.totalOutput) + '</b></span>' +
+          '<span class="ledger-open">↗</span>' +
+        '</a>'
+      ).join('')
+    : '<div class="ledger-empty">No recent confirmed transactions returned.</div>';
+
+  app.innerHTML =
+    '<div class="transactions-page">' +
+      ledgerHeader(
+        'TRANSACTION INDEX',
+        'Recent transactions',
+        number(items.length) + ' confirmed entries from ' + number(data.blocksScanned) + ' recent blocks',
+        '<a href="/blocks">BLOCKS</a>'
+      ) +
+      telemetryRail([
+        { label: 'LOADED', value: number(items.length), note: 'recent transactions' },
+        { label: 'BLOCKS SCANNED', value: number(data.blocksScanned), note: 'decoded directly' },
+        { label: 'CHAIN TIP', value: number(data.tip), note: 'Yerbas Core' },
+        { label: 'DATABASE', value: 'NONE', note: 'RPC-only' }
+      ]) +
+      '<section class="ledger-section">' +
+        railHeading('RECENT ACTIVITY', 'Confirmed transactions', 'newest blocks first') +
+        '<div class="recent-tx-list">' + rows + '</div>' +
+      '</section>' +
+    '</div>';
+}
+
+async function renderAddresses() {
+  document.title = 'Addresses · Yerbas Explorer';
+  renderLoading('Checking Yerbas Core address indexes');
+  const status = await api('/api/status');
+  setRpcState('online', 'Core online');
+
+  app.innerHTML =
+    '<div class="addresses-page">' +
+      ledgerHeader(
+        'ADDRESS INDEX',
+        'Address lookup',
+        'Direct Core-index lookup · no explorer address database',
+        '<a href="/blocks">LIVE CHAIN</a>'
+      ) +
+      telemetryRail([
+        { label: 'CHAIN TIP', value: number(status.blocks), note: status.chain || 'mainnet' },
+        { label: 'DATABASE', value: 'NONE', note: 'RPC-first' },
+        { label: 'LOOKUP', value: 'CORE INDEX', note: 'address history' }
+      ]) +
+      '<section class="address-lookup-panel">' +
+        '<span class="address-lookup-eyebrow">YERBAS ADDRESS</span>' +
+        '<h3>Open an address</h3>' +
+        '<p>Enter a Yerbas address to view balance, indexed transactions, UTXOs, and asset positions reported by Core.</p>' +
+        '<form id="address-lookup-form" class="address-lookup-form">' +
+          '<input id="address-lookup-input" autocomplete="off" spellcheck="false" placeholder="Yerbas address" aria-label="Yerbas address">' +
+          '<button type="submit">OPEN ADDRESS ↗</button>' +
+        '</form>' +
+        '<div id="address-lookup-notice" class="ledger-warning hidden"></div>' +
+      '</section>' +
+    '</div>';
+
+  const form = document.querySelector('#address-lookup-form');
+  const input = document.querySelector('#address-lookup-input');
+  const notice = document.querySelector('#address-lookup-notice');
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const query = input.value.trim();
+    if (!query) {
+      notice.textContent = 'Enter a Yerbas address.';
+      notice.classList.remove('hidden');
+      return;
+    }
+
+    notice.classList.add('hidden');
+    try {
+      const result = await api('/api/search?q=' + encodeURIComponent(query));
+      if (result.type !== 'address') {
+        notice.textContent = 'That value was not recognized as a Yerbas address.';
+        notice.classList.remove('hidden');
+        return;
+      }
+      location.href = '/address/' + encodeURIComponent(result.target);
+    } catch (error) {
+      notice.textContent = error.message;
+      notice.classList.remove('hidden');
+    }
+  });
+}
+
 
 async function renderAddress(address) {
   renderLoading('Reading address index from Yerbas Core');
@@ -1618,6 +1724,18 @@ async function route() {
   const parts = location.pathname.split('/').filter(Boolean);
 
   try {
+    if (parts[0] === 'blocks') {
+      return await renderHome();
+    }
+
+    if (parts[0] === 'transactions') {
+      return await renderTransactions();
+    }
+
+    if (parts[0] === 'addresses') {
+      return await renderAddresses();
+    }
+
     if (parts[0] === 'block' && parts[1]) {
       return await renderBlock(decodeURIComponent(parts[1]));
     }

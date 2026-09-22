@@ -262,3 +262,42 @@ test('market overview uses larger readable typography without returning to overs
   assert.ok(css.includes('.market-matrix-row > strong'));
   assert.ok(css.includes('font-size: 16px'));
 });
+
+
+test('mast section labels are real navigation links', async () => {
+  const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
+
+  assert.ok(html.includes('<a href="/blocks">BLOCKS</a>'));
+  assert.ok(html.includes('<a href="/transactions">TRANSACTIONS</a>'));
+  assert.ok(html.includes('<a href="/addresses">ADDRESSES</a>'));
+  assert.ok(html.includes('<a href="/assets">ASSETS</a>'));
+  assert.ok(html.includes('<a href="/smartnodes">SMARTNODES</a>'));
+  assert.ok(html.includes('<a href="/markets">MARKETS</a>'));
+  assert.ok(css.includes('.mast-nav a:hover'));
+});
+
+test('recent transaction index is decoded directly from recent blocks', async () => {
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+
+  assert.ok(server.includes('async function recentTransactions('));
+  assert.ok(server.includes("method: 'getblock', params: [hash, 2]"));
+  assert.ok(server.includes("url.pathname === '/api/transactions'"));
+  assert.ok(server.includes("url.pathname === '/transactions'"));
+  assert.ok(app.includes('async function renderTransactions()'));
+  assert.ok(app.includes("api('/api/transactions?limit=60&blocks=10')"));
+  assert.ok(app.includes("parts[0] === 'transactions'"));
+});
+
+test('blocks and address index routes are served through the Explorer shell', async () => {
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+
+  assert.ok(server.includes("url.pathname === '/blocks'"));
+  assert.ok(server.includes("url.pathname === '/addresses'"));
+  assert.ok(app.includes("parts[0] === 'blocks'"));
+  assert.ok(app.includes("parts[0] === 'addresses'"));
+  assert.ok(app.includes('async function renderAddresses()'));
+  assert.ok(app.includes("result.type !== 'address'"));
+});

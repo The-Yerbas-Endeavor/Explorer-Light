@@ -542,6 +542,66 @@ async function recentBlocks(limit, offset = 0) {
   }));
 }
 
+async function recentTransactions(limit = 50, blockLimit = 8) {
+  const tip = await rpc.call('getblockcount');
+  const heights = Array.from(
+    { length: Math.min(blockLimit, tip + 1) },
+    (_, index) => tip - index
+  );
+  const hashes = await rpc.batch(
+    heights.map((height) => ({ method: 'getblockhash', params: [height] }))
+  );
+  const blocks = await rpc.batch(
+    hashes.map((hash) => ({ method: 'getblock', params: [hash, 2] }))
+  );
+
+  const items = [];
+  for (let blockIndex = 0; blockIndex < blocks.length; blockIndex += 1) {
+    const block = blocks[blockIndex];
+    const transactions = Array.isArray(block?.tx) ? block.tx : [];
+
+    for (let txIndex = 0; txIndex < transactions.length; txIndex += 1) {
+      const tx = transactions[txIndex];
+      if (!tx || typeof tx !== 'object' || !tx.txid) continue;
+
+      const inputs = Array.isArray(tx.vin) ? tx.vin : [];
+      const outputs = Array.isArray(tx.vout) ? tx.vout : [];
+      const totalOutput = outputs.reduce(
+        (sum, vout) => sum + Number(vout?.value || 0),
+        0
+      );
+
+      items.push({
+        txid: tx.txid,
+        blockHash: block.hash || hashes[blockIndex],
+        blockHeight: block.height ?? heights[blockIndex],
+        blockTime: block.time ?? tx.blocktime ?? null,
+        confirmations: block.confirmations ?? null,
+        index: txIndex,
+        coinbase: inputs.some((vin) => Boolean(vin?.coinbase)),
+        inputs: inputs.length,
+        outputs: outputs.length,
+        totalOutput,
+        size: tx.size ?? null
+      });
+
+      if (items.length >= limit) {
+        return {
+          tip,
+          blocksScanned: blockIndex + 1,
+          items
+        };
+      }
+    }
+  }
+
+  return {
+    tip,
+    blocksScanned: blocks.length,
+    items
+  };
+}
+
 function assetKind(name) {
   if (name.endsWith('!')) return 'Owner';
   if (name.startsWith('$')) return 'Restricted';
@@ -2260,6 +2320,24 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, data);
   }
 
+  if (url.pathname === '/api/transactions') {
+    const requestedLimit = Number.parseInt(url.searchParams.get('limit') || '50', 10);
+    const requestedBlocks = Number.parseInt(url.searchParams.get('blocks') || '8', 10);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(100, Math.max(1, requestedLimit))
+      : 50;
+    const blockLimit = Number.isFinite(requestedBlocks)
+      ? Math.min(12, Math.max(1, requestedBlocks))
+      : 8;
+    const cacheKey = 'transactions:' + limit + ':' + blockLimit;
+    const data = await cached(
+      cacheKey,
+      Math.max(config.cacheMs, 10000),
+      () => recentTransactions(limit, blockLimit)
+    );
+    return sendJson(res, 200, data);
+  }
+
   if (url.pathname.startsWith('/api/block/')) {
     const identifier = decodeURIComponent(url.pathname.slice('/api/block/'.length));
     const hash = await blockHashFromIdentifier(identifier);
@@ -2556,6 +2634,9 @@ async function requestHandler(req, res) {
     }
 
     if (url.pathname === '/'
+      || url.pathname === '/blocks'
+      || url.pathname === '/transactions'
+      || url.pathname === '/addresses'
       || url.pathname.startsWith('/block/')
       || url.pathname.startsWith('/tx/')
       || url.pathname.startsWith('/address/')

@@ -4251,6 +4251,44 @@ tbody tr:hover {
   line-height: 1.5;
 }
 
+.mast-nav {
+  margin: 10px 0 0;
+  max-width: 900px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.6;
+  letter-spacing: .06em;
+  color: var(--muted);
+}
+
+.mast-nav a {
+  padding: 2px 4px;
+  color: #7f9b88;
+  transition: color .12s ease, background .12s ease;
+}
+
+.mast-nav a:hover,
+.mast-nav a:focus-visible {
+  color: var(--green-hot);
+  background: rgba(141, 241, 158, .045);
+}
+
+.mast-nav-separator {
+  padding: 0 2px;
+  color: rgba(141, 241, 158, .28);
+}
+
+.mast-core-note {
+  margin-left: 14px;
+  padding-left: 14px;
+  border-left: 1px solid rgba(141, 241, 158, .18);
+  color: var(--holo-cyan);
+}
+
 .mast-telemetry {
   display: grid;
   grid-template-columns: repeat(3, auto);
@@ -6757,6 +6795,179 @@ body::after {
 
   .chain-pagination > :last-child {
     border-right: 0;
+  }
+}
+
+
+
+/* ==========================================================================
+   Explorer 3.6 — Transaction + address indexes
+   ========================================================================== */
+
+.recent-tx-list {
+  border-bottom: 1px solid rgba(141, 241, 158, .10);
+}
+
+.recent-tx-row {
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 34px 72px minmax(180px, 1fr) 90px 82px 86px 118px 22px;
+  gap: 10px;
+  align-items: center;
+  padding: 0 4px;
+  color: var(--text-soft);
+  border-bottom: 1px solid rgba(141, 241, 158, .06);
+}
+
+.recent-tx-row:hover {
+  color: var(--text);
+  background: rgba(141, 241, 158, .022);
+}
+
+.recent-tx-kind {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  color: var(--green);
+}
+
+.recent-tx-id {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.recent-tx-row > span:not(.ledger-index):not(.recent-tx-kind):not(.ledger-open) {
+  display: grid;
+  gap: 2px;
+  font-family: var(--mono);
+}
+
+.recent-tx-row small {
+  font-size: 8px;
+  letter-spacing: .08em;
+  color: var(--muted);
+}
+
+.recent-tx-row b {
+  font-size: 11px;
+  font-weight: 580;
+}
+
+.address-lookup-panel {
+  min-height: 260px;
+  padding: 34px 4px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  border-bottom: 1px solid rgba(141, 241, 158, .10);
+}
+
+.address-lookup-eyebrow {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: .14em;
+  color: var(--holo-cyan);
+}
+
+.address-lookup-panel h3 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.address-lookup-panel p {
+  margin: 0;
+  max-width: 760px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.address-lookup-form {
+  margin-top: 8px;
+  max-width: 880px;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  border: 1px solid rgba(141, 241, 158, .18);
+  background: rgba(141, 241, 158, .018);
+}
+
+.address-lookup-form input {
+  min-width: 0;
+  padding: 0 14px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.address-lookup-form button {
+  min-width: 150px;
+  border: 0;
+  border-left: 1px solid rgba(141, 241, 158, .16);
+  background: rgba(141, 241, 158, .08);
+  color: var(--green-hot);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  cursor: pointer;
+}
+
+.address-lookup-form button:hover {
+  background: rgba(141, 241, 158, .13);
+}
+
+@media (max-width: 900px) {
+  .recent-tx-row {
+    grid-template-columns: 30px 62px minmax(150px, 1fr) 86px 78px 22px;
+  }
+
+  .recent-tx-row > span:nth-of-type(5),
+  .recent-tx-row > span:nth-of-type(6) {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .mast-core-note {
+    width: 100%;
+    margin: 4px 0 0;
+    padding: 4px 0 0;
+    border-left: 0;
+    border-top: 1px solid rgba(141, 241, 158, .12);
+  }
+
+  .recent-tx-row {
+    grid-template-columns: 28px 58px minmax(120px, 1fr) 68px 20px;
+    gap: 7px;
+  }
+
+  .recent-tx-row > span:nth-of-type(4) {
+    display: none;
+  }
+
+  .recent-tx-id {
+    font-size: 9px;
+  }
+
+  .address-lookup-form {
+    grid-template-columns: 1fr;
+  }
+
+  .address-lookup-form input {
+    min-height: 46px;
+  }
+
+  .address-lookup-form button {
+    min-height: 42px;
+    border-left: 0;
+    border-top: 1px solid rgba(141, 241, 158, .16);
   }
 }
 
