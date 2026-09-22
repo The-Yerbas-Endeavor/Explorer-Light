@@ -309,7 +309,10 @@ test('SpotEx YERB is listed without inventing unverified ticker data', async () 
 
   assert.ok(server.includes("exchange: 'spotex'"));
   assert.ok(server.includes("exchangeName: 'SpotEx'"));
-  assert.ok(server.includes("tradeUrl: 'https://spotex.trade/coins/YERB'"));
+  assert.ok(server.includes("pair: 'YERB/USDT'"));
+  assert.ok(server.includes("tickerId: 'YERB-USDT'"));
+  assert.ok(server.includes("quote: 'USDT'"));
+  assert.ok(server.includes("tradeUrl: 'https://spotex.trade/trade/YERB-USDT'"));
   assert.ok(server.includes("source: 'https://spotex.trade/docs/api'"));
   assert.ok(server.includes("available: false"));
   assert.ok(server.includes("status: 'external-live-market'"));
@@ -327,5 +330,5 @@ test('every listed exchange exposes an explicit external trade link', async () =
   assert.ok(app.includes('target="_blank" rel="noopener noreferrer">TRADE ↗</a>'));
   assert.ok(server.includes("tradeUrl: 'https://trade.nestex.one/spot/YERB_USDT'"));
   assert.ok(server.includes("tradeUrl: 'https://gatevia.io/exchange/YERB_DOGE'"));
-  assert.ok(server.includes("tradeUrl: 'https://spotex.trade/coins/YERB'"));
+  assert.ok(server.includes("tradeUrl: 'https://spotex.trade/trade/YERB-USDT'"));
 });
