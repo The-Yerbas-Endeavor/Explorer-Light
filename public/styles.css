@@ -9059,3 +9059,389 @@ html[data-layout-theme="new"] .transactions-page .ledger-open {
     font-size: 11px;
   }
 }
+
+
+/* ==========================================================================
+   New layout — global readability pass
+   Keep the compact observatory layout, but eliminate 7–9px UI text.
+   ========================================================================== */
+
+html[data-layout-theme="new"] body {
+  font-size: 15px;
+}
+
+/* Header, mast, search, footer */
+html[data-layout-theme="new"] .brand-copy small {
+  font-size: 11px;
+}
+
+html[data-layout-theme="new"] .header-link,
+html[data-layout-theme="new"] .rpc-state,
+html[data-layout-theme="new"] .layout-toggle button {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .mast-nav,
+html[data-layout-theme="new"] .mast-subtitle {
+  font-size: 11px !important;
+  line-height: 1.55;
+}
+
+html[data-layout-theme="new"] .mast-copy p {
+  font-size: 13px;
+}
+
+html[data-layout-theme="new"] .mast-telemetry small {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .mast-telemetry strong {
+  font-size: 12px;
+}
+
+html[data-layout-theme="new"] .search-label small {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .search input {
+  font-size: 14px;
+}
+
+html[data-layout-theme="new"] .search button {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .footer-brand small,
+html[data-layout-theme="new"] .footer-meta {
+  font-size: 10px;
+}
+
+/* Common page headers, telemetry, section labels */
+html[data-layout-theme="new"] .ledger-kind {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .ledger-actions a {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .ledger-identity {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+html[data-layout-theme="new"] .ledger-note,
+html[data-layout-theme="new"] .ledger-empty,
+html[data-layout-theme="new"] .ledger-warning {
+  font-size: 13px;
+}
+
+html[data-layout-theme="new"] .telemetry-cell {
+  min-height: 74px;
+}
+
+html[data-layout-theme="new"] .telemetry-cell > span,
+html[data-layout-theme="new"] .telemetry-cell > small {
+  font-size: 10px;
+  letter-spacing: .10em;
+}
+
+html[data-layout-theme="new"] .telemetry-cell > strong {
+  font-size: clamp(18px, 1.7vw, 25px);
+}
+
+html[data-layout-theme="new"] .rail-heading span,
+html[data-layout-theme="new"] .rail-heading small {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .rail-heading h3 {
+  font-size: 22px;
+}
+
+html[data-layout-theme="new"] .observatory-label span,
+html[data-layout-theme="new"] .observatory-source {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .observatory-label strong {
+  font-size: 15px;
+}
+
+/* Home + block tape + pagination */
+html[data-layout-theme="new"] .chain-tape-row {
+  min-height: 50px;
+}
+
+html[data-layout-theme="new"] .tape-height {
+  font-size: 16px;
+}
+
+html[data-layout-theme="new"] .tape-age,
+html[data-layout-theme="new"] .tape-stat small {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .tape-stat b {
+  font-size: 13px;
+}
+
+html[data-layout-theme="new"] .tape-hash {
+  font-size: 11px;
+}
+
+html[data-layout-theme="new"] .tape-open,
+html[data-layout-theme="new"] .ledger-open {
+  font-size: 11px;
+}
+
+html[data-layout-theme="new"] .tape-confirmation {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .chain-pagination > * {
+  font-size: 10px !important;
+}
+
+/* Shared ledger rows and chain navigation */
+html[data-layout-theme="new"] .ledger-row {
+  min-height: 44px;
+}
+
+html[data-layout-theme="new"] .ledger-index,
+html[data-layout-theme="new"] .ledger-row-label,
+html[data-layout-theme="new"] .asset-inline-type {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .tx-ledger-row code {
+  font-size: 11px;
+}
+
+html[data-layout-theme="new"] .chain-nav-rail span,
+html[data-layout-theme="new"] .chain-nav-rail code {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .chain-nav-rail strong {
+  font-size: 19px;
+}
+
+/* Asset index + asset detail + holders/UTXOs */
+html[data-layout-theme="new"] .asset-badge.large,
+html[data-layout-theme="new"] .asset-state,
+html[data-layout-theme="new"] .asset-live-dot,
+html[data-layout-theme="new"] .asset-discovery-stats small,
+html[data-layout-theme="new"] .asset-discovery-foot,
+html[data-layout-theme="new"] .asset-facts-rail span {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .asset-matrix-row {
+  min-height: 48px;
+}
+
+html[data-layout-theme="new"] .asset-matrix-row,
+html[data-layout-theme="new"] .asset-matrix-row small,
+html[data-layout-theme="new"] .asset-inline-balance,
+html[data-layout-theme="new"] .asset-facts-rail code,
+html[data-layout-theme="new"] .holder-rank,
+html[data-layout-theme="new"] .holder-rail-row strong,
+html[data-layout-theme="new"] .metadata-link {
+  font-size: 12px;
+}
+
+html[data-layout-theme="new"] .portfolio-link,
+html[data-layout-theme="new"] .holder-rail-row > span:not(.ledger-index),
+html[data-layout-theme="new"] .utxo-ledger-row > span:not(.ledger-row-label):not(.ledger-open),
+html[data-layout-theme="new"] .utxo-ledger-row code {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .utxo-ledger-row strong {
+  font-size: 12px;
+}
+
+html[data-layout-theme="new"] .rail-filter input,
+html[data-layout-theme="new"] .rail-filter select,
+html[data-layout-theme="new"] .rail-filter button {
+  font-size: 11px;
+}
+
+/* Address / balance / UTXO detail */
+html[data-layout-theme="new"] .balance-focus > span,
+html[data-layout-theme="new"] .visual-fact > span,
+html[data-layout-theme="new"] .utxo-card > div:first-child > span,
+html[data-layout-theme="new"] .utxo-meta span,
+html[data-layout-theme="new"] .address-identity > span,
+html[data-layout-theme="new"] .address-identity a {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .utxo-card strong small,
+html[data-layout-theme="new"] .utxo-card code,
+html[data-layout-theme="new"] .row-sub {
+  font-size: 11px;
+}
+
+html[data-layout-theme="new"] .address-lookup-eyebrow,
+html[data-layout-theme="new"] .address-lookup-form button {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .address-lookup-panel p,
+html[data-layout-theme="new"] .address-lookup-form input {
+  font-size: 13px;
+}
+
+/* Smartnodes */
+html[data-layout-theme="new"] .collateral-card span,
+html[data-layout-theme="new"] .collateral-card small,
+html[data-layout-theme="new"] .flow-node span,
+html[data-layout-theme="new"] .flow-node small,
+html[data-layout-theme="new"] .node-pay-rank,
+html[data-layout-theme="new"] .node-pose small,
+html[data-layout-theme="new"] .node-stream-row .smartnode-status,
+html[data-layout-theme="new"] .flow-rail > span small,
+html[data-layout-theme="new"] .collateral-rail > span strong {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .node-stream-row {
+  min-height: 48px;
+}
+
+html[data-layout-theme="new"] .node-stream-row strong,
+html[data-layout-theme="new"] .node-stream-row code {
+  font-size: 12px;
+}
+
+html[data-layout-theme="new"] .network-ring-label span,
+html[data-layout-theme="new"] .network-ring-copy > span {
+  font-size: 10px;
+}
+
+/* Markets overview + detail */
+html[data-layout-theme="new"] .market-page .telemetry-cell > span,
+html[data-layout-theme="new"] .market-page .telemetry-cell > small,
+html[data-layout-theme="new"] .market-page .rail-heading span,
+html[data-layout-theme="new"] .market-page .rail-heading small,
+html[data-layout-theme="new"] .market-page .market-disclaimer,
+html[data-layout-theme="new"] .market-exchange small,
+html[data-layout-theme="new"] .market-matrix-row small,
+html[data-layout-theme="new"] .sparkline-placeholder,
+html[data-layout-theme="new"] .market-trade-link {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .market-page .ledger-identity {
+  font-size: 13px;
+}
+
+html[data-layout-theme="new"] .market-sparkline {
+  font-size: 11px;
+}
+
+html[data-layout-theme="new"] .market-matrix-row {
+  min-height: 58px;
+}
+
+html[data-layout-theme="new"] .market-value-rail small,
+html[data-layout-theme="new"] .market-liquidity-rail small,
+html[data-layout-theme="new"] .market-value-rail em,
+html[data-layout-theme="new"] .orderbook-head,
+html[data-layout-theme="new"] .market-trade-head {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .orderbook-row,
+html[data-layout-theme="new"] .market-trade-row {
+  min-height: 44px;
+  font-size: 11px;
+}
+
+html[data-layout-theme="new"] .market-disclaimer {
+  font-size: 10px;
+}
+
+/* Block + transaction detail and decoded outputs */
+html[data-layout-theme="new"] .block-age,
+html[data-layout-theme="new"] .block-card-meta small,
+html[data-layout-theme="new"] .chain-route-current span,
+html[data-layout-theme="new"] .chain-route-current small,
+html[data-layout-theme="new"] .tx-chip-card small,
+html[data-layout-theme="new"] .activity-row small,
+html[data-layout-theme="new"] .block-tx-type,
+html[data-layout-theme="new"] .block-tx-summary small,
+html[data-layout-theme="new"] .block-output-index,
+html[data-layout-theme="new"] .block-output-row > strong small,
+html[data-layout-theme="new"] .block-output-address > span {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .block-card-hash,
+html[data-layout-theme="new"] .block-tx-summary strong,
+html[data-layout-theme="new"] .block-output-address .muted,
+html[data-layout-theme="new"] .output-destination,
+html[data-layout-theme="new"] .output-rail-address {
+  font-size: 12px;
+}
+
+html[data-layout-theme="new"] .block-output-row > strong,
+html[data-layout-theme="new"] .output-rail-row > strong {
+  font-size: 13px;
+}
+
+html[data-layout-theme="new"] .output-card-head span,
+html[data-layout-theme="new"] .output-rail-address small,
+html[data-layout-theme="new"] .raw-ledger summary {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .raw-ledger pre {
+  font-size: 12px;
+}
+
+/* IPFS + metadata */
+html[data-layout-theme="new"] .asset-ipfs-ref span,
+html[data-layout-theme="new"] .ipfs-display-head span,
+html[data-layout-theme="new"] .ipfs-display-head > a,
+html[data-layout-theme="new"] .ipfs-display-foot span {
+  font-size: 10px;
+}
+
+html[data-layout-theme="new"] .ipfs-display-foot code {
+  font-size: 11px;
+}
+
+/* Network map and node lists */
+html[data-layout-theme="new"] .map-node-row strong {
+  font-size: 12px;
+}
+
+html[data-layout-theme="new"] .network-pin.cluster span {
+  font-size: 9px;
+}
+
+/* Small-screen readability: reduce columns, not the font back to 7–8px. */
+@media (max-width: 640px) {
+  html[data-layout-theme="new"] .mast-subtitle,
+  html[data-layout-theme="new"] .mast-nav {
+    font-size: 10px !important;
+  }
+
+  html[data-layout-theme="new"] .telemetry-cell > span,
+  html[data-layout-theme="new"] .telemetry-cell > small,
+  html[data-layout-theme="new"] .rail-heading span,
+  html[data-layout-theme="new"] .rail-heading small,
+  html[data-layout-theme="new"] .chain-pagination > * {
+    font-size: 9px !important;
+  }
+
+  html[data-layout-theme="new"] .tape-age,
+  html[data-layout-theme="new"] .tape-stat small,
+  html[data-layout-theme="new"] .ledger-index,
+  html[data-layout-theme="new"] .ledger-row-label {
+    font-size: 9px;
+  }
+}

@@ -66,3 +66,27 @@ test('Original palette matches the deployed legacy explorer colors', async () =>
   assert.ok(css.includes('background: #0c0c0c'));
   assert.ok(css.includes('background: #89c180'));
 });
+
+
+test('New theme applies the larger typography globally across Explorer pages', async () => {
+  const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
+
+  assert.ok(css.includes('New layout — global readability pass'));
+  assert.ok(css.includes('html[data-layout-theme="new"] .mast-telemetry small'));
+  assert.ok(css.includes('html[data-layout-theme="new"] .telemetry-cell > span'));
+  assert.ok(css.includes('html[data-layout-theme="new"] .tape-age'));
+  assert.ok(css.includes('html[data-layout-theme="new"] .asset-matrix-row'));
+  assert.ok(css.includes('html[data-layout-theme="new"] .node-stream-row'));
+  assert.ok(css.includes('html[data-layout-theme="new"] .market-exchange small'));
+  assert.ok(css.includes('html[data-layout-theme="new"] .block-tx-type'));
+  assert.ok(css.includes('html[data-layout-theme="new"] .ipfs-display-head span'));
+  assert.ok(css.includes('html[data-layout-theme="new"] .map-node-row strong'));
+});
+
+test('global readability pass does not change Original theme typography', async () => {
+  const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
+  const marker = css.indexOf('New layout — global readability pass');
+  assert.ok(marker >= 0);
+  const section = css.slice(marker);
+  assert.ok(!section.includes('html[data-layout-theme="original"]'));
+});
