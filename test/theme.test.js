@@ -55,3 +55,14 @@ test('New and Original have independent header navigation treatments', async () 
   assert.ok(css.includes('html[data-layout-theme="original"] .new-nav-link'));
   assert.ok(css.includes('html[data-layout-theme="original"] .original-nav-link'));
 });
+
+
+test('Original palette matches the deployed legacy explorer colors', async () => {
+  const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
+
+  assert.ok(css.includes('--ink: #000000'));
+  assert.ok(css.includes('background: #4f7942'));
+  assert.ok(css.includes('background: #444444'));
+  assert.ok(css.includes('background: #0c0c0c'));
+  assert.ok(css.includes('background: #89c180'));
+});

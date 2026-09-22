@@ -8757,3 +8757,198 @@ html[data-layout-theme="original"] .footer-meta {
     flex-wrap: wrap;
   }
 }
+
+
+/* ==========================================================================
+   Original palette refinement — match explorer.yerbas.org
+   ========================================================================== */
+
+html[data-layout-theme="original"] {
+  --ink: #000000;
+  --ink-soft: #000000;
+  --panel: #000000;
+  --panel-solid: #000000;
+  --panel-raised: #444444;
+  --line: #444444;
+  --line-strong: #555555;
+  --text: #ffffff;
+  --text-soft: #ffffff;
+  --muted: #888888;
+  --green: #4f7942;
+  --green-hot: #79ba95;
+  --green-dim: #4f7942;
+  background: #000000;
+}
+
+html[data-layout-theme="original"] body {
+  background: #000000;
+}
+
+html[data-layout-theme="original"] .site-header {
+  background: #4f7942;
+  border-bottom-color: #4f7942;
+}
+
+html[data-layout-theme="original"] .brand,
+html[data-layout-theme="original"] .brand-copy strong,
+html[data-layout-theme="original"] .brand-copy small {
+  color: #000000;
+}
+
+html[data-layout-theme="original"] .header-link {
+  color: #000000;
+}
+
+html[data-layout-theme="original"] .header-link:hover,
+html[data-layout-theme="original"] .header-link:focus-visible {
+  color: #ffffff;
+  background: #000000;
+}
+
+html[data-layout-theme="original"] .layout-toggle {
+  border-color: #000000;
+  background: transparent;
+}
+
+html[data-layout-theme="original"] .layout-toggle button {
+  color: #000000;
+}
+
+html[data-layout-theme="original"] .layout-toggle button + button {
+  border-left-color: #000000;
+}
+
+html[data-layout-theme="original"] .layout-toggle button.is-active {
+  color: #ffffff;
+  background: #000000;
+}
+
+html[data-layout-theme="original"] .rpc-state,
+html[data-layout-theme="original"] .rpc-state.online {
+  color: #ffffff;
+  border-color: #000000;
+  background: #000000;
+}
+
+html[data-layout-theme="original"] .rpc-state .rpc-dot,
+html[data-layout-theme="original"] .rpc-state.online .rpc-dot {
+  background: #79ba95;
+  box-shadow: none;
+}
+
+html[data-layout-theme="original"] .search {
+  border-color: #444444;
+  background: #000000;
+}
+
+html[data-layout-theme="original"] .search-icon,
+html[data-layout-theme="original"] .search input {
+  color: #ffffff;
+  background: #000000;
+}
+
+html[data-layout-theme="original"] .search input::placeholder {
+  color: #888888;
+}
+
+html[data-layout-theme="original"] .search button,
+html[data-layout-theme="original"] .asset-filter button,
+html[data-layout-theme="original"] .address-lookup-form button {
+  color: #000000;
+  background: #89c180;
+}
+
+html[data-layout-theme="original"] .search button:hover,
+html[data-layout-theme="original"] .asset-filter button:hover,
+html[data-layout-theme="original"] .address-lookup-form button:hover {
+  background: #9bca93;
+}
+
+html[data-layout-theme="original"] .original-panel-card,
+html[data-layout-theme="original"] .original-market-strip,
+html[data-layout-theme="original"] .original-card,
+html[data-layout-theme="original"] .original-latest-table,
+html[data-layout-theme="original"] .telemetry-cell,
+html[data-layout-theme="original"] .market-page .telemetry-cell,
+html[data-layout-theme="original"] .chain-tape,
+html[data-layout-theme="original"] .recent-tx-list,
+html[data-layout-theme="original"] .market-matrix,
+html[data-layout-theme="original"] .orderbook-list,
+html[data-layout-theme="original"] .market-trade-list {
+  background: #000000;
+}
+
+html[data-layout-theme="original"] .original-panel-card small,
+html[data-layout-theme="original"] .original-card > header,
+html[data-layout-theme="original"] .rail-heading {
+  background: #444444;
+}
+
+html[data-layout-theme="original"] .original-market-strip,
+html[data-layout-theme="original"] .original-card,
+html[data-layout-theme="original"] .original-panel-card,
+html[data-layout-theme="original"] .original-latest-table th,
+html[data-layout-theme="original"] .original-latest-table td,
+html[data-layout-theme="original"] .telemetry-cell,
+html[data-layout-theme="original"] .market-page .telemetry-cell,
+html[data-layout-theme="original"] .chain-tape,
+html[data-layout-theme="original"] .recent-tx-list,
+html[data-layout-theme="original"] .market-matrix,
+html[data-layout-theme="original"] .orderbook-list,
+html[data-layout-theme="original"] .market-trade-list,
+html[data-layout-theme="original"] .recent-tx-row,
+html[data-layout-theme="original"] .market-matrix-row,
+html[data-layout-theme="original"] .orderbook-row,
+html[data-layout-theme="original"] .market-trade-row,
+html[data-layout-theme="original"] .output-rail-row,
+html[data-layout-theme="original"] .chain-tape-row {
+  border-color: #444444;
+}
+
+html[data-layout-theme="original"] .original-latest-table tbody tr,
+html[data-layout-theme="original"] .chain-tape-row,
+html[data-layout-theme="original"] .recent-tx-row,
+html[data-layout-theme="original"] .market-matrix-row,
+html[data-layout-theme="original"] .orderbook-row,
+html[data-layout-theme="original"] .market-trade-row,
+html[data-layout-theme="original"] .output-rail-row {
+  background: #000000;
+}
+
+html[data-layout-theme="original"] .original-latest-table tbody tr:nth-child(even),
+html[data-layout-theme="original"] .chain-tape-row:nth-child(even),
+html[data-layout-theme="original"] .recent-tx-row:nth-child(even),
+html[data-layout-theme="original"] .market-matrix-row:nth-child(even),
+html[data-layout-theme="original"] .orderbook-row:nth-child(even),
+html[data-layout-theme="original"] .market-trade-row:nth-child(even),
+html[data-layout-theme="original"] .output-rail-row:nth-child(even) {
+  background: #0c0c0c;
+}
+
+html[data-layout-theme="original"] .original-latest-table tbody tr:hover,
+html[data-layout-theme="original"] .chain-tape-row:hover,
+html[data-layout-theme="original"] .chain-tape-row.is-tip,
+html[data-layout-theme="original"] .market-matrix-row:hover,
+html[data-layout-theme="original"] .recent-tx-row:hover {
+  background: #161616;
+}
+
+html[data-layout-theme="original"] .original-page-heading div,
+html[data-layout-theme="original"] .original-page-heading p,
+html[data-layout-theme="original"] .telemetry-cell > span,
+html[data-layout-theme="original"] .telemetry-cell > small,
+html[data-layout-theme="original"] .market-page .telemetry-cell > span,
+html[data-layout-theme="original"] .market-page .telemetry-cell > small,
+html[data-layout-theme="original"] .rail-heading small,
+html[data-layout-theme="original"] .market-page .rail-heading small {
+  color: #888888;
+}
+
+html[data-layout-theme="original"] .site-footer {
+  border-top-color: #444444;
+  background: #000000;
+}
+
+html[data-layout-theme="original"] .footer-brand strong {
+  color: #ffffff;
+}
