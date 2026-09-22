@@ -323,7 +323,7 @@ test('every listed exchange exposes an explicit external trade link', async () =
   const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
 
   assert.ok(app.includes('class="market-trade-link"'));
-  assert.ok(app.includes('href="' + esc(market.tradeUrl) + '"'));
+  assert.ok(app.includes("' + esc(market.tradeUrl) + '"));
   assert.ok(app.includes('target="_blank" rel="noopener noreferrer">TRADE ↗</a>'));
   assert.ok(server.includes("tradeUrl: 'https://trade.nestex.one/spot/YERB_USDT'"));
   assert.ok(server.includes("tradeUrl: 'https://gatevia.io/exchange/YERB_DOGE'"));
