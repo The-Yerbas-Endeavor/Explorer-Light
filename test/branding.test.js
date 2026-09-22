@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+
+const logoPath = '/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c';
+const pages = ['public/index.html', 'public/info.html'];
+
+for (const page of pages) {
+  test(`${page} references the served Yerbas logo asset`, async () => {
+    const html = await readFile(new URL(`../${page}`, import.meta.url), 'utf8');
+    const matches = html.split(logoPath).length - 1;
+    assert.ok(matches >= 4, `${page} should reference logo for favicon, touch icon, header, and footer`);
+  });
+}
+
+test('server whitelists the Yerbas logo PNG', async () => {
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+  assert.ok(server.includes("['/yerbas-logo.png', ['yerbas-logo.png', 'image/png']]"));
+});
+
+test('Yerbas logo file is a PNG', async () => {
+  const logo = await readFile(new URL('../public/yerbas-logo.png', import.meta.url));
+  assert.equal(logo.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+  assert.equal(logo.subarray(-12).toString('hex'), '0000000049454e44ae426082');
+});
