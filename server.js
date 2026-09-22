@@ -2620,6 +2620,7 @@ async function handleApi(req, res, url) {
 
 const staticFiles = new Map([
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
+  ['/theme.js', ['theme.js', 'text/javascript; charset=utf-8']],
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
   ['/yerbas-logo.png', ['yerbas-logo.png', 'image/png']],
   ['/robots.txt', ['robots.txt', 'text/plain; charset=utf-8']]

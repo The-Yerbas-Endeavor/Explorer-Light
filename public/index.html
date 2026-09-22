@@ -8,7 +8,8 @@
   <title>Yerbas Explorer</title>
   <link rel="icon" type="image/png" href="/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c">
   <link rel="apple-touch-icon" href="/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c">
-  <link rel="stylesheet" href="/styles.css?v=20260920-blocktx41">
+  <script src="/theme.js?v=20260922-layout1"></script>
+  <link rel="stylesheet" href="/styles.css?v=20260922-layout1">
 </head>
 <body>
   <div class="page-noise" aria-hidden="true"></div>
@@ -26,12 +27,28 @@
       </a>
 
       <div class="header-actions">
-        <a class="header-link assets-link" href="/assets">Assets</a>
-        <a class="header-link assets-link" href="/smartnodes">Smartnodes</a>
-        <a class="header-link assets-link" href="/markets">Markets</a>
-        <a class="header-link assets-link" href="/node-map">Map</a>
-        <a class="header-link" href="/info">API</a>
-        <a class="header-link" href="/.well-known/yerbas-ai.json">AI manifest</a>
+        <a class="header-link new-nav-link assets-link" href="/assets">Assets</a>
+        <a class="header-link new-nav-link assets-link" href="/smartnodes">Smartnodes</a>
+        <a class="header-link new-nav-link assets-link" href="/markets">Markets</a>
+        <a class="header-link new-nav-link assets-link" href="/node-map">Map</a>
+        <a class="header-link new-nav-link" href="/info">API</a>
+        <a class="header-link new-nav-link" href="/.well-known/yerbas-ai.json">AI manifest</a>
+
+        <a class="header-link original-nav-link" href="/">Explorer</a>
+        <a class="header-link original-nav-link" href="/blocks">Blocks</a>
+        <a class="header-link original-nav-link" href="/transactions">Transactions</a>
+        <a class="header-link original-nav-link" href="/addresses">Addresses</a>
+        <a class="header-link original-nav-link" href="/assets">Assets</a>
+        <a class="header-link original-nav-link" href="/smartnodes">Smartnodes</a>
+        <a class="header-link original-nav-link" href="/markets">Markets</a>
+        <a class="header-link original-nav-link" href="/node-map">Network</a>
+        <a class="header-link original-nav-link" href="/info">API</a>
+
+        <span class="layout-toggle" role="group" aria-label="Explorer layout theme">
+          <button type="button" data-layout-theme-option="new" aria-pressed="true">New</button>
+          <button type="button" data-layout-theme-option="original" aria-pressed="false">Original</button>
+        </span>
+
         <span id="rpc-state" class="rpc-state">
           <span class="rpc-dot" aria-hidden="true"></span>
           <span>Connecting</span>
@@ -126,6 +143,6 @@
     </div>
   </footer>
 
-  <script type="module" src="/app.js?v=20260920-blocktx41"></script>
+  <script type="module" src="/app.js?v=20260922-layout1"></script>
 </body>
 </html>

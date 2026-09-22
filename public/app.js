@@ -4,6 +4,12 @@ const rpcState = document.querySelector('#rpc-state');
 const searchForm = document.querySelector('#search-form');
 const searchInput = document.querySelector('#search-input');
 
+function layoutTheme() {
+  return document.documentElement.dataset.layoutTheme === 'original'
+    ? 'original'
+    : 'new';
+}
+
 function esc(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -178,6 +184,21 @@ function marketSparkline(history, fallbackQuote = '') {
     '</svg>' +
     '<em>' + esc(coverageLabel) + '</em>' +
   '</span>';
+}
+
+function hashRate(value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
+  let numeric = Number(value);
+  const units = ['H/s', 'KH/s', 'MH/s', 'GH/s', 'TH/s', 'PH/s'];
+  let unit = 0;
+  while (Math.abs(numeric) >= 1000 && unit < units.length - 1) {
+    numeric /= 1000;
+    unit += 1;
+  }
+  return numeric.toLocaleString(undefined, {
+    minimumFractionDigits: numeric < 100 ? 2 : 0,
+    maximumFractionDigits: numeric < 10 ? 3 : 2
+  }) + ' ' + units[unit];
 }
 
 function bytes(value) {
@@ -485,7 +506,81 @@ async function renderMarketDetail(exchange = 'nestex') {
     '</div>';
 }
 
+async function renderOriginalHome() {
+  document.title = 'Yerbas Block Explorer';
+  renderLoading('Reading live blockchain state');
+
+  const [summary, transactions, markets] = await Promise.all([
+    api('/ext/getsummary'),
+    api('/api/transactions?limit=25&blocks=8'),
+    api('/api/markets').catch(() => null)
+  ]);
+
+  setRpcState('online', 'Core online');
+
+  const reference = markets?.reference || {};
+  const items = Array.isArray(transactions?.items) ? transactions.items : [];
+  const lastTimestamp = items[0]?.blockTime || null;
+  const lastUpdated = lastTimestamp
+    ? new Date(Number(lastTimestamp) * 1000).toLocaleString()
+    : new Date().toLocaleString();
+
+  const rows = items.length
+    ? items.map((tx) =>
+        '<tr>' +
+          '<td><a href="/block/' + encodeURIComponent(tx.blockHeight) + '">' + number(tx.blockHeight) + '</a></td>' +
+          '<td class="original-tx-hash"><a href="/tx/' + encodeURIComponent(tx.txid) + '?block=' + encodeURIComponent(tx.blockHash) + '">' + esc(tx.txid) + '</a></td>' +
+          '<td>' + number(tx.outputs) + '</td>' +
+          '<td>' + number(tx.totalOutput, 8) + '</td>' +
+          '<td>' + esc(marketTime(tx.blockTime)) + '</td>' +
+        '</tr>'
+      ).join('')
+    : '<tr><td colspan="5">No recent confirmed transactions returned.</td></tr>';
+
+  app.innerHTML =
+    '<div class="original-home">' +
+      '<section class="original-header-panels" aria-label="Network summary">' +
+        '<article class="original-panel-card">' +
+          '<small>Network Hashrate</small>' +
+          '<strong>' + esc(hashRate(summary.hashrate)) + '</strong>' +
+        '</article>' +
+        '<article class="original-panel-card">' +
+          '<small>Network Difficulty</small>' +
+          '<strong>' + number(summary.difficulty, 8) + '</strong>' +
+        '</article>' +
+        '<article class="original-panel-card original-panel-logo" aria-label="Yerbas">' +
+          '<img src="/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c" alt="Yerbas">' +
+        '</article>' +
+      '</section>' +
+      '<section class="original-page-heading">' +
+        '<h3>Yerbas Block Explorer</h3>' +
+        '<div><strong>Last Updated:</strong> <span>' + esc(lastUpdated) + '</span></div>' +
+        '<p>A listing of all verified Yerbas transactions</p>' +
+      '</section>' +
+      '<section class="original-market-strip">' +
+        '<span><small>YERB/USDT</small><strong>' + marketPrice(reference.priceUsdt) + '</strong></span>' +
+        '<span><small>Market Cap</small><strong>' + marketMoney(reference.marketCapUsdt) + ' USDT</strong></span>' +
+        '<span><small>Connections</small><strong>' + number(summary.connections) + '</strong></span>' +
+        '<span><small>Block Height</small><strong>' + number(summary.blockcount) + '</strong></span>' +
+      '</section>' +
+      '<section class="original-card">' +
+        '<header><strong>Latest Transactions</strong><a href="/transactions">View all</a></header>' +
+        '<div class="original-table-wrap">' +
+          '<table class="original-latest-table">' +
+            '<thead><tr><th>Block</th><th>Transaction</th><th>Recipients</th><th>Amount (YERB)</th><th>Timestamp</th></tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+          '</table>' +
+        '</div>' +
+      '</section>' +
+    '</div>';
+}
+
+
 async function renderHome() {
+  if (layoutTheme() === 'original' && location.pathname === '/') {
+    return renderOriginalHome();
+  }
+
   document.title = 'Yerbas Explorer';
   renderLoading('Reading live blockchain state');
 
@@ -1814,6 +1909,10 @@ searchForm.addEventListener('submit', async (event) => {
   } catch (error) {
     showNotice(error.message, 'error');
   }
+});
+
+window.addEventListener('yerbas-layout-theme-change', () => {
+  route();
 });
 
 route();
