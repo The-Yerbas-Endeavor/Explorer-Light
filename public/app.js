@@ -325,10 +325,10 @@ async function renderMarkets() {
       ? ''
       : (Number(ticker.change24hPct) >= 0 ? 'market-up' : 'market-down');
     const internalDetail = market.exchange === 'nestex' || market.exchange === 'gatevia';
-    const href = internalDetail
+    const detailHref = internalDetail
       ? '/markets/' + encodeURIComponent(market.exchange) + '/YERB/' + encodeURIComponent(market.quote || 'USDT')
       : market.tradeUrl;
-    const external = internalDetail
+    const detailExternal = internalDetail
       ? ''
       : ' target="_blank" rel="noopener noreferrer"';
     const quoteLabel = 'VOL ' + esc(market.quote || 'QUOTE');
@@ -340,17 +340,17 @@ async function renderMarkets() {
       ? 'LIVE API'
       : (market.status === 'external-live-market' ? 'TRADE LINK' : 'API OFFLINE');
 
-    return '<a class="market-matrix-row' + (hasLiveData ? '' : ' external-market') + '" href="' + esc(href) + '"' + external + '>' +
-      '<span class="market-exchange"><b>' + esc(market.exchangeName) + '</b><small>' + sourceLabel + '</small></span>' +
-      '<strong>' + esc(market.pair) + '</strong>' +
+    return '<div class="market-matrix-row' + (hasLiveData ? '' : ' external-market') + '">' +
+      '<a class="market-exchange market-detail-link" href="' + esc(detailHref) + '"' + detailExternal + '><b>' + esc(market.exchangeName) + '</b><small>' + sourceLabel + '</small></a>' +
+      '<a class="market-pair-link" href="' + esc(detailHref) + '"' + detailExternal + '>' + esc(market.pair) + '</a>' +
       '<span><small>LAST ' + esc(market.quote || '') + '</small>' + marketPrice(ticker.last) + '</span>' +
       '<span class="' + changeClass + '"><small>24H</small>' + marketPercent(ticker.change24hPct) + '</span>' +
       '<span><small>VOL YERB</small>' + number(ticker.baseVolume, 2) + '</span>' +
       '<span><small>' + quoteLabel + '</small>' + marketMoney(ticker.quoteVolume) + '</span>' +
       '<span><small>VALUATION</small>' + valuation + '</span>' +
       marketSparkline(market.history7d, market.quote) +
-      '<span class="ledger-open">' + (hasLiveData ? '↗' : 'TRADE ↗') + '</span>' +
-    '</a>';
+      '<a class="market-trade-link" href="' + esc(market.tradeUrl) + '" target="_blank" rel="noopener noreferrer">TRADE ↗</a>' +
+    '</div>';
   }).join('');
 
   app.innerHTML =

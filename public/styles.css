@@ -7019,7 +7019,7 @@ body::after {
 .market-matrix-row {
   min-height: 50px;
   display: grid;
-  grid-template-columns: 110px 120px 110px 80px 120px 100px 130px minmax(180px, 1fr) 34px;
+  grid-template-columns: 110px 120px 110px 80px 120px 100px 130px minmax(180px, 1fr) 74px;
   gap: 10px;
   align-items: center;
   padding: 0 4px;
@@ -7125,9 +7125,38 @@ body::after {
   white-space: nowrap;
 }
 
-.market-matrix-row > strong {
+.market-pair-link {
   font-size: 16px;
+  font-weight: 700;
   letter-spacing: -.02em;
+  color: var(--text);
+}
+
+.market-detail-link,
+.market-pair-link {
+  min-width: 0;
+}
+
+.market-detail-link:hover b,
+.market-detail-link:focus-visible b,
+.market-pair-link:hover,
+.market-pair-link:focus-visible {
+  color: var(--holo-cyan);
+}
+
+.market-trade-link {
+  justify-self: end;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: var(--holo-cyan);
+}
+
+.market-trade-link:hover,
+.market-trade-link:focus-visible {
+  color: var(--green-hot);
 }
 
 .market-up {

@@ -259,7 +259,7 @@ test('market overview uses larger readable typography without returning to overs
   assert.ok(css.includes('font-size: 9px'));
   assert.ok(css.includes('.market-page .market-matrix-row'));
   assert.ok(css.includes('min-height: 56px'));
-  assert.ok(css.includes('.market-matrix-row > strong'));
+  assert.ok(css.includes('.market-pair-link'));
   assert.ok(css.includes('font-size: 16px'));
 });
 
@@ -315,4 +315,17 @@ test('SpotEx YERB is listed without inventing unverified ticker data', async () 
   assert.ok(server.includes("status: 'external-live-market'"));
   assert.ok(server.includes('const markets = [nestex, gatevia, spotexMarketListing()]'));
   assert.ok(app.includes("'TRADE LINK'"));
+});
+
+
+test('every listed exchange exposes an explicit external trade link', async () => {
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+
+  assert.ok(app.includes('class="market-trade-link"'));
+  assert.ok(app.includes('href="' + esc(market.tradeUrl) + '"'));
+  assert.ok(app.includes('target="_blank" rel="noopener noreferrer">TRADE ↗</a>'));
+  assert.ok(server.includes("tradeUrl: 'https://trade.nestex.one/spot/YERB_USDT'"));
+  assert.ok(server.includes("tradeUrl: 'https://gatevia.io/exchange/YERB_DOGE'"));
+  assert.ok(server.includes("tradeUrl: 'https://spotex.trade/coins/YERB'"));
 });
