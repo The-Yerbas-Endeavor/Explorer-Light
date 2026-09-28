@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Yerbas Explorer Light — direct, database-free access to the Yerbas blockchain">
+  <meta name="theme-color" content="#030907">
+  <title>Yerbas Explorer</title>
+  <link rel="icon" type="image/png" href="/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c">
+  <link rel="apple-touch-icon" href="/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c">
+  <script src="/theme.js?v=20260922-layout1"></script>
+  <link rel="stylesheet" href="/styles.css?v=20260922-layout1">
+</head>
+<body>
+  <div class="page-noise" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="/" aria-label="Yerbas Explorer Light home">
+        <span class="brand-mark" aria-hidden="true">
+          <img src="/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c" alt="" width="44" height="44">
+        </span>
+        <span class="brand-copy">
+          <strong>YERBAS</strong>
+          <small>EXPLORER LIGHT</small>
+        </span>
+      </a>
+
+      <div class="header-actions">
+        <a class="header-link new-nav-link assets-link" href="/assets">Assets</a>
+        <a class="header-link new-nav-link assets-link" href="/smartnodes">Smartnodes</a>
+        <a class="header-link new-nav-link assets-link" href="/markets">Markets</a>
+        <a class="header-link new-nav-link assets-link" href="/node-map">Map</a>
+        <a class="header-link new-nav-link" href="/info">API</a>
+        <a class="header-link new-nav-link" href="/.well-known/yerbas-ai.json">AI manifest</a>
+
+        <a class="header-link original-nav-link" href="/">Explorer</a>
+        <a class="header-link original-nav-link" href="/blocks">Blocks</a>
+        <a class="header-link original-nav-link" href="/transactions">Transactions</a>
+        <a class="header-link original-nav-link" href="/addresses">Addresses</a>
+        <a class="header-link original-nav-link" href="/assets">Assets</a>
+        <a class="header-link original-nav-link" href="/smartnodes">Smartnodes</a>
+        <a class="header-link original-nav-link" href="/markets">Markets</a>
+        <a class="header-link original-nav-link" href="/node-map">Network</a>
+        <a class="header-link original-nav-link" href="/info">API</a>
+
+        <span class="layout-toggle" role="group" aria-label="Explorer layout theme">
+          <button type="button" data-layout-theme-option="new" aria-pressed="true">New</button>
+          <button type="button" data-layout-theme-option="original" aria-pressed="false">Original</button>
+        </span>
+
+        <span id="rpc-state" class="rpc-state">
+          <span class="rpc-dot" aria-hidden="true"></span>
+          <span>Connecting</span>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="observatory-mast">
+      <div class="mast-copy">
+        <div class="signal-line">
+          <span class="signal-pulse" aria-hidden="true"></span>
+          <span>YERBAS MAINNET</span>
+          <span class="signal-separator">/</span>
+          <span>LIVE OBSERVATORY</span>
+        </div>
+        <h1 class="mast-title">
+          <strong>YERBAS</strong>
+          <span class="mast-slash">//</span>
+          <span class="mast-channel">LIVE CHAIN</span>
+        </h1>
+        <nav class="mast-subtitle mast-nav" aria-label="Explorer sections">
+          <a href="/blocks">BLOCKS</a>
+          <span class="mast-nav-separator" aria-hidden="true">·</span>
+          <a href="/transactions">TRANSACTIONS</a>
+          <span class="mast-nav-separator" aria-hidden="true">·</span>
+          <a href="/addresses">ADDRESSES</a>
+          <span class="mast-nav-separator" aria-hidden="true">·</span>
+          <a href="/assets">ASSETS</a>
+          <span class="mast-nav-separator" aria-hidden="true">·</span>
+          <a href="/smartnodes">SMARTNODES</a>
+          <span class="mast-nav-separator" aria-hidden="true">·</span>
+          <a href="/markets">MARKETS</a>
+          <span class="mast-core-note">DIRECT FROM CORE</span>
+        </nav>
+      </div>
+
+      <div class="mast-telemetry" aria-label="Explorer architecture">
+        <span><small>SOURCE</small><strong>CORE RPC</strong></span>
+        <span><small>DATABASE</small><strong>NONE</strong></span>
+        <span><small>NETWORK</small><strong>MAINNET</strong></span>
+      </div>
+    </section>
+
+    <section class="search-zone" aria-label="Blockchain search">
+      <div class="search-label">
+        <span>CHAIN QUERY</span>
+        <small>HEIGHT / HASH / TXID / ADDRESS / ASSET</small>
+      </div>
+      <form id="search-form" class="search" role="search">
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input
+          id="search-input"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Search the Yerbas blockchain"
+          aria-label="Search Yerbas blockchain"
+        >
+        <button type="submit">
+          <span>Explore</span>
+          <span aria-hidden="true">↗</span>
+        </button>
+      </form>
+      <div id="notice" class="notice hidden" role="status"></div>
+    </section>
+
+    <div id="app" aria-live="polite">
+      <section class="loading-card">
+        <span class="loading-scan" aria-hidden="true"></span>
+        <span>Reading Yerbas Core…</span>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-brand">
+      <span class="footer-mark"><img src="/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c" alt="" width="44" height="44"></span>
+      <span>
+        <strong>Yerbas Explorer Light</strong>
+        <small>RPC-first blockchain visibility</small>
+      </span>
+    </div>
+    <div class="footer-meta">
+      <span>© 2026 YERBAS</span>
+      <a href="https://github.com/The-Yerbas-Endeavor/Explorer-Light" target="_blank" rel="noopener noreferrer">GITHUB ↗</a>
+      <a href="/assets">ASSET INDEX</a>
+      <a href="/smartnodes">SMARTNODES</a>
+      <a href="/markets">MARKETS</a>
+      <a href="/node-map">NETWORK MAP</a>
+      <a href="/info">PUBLIC API</a>
+    </div>
+  </footer>
+
+  <script type="module" src="/app.js?v=20260922-layout1"></script>
+</body>
+</html>

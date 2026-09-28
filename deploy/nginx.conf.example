@@ -1,0 +1,30 @@
+# This file is intended to be included from nginx's http context
+# (for example through sites-enabled/). Tune the rate for your deployment.
+limit_req_zone $binary_remote_addr zone=yerbas_ai_query:10m rate=10r/s;
+
+server {
+    listen 80;
+    server_name explorer-light.example.org;
+
+    # AI tool invocation is the only public POST surface.
+    location ~ ^/(api/ai(?:/v1)?/query|ext/ai/query)$ {
+        limit_req zone=yerbas_ai_query burst=20 nodelay;
+        client_max_body_size 64k;
+
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

@@ -1,0 +1,22 @@
+[Unit]
+Description=Yerbas Explorer Light
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=yerbas
+Group=yerbas
+WorkingDirectory=/opt/yerbas-explorer-light
+EnvironmentFile=-/opt/yerbas-explorer-light/.env
+ExecStart=/usr/bin/node /opt/yerbas-explorer-light/server.js
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/yerbas-explorer-light
+
+[Install]
+WantedBy=multi-user.target

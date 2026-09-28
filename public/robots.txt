@@ -1,0 +1,16 @@
+User-agent: GPTBot
+Disallow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: bingbot
+Allow: /
+
+User-agent: *
+Disallow: /api/
+Disallow: /ext/
+Allow: /
