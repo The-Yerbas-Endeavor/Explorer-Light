@@ -542,11 +542,22 @@ async function recentBlocks(limit, offset = 0) {
   }));
 }
 
-async function recentTransactions(limit = 50, blockLimit = 8) {
+async function recentTransactions(limit = 50, blockLimit = 8, blockOffset = 0) {
   const tip = await rpc.call('getblockcount');
+  const safeOffset = Math.max(0, Number(blockOffset) || 0);
+  if (safeOffset > tip) {
+    return {
+      tip,
+      blockOffset: safeOffset,
+      blocksScanned: 0,
+      items: []
+    };
+  }
+
+  const startHeight = tip - safeOffset;
   const heights = Array.from(
-    { length: Math.min(blockLimit, tip + 1) },
-    (_, index) => tip - index
+    { length: Math.min(blockLimit, startHeight + 1) },
+    (_, index) => startHeight - index
   );
   const hashes = await rpc.batch(
     heights.map((height) => ({ method: 'getblockhash', params: [height] }))
@@ -588,6 +599,7 @@ async function recentTransactions(limit = 50, blockLimit = 8) {
       if (items.length >= limit) {
         return {
           tip,
+          blockOffset: safeOffset,
           blocksScanned: blockIndex + 1,
           items
         };
@@ -597,6 +609,7 @@ async function recentTransactions(limit = 50, blockLimit = 8) {
 
   return {
     tip,
+    blockOffset: safeOffset,
     blocksScanned: blocks.length,
     items
   };
@@ -2362,17 +2375,21 @@ async function handleApi(req, res, url) {
   if (url.pathname === '/api/transactions') {
     const requestedLimit = Number.parseInt(url.searchParams.get('limit') || '50', 10);
     const requestedBlocks = Number.parseInt(url.searchParams.get('blocks') || '8', 10);
+    const requestedOffset = Number.parseInt(url.searchParams.get('offsetBlocks') || '0', 10);
     const limit = Number.isFinite(requestedLimit)
-      ? Math.min(100, Math.max(1, requestedLimit))
+      ? Math.min(500, Math.max(1, requestedLimit))
       : 50;
     const blockLimit = Number.isFinite(requestedBlocks)
-      ? Math.min(12, Math.max(1, requestedBlocks))
+      ? Math.min(25, Math.max(1, requestedBlocks))
       : 8;
-    const cacheKey = 'transactions:' + limit + ':' + blockLimit;
+    const blockOffset = Number.isFinite(requestedOffset)
+      ? Math.max(0, requestedOffset)
+      : 0;
+    const cacheKey = 'transactions:' + limit + ':' + blockLimit + ':' + blockOffset;
     const data = await cached(
       cacheKey,
       Math.max(config.cacheMs, 10000),
-      () => recentTransactions(limit, blockLimit)
+      () => recentTransactions(limit, blockLimit, blockOffset)
     );
     return sendJson(res, 200, data);
   }

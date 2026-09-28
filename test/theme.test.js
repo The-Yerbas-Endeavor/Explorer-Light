@@ -97,3 +97,21 @@ test('Original latest transactions hides zero-value rows', async () => {
 
   assert.ok(app.includes(".filter((tx) => Number(tx?.totalOutput || 0) > 0)"));
 });
+
+
+test('Original latest transactions paginates by ten blocks', async () => {
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
+
+  assert.ok(app.includes('const pageSize = 10'));
+  assert.ok(app.includes("'&offsetBlocks=' + blockOffset"));
+  assert.ok(app.includes('new Set()'));
+  assert.ok(app.includes('.slice(0, pageSize)'));
+  assert.ok(app.includes('Page ' + " + number(page) + " + ' of '));
+  assert.ok(app.includes('>Older</a>'));
+  assert.ok(app.includes('>Newer</a>'));
+  assert.ok(server.includes("url.searchParams.get('offsetBlocks')"));
+  assert.ok(server.includes('recentTransactions(limit, blockLimit, blockOffset)'));
+  assert.ok(css.includes('.original-pagination'));
+});

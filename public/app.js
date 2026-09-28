@@ -510,17 +510,48 @@ async function renderOriginalHome() {
   document.title = 'Yerbas Block Explorer';
   renderLoading('Reading live blockchain state');
 
+  const pageSize = 10;
+  const requestedPage = Math.max(
+    1,
+    Number.parseInt(new URLSearchParams(location.search).get('page') || '1', 10) || 1
+  );
+  const blockOffset = (requestedPage - 1) * pageSize;
+
   const [summary, transactions, markets] = await Promise.all([
     api('/ext/getsummary'),
-    api('/api/transactions?limit=25&blocks=8'),
+    api('/api/transactions?limit=500&blocks=' + pageSize + '&offsetBlocks=' + blockOffset),
     api('/api/markets').catch(() => null)
   ]);
 
   setRpcState('online', 'Core online');
 
   const reference = markets?.reference || {};
-  const items = (Array.isArray(transactions?.items) ? transactions.items : [])
+  const totalBlocks = Math.max(1, Number(transactions?.tip ?? summary.blockcount ?? 0) + 1);
+  const totalPages = Math.max(1, Math.ceil(totalBlocks / pageSize));
+  const page = Math.min(requestedPage, totalPages);
+
+  const positiveItems = (Array.isArray(transactions?.items) ? transactions.items : [])
     .filter((tx) => Number(tx?.totalOutput || 0) > 0);
+  const seenBlocks = new Set();
+  const items = positiveItems.filter((tx) => {
+    const height = Number(tx?.blockHeight);
+    if (!Number.isFinite(height) || seenBlocks.has(height)) return false;
+    seenBlocks.add(height);
+    return true;
+  }).slice(0, pageSize);
+
+  const originalPageHref = (target) => target <= 1 ? '/' : '/?page=' + target;
+  const pagination =
+    '<nav class="original-pagination" aria-label="Latest transaction block pages">' +
+      (page > 1
+        ? '<a href="/">Latest</a><a href="' + originalPageHref(page - 1) + '">Newer</a>'
+        : '<span class="disabled">Latest</span><span class="disabled">Newer</span>') +
+      '<span class="original-page-status">Page ' + number(page) + ' of ' + number(totalPages) + '</span>' +
+      (page < totalPages
+        ? '<a href="' + originalPageHref(page + 1) + '">Older</a>'
+        : '<span class="disabled">Older</span>') +
+    '</nav>';
+
   const lastTimestamp = items[0]?.blockTime || null;
   const lastUpdated = lastTimestamp
     ? new Date(Number(lastTimestamp) * 1000).toLocaleString()
@@ -572,6 +603,7 @@ async function renderOriginalHome() {
             '<tbody>' + rows + '</tbody>' +
           '</table>' +
         '</div>' +
+        pagination +
       '</section>' +
     '</div>';
 }
