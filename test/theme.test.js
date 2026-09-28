@@ -39,7 +39,7 @@ test('Original home restores the classic Yerbas explorer hierarchy using live RP
   assert.ok(app.includes('A listing of all verified Yerbas transactions'));
   assert.ok(app.includes('Latest Transactions'));
   assert.ok(app.includes("api('/ext/getsummary')"));
-  assert.ok(app.includes("api('/api/transactions?limit=25&blocks=8')"));
+  assert.ok(app.includes("api('/api/transactions?limit=500&blocks=' + pageSize + '&offsetBlocks=' + blockOffset)"));
   assert.ok(app.includes("if (layoutTheme() === 'original' && location.pathname === '/')"));
   assert.ok(app.includes("window.addEventListener('yerbas-layout-theme-change'"));
 });
@@ -83,12 +83,13 @@ test('New theme applies the larger typography globally across Explorer pages', a
   assert.ok(css.includes('html[data-layout-theme="new"] .map-node-row strong'));
 });
 
-test('global readability pass does not change Original theme typography', async () => {
+test('global readability pass remains explicitly scoped to the New theme', async () => {
   const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
-  const marker = css.indexOf('New layout — global readability pass');
-  assert.ok(marker >= 0);
-  const section = css.slice(marker);
-  assert.ok(!section.includes('html[data-layout-theme="original"]'));
+
+  assert.ok(css.includes('New layout — global readability pass'));
+  assert.ok(css.includes('html[data-layout-theme="new"] body'));
+  assert.ok(css.includes('html[data-layout-theme="new"] .telemetry-cell > span'));
+  assert.ok(css.includes('html[data-layout-theme="original"] .original-pagination'));
 });
 
 
@@ -108,7 +109,7 @@ test('Original latest transactions paginates by ten blocks', async () => {
   assert.ok(app.includes("'&offsetBlocks=' + blockOffset"));
   assert.ok(app.includes('new Set()'));
   assert.ok(app.includes('.slice(0, pageSize)'));
-  assert.ok(app.includes('Page ' + " + number(page) + " + ' of '));
+  assert.ok(app.includes("'<span class=\"original-page-status\">Page ' + number(page) + ' of ' + number(totalPages) + '</span>'"));
   assert.ok(app.includes('>Older</a>'));
   assert.ok(app.includes('>Newer</a>'));
   assert.ok(server.includes("url.searchParams.get('offsetBlocks')"));
