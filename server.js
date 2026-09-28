@@ -2188,6 +2188,27 @@ async function handlePublicApi(req, res, url) {
     return sendText(res, 200, await rpc.call('getblockcount'));
   }
 
+  if (path === '/api/getmininginfo') {
+    try {
+      return sendJson(res, 200, await rpc.call('getmininginfo'));
+    } catch {
+      const [chain, hashRate] = await Promise.all([
+        rpc.call('getblockchaininfo'),
+        rpc.call('getnetworkhashps').catch(() => null)
+      ]);
+      return sendJson(res, 200, {
+        blocks: chain.blocks,
+        difficulty: chain.difficulty,
+        networkhashps: hashRate,
+        chain: chain.chain
+      });
+    }
+  }
+
+  if (path === '/api/getblockchaininfo') {
+    return sendJson(res, 200, await rpc.call('getblockchaininfo'));
+  }
+
   if (path === '/api/getblockhash') {
     const index = apiInt(url.searchParams.get('index'), -1, 0, Number.MAX_SAFE_INTEGER);
     if (index < 0) return sendJson(res, 400, { error: 'index is required.' });

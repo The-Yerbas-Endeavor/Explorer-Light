@@ -1042,17 +1042,17 @@ map $http_user_agent $explorer_block_gptbot {
 
 map $uri $explorer_legacy_api {
     default 0;
-    ~^/api/(?:getblockcount|getdifficulty|getnetworkhashps|getconnectioncount|getblockhash|getblock|getrawtransaction|getmasternodecount)$ 1;
+    ~^/api/(?:getblockcount|getdifficulty|getnetworkhashps|getconnectioncount|getmininginfo|getblockchaininfo|getblockhash|getblock|getrawtransaction|getmasternodecount)$ 1;
 }
 
 map $uri $explorer_all_key {
     default $binary_remote_addr;
-    ~^/api/(?:getblockcount|getdifficulty|getnetworkhashps|getconnectioncount|getblockhash|getblock|getrawtransaction|getmasternodecount)$ "";
+    ~^/api/(?:getblockcount|getdifficulty|getnetworkhashps|getconnectioncount|getmininginfo|getblockchaininfo|getblockhash|getblock|getrawtransaction|getmasternodecount)$ "";
 }
 
 map $uri $explorer_legacy_key {
     default "";
-    ~^/api/(?:getblockcount|getdifficulty|getnetworkhashps|getconnectioncount|getblockhash|getblock|getrawtransaction|getmasternodecount)$ $binary_remote_addr;
+    ~^/api/(?:getblockcount|getdifficulty|getnetworkhashps|getconnectioncount|getmininginfo|getblockchaininfo|getblockhash|getblock|getrawtransaction|getmasternodecount)$ $binary_remote_addr;
 }
 
 map "$explorer_legacy_api:$http_user_agent" $explorer_scraper_key {

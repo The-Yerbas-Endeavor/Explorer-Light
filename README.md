@@ -55,7 +55,7 @@ Explorer-Light ships with `scripts/install-nginx-bot-guard.sh` for existing depl
 - OAI-SearchBot, Googlebot, Bingbot: permitted and subject to normal client limits.
 - Obvious crawlers/scrapers: 1 request/second per IP, burst 5.
 - All normal clients: 10 requests/second per IP, burst 40.
-- Legacy read-only explorer compatibility calls (`/api/getblockcount`, `getdifficulty`, `getnetworkhashps`, `getconnectioncount`, `getblockhash`, `getblock`, `getrawtransaction`, `getmasternodecount`) use a dedicated 25 requests/second lane with burst 150 so public indexers and mining-stat services can poll the same API surface as the legacy explorer.
+- Legacy read-only explorer compatibility calls (`/api/getblockcount`, `getdifficulty`, `getnetworkhashps`, `getconnectioncount`, `getmininginfo`, `getblockchaininfo`, `getblockhash`, `getblock`, `getrawtransaction`, `getmasternodecount`) use a dedicated 25 requests/second lane with burst 150 so public indexers and mining-stat services can poll the same API surface as the legacy explorer.
 - All clients: maximum 20 concurrent requests per IP.
 - `/api/ipfs-preview/`: 2 requests/second, burst 4, maximum 4 concurrent requests per IP.
 - Repeated nginx rate-limit violations can trigger a one-hour Fail2ban ban after 30 logged violations within 10 minutes.

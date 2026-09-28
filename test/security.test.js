@@ -50,11 +50,14 @@ test('legacy read-only API stays compatible with public mining/stat indexers', a
   const guard = await readFile(new URL('../scripts/install-nginx-bot-guard.sh', import.meta.url), 'utf8');
   const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
 
-  assert.ok(guard.includes('~^/api/(?:getblockcount|getdifficulty|getnetworkhashps|getconnectioncount|getblockhash|getblock|getrawtransaction|getmasternodecount)$ 1;'));
+  assert.ok(guard.includes('~^/api/(?:getblockcount|getdifficulty|getnetworkhashps|getconnectioncount|getmininginfo|getblockchaininfo|getblockhash|getblock|getrawtransaction|getmasternodecount)$ 1;'));
   assert.ok(guard.includes('zone=explorer_legacy:10m rate=25r/s'));
   assert.ok(guard.includes('limit_req zone=explorer_legacy burst=150 nodelay'));
   assert.ok(server.includes("if (path === '/api/getblockcount')"));
   assert.ok(server.includes("return sendText(res, 200, await rpc.call('getblockcount'))"));
+  assert.ok(server.includes("if (path === '/api/getmininginfo')"));
+  assert.ok(server.includes("rpc.call('getmininginfo')"));
+  assert.ok(server.includes("if (path === '/api/getblockchaininfo')"));
   assert.ok(server.includes("if (path === '/api/getnetworkhashps')"));
   assert.ok(server.includes("if (path === '/api/getdifficulty')"));
 });
