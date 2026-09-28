@@ -19,9 +19,11 @@ test('nginx bot guard mirrors the production per-IP protections', async () => {
 
   for (const source of [guard, installer]) {
     assert.ok(source.includes('zone=explorer_all:10m rate=10r/s'));
+    assert.ok(source.includes('zone=explorer_legacy:10m rate=25r/s'));
     assert.ok(source.includes('zone=explorer_scraper:10m rate=1r/s'));
     assert.ok(source.includes('zone=explorer_heavy:10m rate=2r/s'));
     assert.ok(source.includes('limit_req zone=explorer_all burst=40 nodelay'));
+    assert.ok(source.includes('limit_req zone=explorer_legacy burst=150 nodelay'));
     assert.ok(source.includes('limit_req zone=explorer_scraper burst=5 nodelay'));
     assert.ok(source.includes('limit_req zone=explorer_heavy burst=4 nodelay'));
     assert.ok(source.includes('limit_conn explorer_conn 20'));
@@ -41,4 +43,18 @@ test('existing-server bot guard validates and can roll nginx back', async () => 
   assert.ok(guard.includes('maxretry = 30'));
   assert.ok(guard.includes('findtime = 10m'));
   assert.ok(guard.includes('bantime = 1h'));
+});
+
+
+test('legacy read-only API stays compatible with public mining/stat indexers', async () => {
+  const guard = await readFile(new URL('../scripts/install-nginx-bot-guard.sh', import.meta.url), 'utf8');
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+
+  assert.ok(guard.includes('~^/api/(?:getblockcount|getdifficulty|getnetworkhashps|getconnectioncount|getblockhash|getblock|getrawtransaction|getmasternodecount)$ 1;'));
+  assert.ok(guard.includes('zone=explorer_legacy:10m rate=25r/s'));
+  assert.ok(guard.includes('limit_req zone=explorer_legacy burst=150 nodelay'));
+  assert.ok(server.includes("if (path === '/api/getblockcount')"));
+  assert.ok(server.includes("return sendText(res, 200, await rpc.call('getblockcount'))"));
+  assert.ok(server.includes("if (path === '/api/getnetworkhashps')"));
+  assert.ok(server.includes("if (path === '/api/getdifficulty')"));
 });

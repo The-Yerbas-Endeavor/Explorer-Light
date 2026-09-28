@@ -54,7 +54,8 @@ Explorer-Light ships with `scripts/install-nginx-bot-guard.sh` for existing depl
 - GPTBot: HTTP 403.
 - OAI-SearchBot, Googlebot, Bingbot: permitted and subject to normal client limits.
 - Obvious crawlers/scrapers: 1 request/second per IP, burst 5.
-- All clients: 10 requests/second per IP, burst 40.
+- All normal clients: 10 requests/second per IP, burst 40.
+- Legacy read-only explorer compatibility calls (`/api/getblockcount`, `getdifficulty`, `getnetworkhashps`, `getconnectioncount`, `getblockhash`, `getblock`, `getrawtransaction`, `getmasternodecount`) use a dedicated 25 requests/second lane with burst 150 so public indexers and mining-stat services can poll the same API surface as the legacy explorer.
 - All clients: maximum 20 concurrent requests per IP.
 - `/api/ipfs-preview/`: 2 requests/second, burst 4, maximum 4 concurrent requests per IP.
 - Repeated nginx rate-limit violations can trigger a one-hour Fail2ban ban after 30 logged violations within 10 minutes.
@@ -87,6 +88,7 @@ The default installation performs the **entire explorer-node bootstrap and host 
 - Opens only SSH, HTTP, HTTPS, and Yerbas mainnet P2P `15420/tcp`; Core RPC `9998` is never opened publicly.
 - Enables Fail2ban SSH protection.
 - Adds an nginx bot guard: GPTBot is denied, obvious scrapers are throttled to 1 req/s per IP with burst 5, normal clients to 10 req/s with burst 40, and each IP is capped at 20 concurrent requests.
+- Gives the legacy read-only `/api/get*` compatibility surface a separate 25 req/s, burst-150 lane for MiningPoolStats-style polling and block scans.
 - Applies a tighter IPFS-preview guard of 2 req/s with burst 4 and 4 concurrent preview requests per IP.
 - Keeps OAI-SearchBot, Googlebot, and Bingbot out of the scraper-specific throttle while they remain subject to the normal per-IP limits.
 - Adds a Fail2ban jail for repeated nginx rate-limit violations.

@@ -59,11 +59,26 @@ map $http_user_agent $explorer_block_gptbot {
     ~*GPTBot 1;
 }
 
-map $http_user_agent $explorer_scraper_key {
+map $uri $explorer_legacy_api {
+    default 0;
+    ~^/api/(?:getblockcount|getdifficulty|getnetworkhashps|getconnectioncount|getblockhash|getblock|getrawtransaction|getmasternodecount)$ 1;
+}
+
+map $uri $explorer_all_key {
+    default $binary_remote_addr;
+    ~^/api/(?:getblockcount|getdifficulty|getnetworkhashps|getconnectioncount|getblockhash|getblock|getrawtransaction|getmasternodecount)$ "";
+}
+
+map $uri $explorer_legacy_key {
     default "";
-    ~*(?:OAI-SearchBot|Googlebot|bingbot) "";
-    ~*(?:GPTBot) "";
-    ~*(?:bot|crawler|spider|scrapy|curl|wget|python-requests|aiohttp|httpx|Go-http-client|libwww-perl|HeadlessChrome|PhantomJS|SemrushBot|AhrefsBot|MJ12bot|DotBot|CCBot|Bytespider|PetalBot|DataForSeoBot|rust_sniffer|masscan|zgrab|nikto|nuclei|sqlmap) $binary_remote_addr;
+    ~^/api/(?:getblockcount|getdifficulty|getnetworkhashps|getconnectioncount|getblockhash|getblock|getrawtransaction|getmasternodecount)$ $binary_remote_addr;
+}
+
+map "$explorer_legacy_api:$http_user_agent" $explorer_scraper_key {
+    default "";
+    ~*^0:.*(?:OAI-SearchBot|Googlebot|bingbot) "";
+    ~*^0:.*(?:GPTBot) "";
+    ~*^0:.*(?:bot|crawler|spider|scrapy|curl|wget|python-requests|aiohttp|httpx|Go-http-client|libwww-perl|HeadlessChrome|PhantomJS|SemrushBot|AhrefsBot|MJ12bot|DotBot|CCBot|Bytespider|PetalBot|DataForSeoBot|rust_sniffer|masscan|zgrab|nikto|nuclei|sqlmap) $binary_remote_addr;
 }
 
 map $uri $explorer_heavy_key {
@@ -71,7 +86,8 @@ map $uri $explorer_heavy_key {
     ~^/api/ipfs-preview/ $binary_remote_addr;
 }
 
-limit_req_zone $binary_remote_addr zone=explorer_all:10m rate=10r/s;
+limit_req_zone $explorer_all_key zone=explorer_all:10m rate=10r/s;
+limit_req_zone $explorer_legacy_key zone=explorer_legacy:10m rate=25r/s;
 limit_req_zone $explorer_scraper_key zone=explorer_scraper:10m rate=1r/s;
 limit_req_zone $explorer_heavy_key zone=explorer_heavy:10m rate=2r/s;
 limit_conn_zone $binary_remote_addr zone=explorer_conn:10m;
@@ -84,6 +100,7 @@ if ($explorer_block_gptbot) {
 }
 
 limit_req zone=explorer_all burst=40 nodelay;
+limit_req zone=explorer_legacy burst=150 nodelay;
 limit_req zone=explorer_scraper burst=5 nodelay;
 limit_req zone=explorer_heavy burst=4 nodelay;
 limit_conn explorer_conn 20;
@@ -121,7 +138,7 @@ fi
 
 cat > "$FILTER" <<'EOF'
 [Definition]
-failregex = limiting requests, excess: .* by zone "explorer_(?:all|scraper|heavy)", client: <HOST>,
+failregex = limiting requests, excess: .* by zone "explorer_(?:all|legacy|scraper|heavy)", client: <HOST>,
 ignoreregex =
 EOF
 
@@ -155,4 +172,4 @@ trap - ERR
 rm -rf "$BACKUP_DIR"
 
 log "Bot guard active."
-printf '%s\n'   "  GPTBot: 403"   "  obvious scrapers: 1r/s, burst 5"   "  all clients: 10r/s, burst 40, max 20 concurrent"   "  IPFS previews: 2r/s, burst 4, max 4 concurrent"   "  OAI-SearchBot / Googlebot / Bingbot: permitted under normal limits"
+printf '%s\n'   "  GPTBot: 403"   "  obvious scrapers: 1r/s, burst 5"   "  all clients: 10r/s, burst 40, max 20 concurrent"   "  legacy /api/get* compatibility: 25r/s, burst 150"   "  IPFS previews: 2r/s, burst 4, max 4 concurrent"   "  OAI-SearchBot / Googlebot / Bingbot: permitted under normal limits"
