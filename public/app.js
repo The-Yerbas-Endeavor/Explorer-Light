@@ -519,7 +519,8 @@ async function renderOriginalHome() {
   setRpcState('online', 'Core online');
 
   const reference = markets?.reference || {};
-  const items = Array.isArray(transactions?.items) ? transactions.items : [];
+  const items = (Array.isArray(transactions?.items) ? transactions.items : [])
+    .filter((tx) => Number(tx?.totalOutput || 0) > 0);
   const lastTimestamp = items[0]?.blockTime || null;
   const lastUpdated = lastTimestamp
     ? new Date(Number(lastTimestamp) * 1000).toLocaleString()

@@ -90,3 +90,10 @@ test('global readability pass does not change Original theme typography', async 
   const section = css.slice(marker);
   assert.ok(!section.includes('html[data-layout-theme="original"]'));
 });
+
+
+test('Original latest transactions hides zero-value rows', async () => {
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+
+  assert.ok(app.includes(".filter((tx) => Number(tx?.totalOutput || 0) > 0)"));
+});
