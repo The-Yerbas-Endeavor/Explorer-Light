@@ -388,3 +388,10 @@ Database-dependent legacy routes that cannot be reproduced faithfully without re
 - IP geolocation runs server-side, is cached, and is never requested directly from visitors' browsers.
 - The public API is `/api/v1/network-map?view=smartnodes` or `?view=peers`.
 - Explorer-Light remains database-free; the geolocation cache is ephemeral runtime cache rather than a blockchain/explorer database.
+
+### Rich list
+
+`/richlist` and `/api/v1/richlist` expose a top-100 richest-address snapshot.
+A daily background job reads the patched local Core node's `getrichlist` RPC;
+web requests never scan chainstate. No explorer database or new Core index is
+required. See [docs/RICHLIST.md](docs/RICHLIST.md) for deployment and balance rules.

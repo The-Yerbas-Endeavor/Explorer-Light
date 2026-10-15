@@ -852,6 +852,32 @@ async function renderTransactions() {
     '</div>';
 }
 
+function richlistAmount(value) {
+  const units = BigInt(value);
+  return (units / 100000000n).toLocaleString('en-US') + '.'
+    + (units % 100000000n).toString().padStart(8, '0');
+}
+
+async function renderRichlist() {
+  document.title = 'Rich list · Yerbas Explorer';
+  renderLoading('Loading richest addresses');
+  const data = await api('/api/v1/richlist');
+  setRpcState('online', 'Core online');
+  const rows = data.items.map((item) => '<tr><td>' + item.rank + '</td><td><a href="/address/'
+    + encodeURIComponent(item.address) + '">' + esc(item.address) + '</a></td><td>'
+    + richlistAmount(item.balanceSatoshis) + '</td></tr>').join('');
+  app.innerHTML = '<div class="addresses-page">'
+    + ledgerHeader('YERB DISTRIBUTION', 'Richest addresses', 'Top 100 · confirmed unspent YERB', '<a href="/addresses">ADDRESS LOOKUP</a>')
+    + '<p>' + esc(data.policy) + '</p>'
+    + '<p>Snapshot block <a href="/block/' + data.height + '">' + number(data.height) + '</a> · Updated '
+    + esc(new Date(data.generatedAt).toLocaleString()) + '</p>'
+    + (data.stale ? '<p class="ledger-warning">This snapshot is older than the configured refresh window.</p>' : '')
+    + '<p>Addresses with a positive balance: ' + number(data.addresses)
+    + ' · Native YERB without a single identifiable address: ' + richlistAmount(data.unattributedSatoshis) + '</p>'
+    + '<div class="richlist-scroll"><table class="richlist-table"><thead><tr><th>Rank</th><th>Address</th><th>YERB balance</th></tr></thead><tbody>'
+    + rows + '</tbody></table></div></div>';
+}
+
 async function renderAddresses() {
   document.title = 'Addresses · Yerbas Explorer';
   renderLoading('Checking Yerbas Core address indexes');
@@ -1863,6 +1889,8 @@ async function route() {
     if (parts[0] === 'transactions') {
       return await renderTransactions();
     }
+
+    if (parts[0] === 'richlist') return await renderRichlist();
 
     if (parts[0] === 'addresses') {
       return await renderAddresses();

@@ -1,0 +1,19 @@
+[Unit]
+Description=Refresh Yerbas richest-address snapshot
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=explorer-light
+Group=explorer-light
+WorkingDirectory=/opt/yerbas-explorer-light
+EnvironmentFile=/opt/yerbas-explorer-light/.env
+ExecStart=/usr/bin/node /opt/yerbas-explorer-light/scripts/update-richlist.js
+StateDirectory=yerbas-explorer-light
+Environment=RICHLIST_FILE=/var/lib/yerbas-explorer-light/richlist.json
+TimeoutStartSec=2h
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
