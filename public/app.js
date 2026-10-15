@@ -852,6 +852,14 @@ async function renderTransactions() {
     '</div>';
 }
 
+const addressLabels = Object.freeze({
+  'yYRDT2bovVEJrJ7BbcEXG3FCBwnYdX9Zg7': 'XeggeX (defunct exchange)'
+});
+
+function addressLabel(address) {
+  return Object.hasOwn(addressLabels, address) ? addressLabels[address] : '';
+}
+
 function richlistAmount(value) {
   const units = BigInt(value);
   return (units / 100000000n).toLocaleString('en-US') + '.'
@@ -864,7 +872,8 @@ async function renderRichlist() {
   const data = await api('/api/v1/richlist');
   setRpcState('online', 'Core online');
   const rows = data.items.map((item) => '<tr><td>' + item.rank + '</td><td><a href="/address/'
-    + encodeURIComponent(item.address) + '">' + esc(item.address) + '</a></td><td>'
+    + encodeURIComponent(item.address) + '">' + esc(item.address) + '</a>'
+    + (addressLabel(item.address) ? '<br><strong>' + esc(addressLabel(item.address)) + '</strong>' : '') + '</td><td>'
     + richlistAmount(item.balanceSatoshis) + '</td></tr>').join('');
   app.innerHTML = '<div class="addresses-page">'
     + ledgerHeader('YERB DISTRIBUTION', 'Richest addresses', 'Top 100 · confirmed unspent YERB', '<a href="/addresses">ADDRESS LOOKUP</a>')
@@ -993,7 +1002,7 @@ async function renderAddress(address) {
     : '<div class="ledger-warning">Address recognized, but indexed history is unavailable from Core.</div>';
 
   app.innerHTML =
-    ledgerHeader('YERBAS ADDRESS', 'Address', data.address, '<a href="/">LIVE CHAIN</a>') +
+    ledgerHeader('YERBAS ADDRESS', addressLabel(data.address) || 'Address', data.address, '<a href="/">LIVE CHAIN</a>') +
     historyNotice +
     telemetryRail([
       { label: 'BALANCE', value: yerb(balance?.balanceYerb) + ' YERB', note: 'current' },
