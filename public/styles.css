@@ -9516,3 +9516,23 @@ html[data-layout-theme="original"] .original-page-status {
 .richlist-chart-legend button.is-selected, .richlist-chart-legend button:focus-visible { border-color: currentColor; border-radius: 4px; }
 .richlist-chart-detail { min-height: 3em; font-variant-numeric: tabular-nums; }
 @media (max-width: 650px) { .richlist-chart-layout { grid-template-columns: 1fr; gap: 1rem; } .richlist-chart-legend button { font-size: .85rem; } }
+
+/* Compact rich list with a supply chart alongside the addresses. */
+.richlist-content { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 1.25rem; align-items: start; margin-top: 1.5rem; }
+.richlist-content .richlist-table { margin-top: 0; font-size: .8rem; }
+.richlist-content .richlist-table th, .richlist-content .richlist-table td { padding: .6rem .45rem; }
+.richlist-content .richlist-table td:nth-child(2) { overflow-wrap: anywhere; }
+.richlist-content .richlist-table td:nth-child(2) a { font-family: monospace; }
+.richlist-content .richlist-distribution { margin: 0; padding: .9rem; position: sticky; top: 90px; max-height: calc(100vh - 105px); overflow-y: auto; font-size: .8rem; }
+.richlist-content .richlist-distribution h3 { font-size: 1rem; }
+.richlist-content .richlist-chart-layout { grid-template-columns: 1fr; gap: .5rem; margin: .75rem 0; }
+.richlist-content .richlist-pie { max-width: 180px; }
+.richlist-content .richlist-chart-legend { gap: 0; }
+.richlist-content .richlist-chart-legend button { gap: .4rem; padding: .25rem; font-size: .73rem; }
+.richlist-content .richlist-chart-detail { min-height: 3em; margin-bottom: .5rem; }
+@media (max-width: 980px) {
+  .richlist-content { grid-template-columns: minmax(0, 1fr); }
+  .richlist-content .richlist-distribution { order: -1; position: static; max-height: none; }
+  .richlist-content .richlist-chart-layout { grid-template-columns: 180px minmax(0, 1fr); }
+}
+@media (max-width: 520px) { .richlist-content .richlist-chart-layout { grid-template-columns: 1fr; } }
