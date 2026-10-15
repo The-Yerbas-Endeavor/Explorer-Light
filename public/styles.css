@@ -9503,3 +9503,16 @@ html[data-layout-theme="original"] .original-page-status {
 .richlist-table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
 .richlist-table th, .richlist-table td { padding: .8rem; text-align: left; border-bottom: 1px solid currentColor; }
 .richlist-table td:last-child, .richlist-table th:last-child { text-align: right; white-space: nowrap; }
+
+.richlist-distribution { margin: 2rem 0; padding: 1.25rem; border: 1px solid #687d91; border-radius: 8px; }
+.richlist-distribution h3 { margin: 0 0 .75rem; }
+.richlist-chart-layout { display: grid; grid-template-columns: minmax(180px, 280px) minmax(0, 1fr); align-items: center; gap: 2rem; margin: 1.25rem 0; }
+.richlist-pie { width: 100%; max-width: 280px; overflow: visible; justify-self: center; }
+.richlist-pie [data-richlist-slice] { stroke: #10251d; stroke-width: 1; cursor: pointer; transition: opacity .15s; }
+.richlist-pie.has-selection [data-richlist-slice]:not(.is-selected) { opacity: .4; }
+.richlist-pie [data-richlist-slice]:focus { outline: none; stroke: currentColor; stroke-width: 3; }
+.richlist-chart-legend { display: grid; gap: .25rem; min-width: 0; }
+.richlist-chart-legend button { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; align-items: center; gap: .75rem; padding: .5rem; background: transparent; color: inherit; border: 1px solid transparent; text-align: left; font: inherit; cursor: pointer; }
+.richlist-chart-legend button.is-selected, .richlist-chart-legend button:focus-visible { border-color: currentColor; border-radius: 4px; }
+.richlist-chart-detail { min-height: 3em; font-variant-numeric: tabular-nums; }
+@media (max-width: 650px) { .richlist-chart-layout { grid-template-columns: 1fr; gap: 1rem; } .richlist-chart-legend button { font-size: .85rem; } }

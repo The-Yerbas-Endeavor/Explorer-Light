@@ -866,6 +866,81 @@ function richlistAmount(value) {
     + (units % 100000000n).toString().padStart(8, '0');
 }
 
+function richlistDistribution(items) {
+  const total = items.reduce((sum, item) => sum + BigInt(item.balanceSatoshis), 0n);
+  if (total === 0n) return { total, slices: [] };
+  const slices = items.slice(0, 10).map((item) => ({
+    label: addressLabel(item.address) || '#' + item.rank + ' · ' + compactHash(item.address),
+    balance: BigInt(item.balanceSatoshis)
+  }));
+  const other = items.slice(10).reduce((sum, item) => sum + BigInt(item.balanceSatoshis), 0n);
+  if (other > 0n) slices.push({ label: 'Other top-100 addresses (ranks 11–' + items.length + ')', balance: other });
+  return { total, slices: slices.map((slice) => ({ ...slice,
+    fraction: Number(slice.balance * 1000000000n / total) / 1000000000,
+    percent: (Number(slice.balance * 10000n / total) / 100).toFixed(2)
+  })) };
+}
+
+function richlistChart(items) {
+  const { total, slices } = richlistDistribution(items);
+  if (!slices.length) return '<p>No positive balances to chart.</p>';
+  const colors = ['#75f0ac', '#57d9ec', '#a6a2ff', '#ffc778', '#f58fb2', '#8dcdf5',
+    '#cee97b', '#cc9ce7', '#fb9f77', '#8cdac5', '#687d91'];
+  let angle = -Math.PI / 2;
+  const paths = slices.map((slice, index) => {
+    const start = angle;
+    angle += slice.fraction * Math.PI * 2;
+    // Close the final slice exactly to avoid a rounding seam.
+    if (index === slices.length - 1) angle = Math.PI * 1.5;
+    const title = slice.label + ': ' + slice.percent + '% · ' + richlistAmount(slice.balance) + ' YERB';
+    const attrs = ' data-richlist-slice="' + index + '" fill="' + colors[index]
+      + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + esc(title) + '"';
+    if (slices.length === 1) return '<circle cx="120" cy="120" r="110"' + attrs + '><title>' + esc(title) + '</title></circle>';
+    const x1 = 120 + 110 * Math.cos(start), y1 = 120 + 110 * Math.sin(start);
+    const x2 = 120 + 110 * Math.cos(angle), y2 = 120 + 110 * Math.sin(angle);
+    return '<path d="M120 120 L' + x1 + ' ' + y1 + ' A110 110 0 '
+      + (angle - start > Math.PI ? 1 : 0) + ' 1 ' + x2 + ' ' + y2 + ' Z"' + attrs + '><title>' + esc(title) + '</title></path>';
+  }).join('');
+  const legend = slices.map((slice, index) => '<button type="button" data-richlist-slice="' + index
+    + '" aria-pressed="false"><svg width="12" height="12" aria-hidden="true"><rect width="12" height="12" fill="'
+    + colors[index] + '"/></svg><span>' + esc(slice.label) + '</span><strong>' + slice.percent + '%</strong></button>').join('');
+  return '<section class="richlist-distribution" aria-labelledby="richlist-distribution-title">'
+    + '<h3 id="richlist-distribution-title">Distribution within the top 100</h3>'
+    + '<p>Share of the combined top-100 balance, not the entire YERB supply. Ranks 11–100 are grouped.</p>'
+    + '<div class="richlist-chart-layout"><svg class="richlist-pie" viewBox="0 0 240 240" role="group" aria-label="Top-100 balance distribution">'
+    + paths + '</svg><div class="richlist-chart-legend">' + legend + '</div></div>'
+    + '<p class="richlist-chart-detail" aria-live="polite">Hover, focus, or tap a slice to see its balance.</p>'
+    + '<p>Combined top-100 balance: <strong>' + richlistAmount(total) + ' YERB</strong></p></section>';
+}
+
+function bindRichlistChart(items) {
+  const { slices } = richlistDistribution(items);
+  const chart = app.querySelector('.richlist-distribution');
+  if (!chart) return;
+  const controls = chart.querySelectorAll('[data-richlist-slice]');
+  function select(index) {
+    const slice = slices[index];
+    if (!slice) return;
+    controls.forEach((control) => {
+      const selected = Number(control.dataset.richlistSlice) === index;
+      control.classList.toggle('is-selected', selected);
+      control.setAttribute('aria-pressed', String(selected));
+    });
+    chart.querySelector('.richlist-pie').classList.add('has-selection');
+    chart.querySelector('.richlist-chart-detail').textContent = slice.label + ' · '
+      + richlistAmount(slice.balance) + ' YERB · ' + slice.percent + '% of the top-100 balance';
+  }
+  controls.forEach((control) => {
+    const activate = () => select(Number(control.dataset.richlistSlice));
+    control.addEventListener('pointerenter', activate);
+    control.addEventListener('focus', activate);
+    control.addEventListener('click', activate);
+    control.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); }
+    });
+  });
+}
+
 async function renderRichlist() {
   document.title = 'Rich List · Yerbas Explorer';
   renderLoading('Loading richest addresses');
@@ -883,8 +958,10 @@ async function renderRichlist() {
     + (data.stale ? '<p class="ledger-warning">This snapshot is older than the configured refresh window.</p>' : '')
     + '<p>Addresses with a positive balance: ' + number(data.addresses)
     + ' · Native YERB without a single identifiable address: ' + richlistAmount(data.unattributedSatoshis) + '</p>'
+    + richlistChart(data.items)
     + '<div class="richlist-scroll"><table class="richlist-table"><thead><tr><th>Rank</th><th>Address</th><th>YERB balance</th></tr></thead><tbody>'
     + rows + '</tbody></table></div></div>';
+  bindRichlistChart(data.items);
 }
 
 async function renderAddresses() {
