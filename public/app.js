@@ -1132,6 +1132,7 @@ async function renderAddress(address) {
       railHeading('ACTIVITY', 'Address transactions', number(txids.length) + ' indexed') +
       '<div class="ledger-list">' + txRows + '</div>' +
     '</section>';
+  void updateWatchedAddressNote();
 }
 
 
@@ -1191,7 +1192,6 @@ function assetListHref(params, page) {
 
   const query = next.toString();
   return '/assets' + (query ? '?' + query : '');
-  void updateWatchedAddressNote();
 }
 
 async function renderAssets() {
