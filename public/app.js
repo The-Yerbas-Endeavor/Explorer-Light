@@ -862,6 +862,7 @@ async function renderRichlist() {
   document.title = 'Rich list · Yerbas Explorer';
   renderLoading('Loading richest addresses');
   const data = await api('/api/v1/richlist');
+  setRpcState('online', 'Core online');
   const rows = data.items.map((item) => '<tr><td>' + item.rank + '</td><td><a href="/address/'
     + encodeURIComponent(item.address) + '">' + esc(item.address) + '</a></td><td>'
     + richlistAmount(item.balanceSatoshis) + '</td></tr>').join('');
