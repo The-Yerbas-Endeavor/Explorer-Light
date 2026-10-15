@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { AiToolError, AI_API_VERSION, AI_PROTOCOL, AI_TOOL_DEFINITIONS, createAiGateway } from './src/ai.js';
+import { lastXeggeXSend } from './src/address-watch.js';
 import { readRichlist } from './src/richlist.js';
 import { config } from './src/config.js';
 import { RpcError, YerbasRpc } from './src/rpc.js';
@@ -2352,6 +2353,11 @@ async function handlePublicApi(req, res, url) {
 }
 
 async function handleApi(req, res, url) {
+  if (url.pathname === '/api/address-watch') {
+    const data = await cached('address-watch:xeggex', 300000, () => lastXeggeXSend(rpc));
+    return sendJson(res, 200, data);
+  }
+
   if (url.pathname === '/api/richlist') {
     try {
       const data = await readRichlist(config.richlist.file, config.richlist.maxAgeMs);

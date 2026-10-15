@@ -9536,3 +9536,5 @@ html[data-layout-theme="original"] .original-page-status {
   .richlist-content .richlist-chart-layout { grid-template-columns: 180px minmax(0, 1fr); }
 }
 @media (max-width: 520px) { .richlist-content .richlist-chart-layout { grid-template-columns: 1fr; } }
+
+.address-last-sent { display: block; margin-top: .3rem; font-size: .72rem; line-height: 1.5; }

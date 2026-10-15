@@ -860,6 +860,30 @@ function addressLabel(address) {
   return Object.hasOwn(addressLabels, address) ? addressLabels[address] : '';
 }
 
+function watchedAddressNote(address) {
+  return address === 'yYRDT2bovVEJrJ7BbcEXG3FCBwnYdX9Zg7'
+    ? '<small class="address-last-sent">Last sent: checking…</small>' : '';
+}
+
+async function updateWatchedAddressNote() {
+  const notes = app.querySelectorAll('.address-last-sent');
+  if (!notes.length) return;
+  try {
+    const data = await api('/api/v1/address-watch');
+    notes.forEach(note => {
+      const sent = data.lastSent;
+      if (!sent) { note.textContent = 'No confirmed outgoing YERB found.'; return; }
+      const when = new Date(sent.time * 1000).toISOString().replace('T', ' ').replace('.000Z', ' UTC');
+      note.innerHTML = 'Last sent: <a href="/tx/' + encodeURIComponent(sent.txid) + '">'
+        + esc(when) + '</a> (confirmed)';
+      note.title = 'Last confirmed spend from this address. Incoming deposits do not change this date. Checked '
+        + new Date(data.checkedAt).toISOString();
+    });
+  } catch {
+    notes.forEach(note => { note.textContent = 'Last sent: temporarily unavailable'; });
+  }
+}
+
 function richlistAmount(value) {
   const units = BigInt(value);
   return (units / 100000000n).toLocaleString('en-US') + '.'
@@ -951,7 +975,7 @@ async function renderRichlist() {
   setRpcState('online', 'Core online');
   const rows = data.items.map((item) => '<tr><td>' + item.rank + '</td><td><a href="/address/'
     + encodeURIComponent(item.address) + '">' + esc(item.address) + '</a>'
-    + (addressLabel(item.address) ? '<br><strong>' + esc(addressLabel(item.address)) + '</strong>' : '') + '</td><td>'
+    + (addressLabel(item.address) ? '<br><strong>' + esc(addressLabel(item.address)) + '</strong>' : '') + watchedAddressNote(item.address) + '</td><td>'
     + richlistAmount(item.balanceSatoshis) + '</td></tr>').join('');
   app.innerHTML = '<div class="addresses-page">'
     + ledgerHeader('YERB DISTRIBUTION', 'Rich List', 'Top 100 · confirmed unspent YERB', '<a href="/addresses">ADDRESS LOOKUP</a>')
@@ -966,6 +990,7 @@ async function renderRichlist() {
     + ' · Native YERB without a single identifiable address: ' + richlistAmount(data.unattributedSatoshis) + '</p>'
     + '</section></div>';
   bindRichlistChart(data.items, data.totalSatoshis);
+  void updateWatchedAddressNote();
 }
 
 async function renderAddresses() {
@@ -1084,6 +1109,7 @@ async function renderAddress(address) {
 
   app.innerHTML =
     ledgerHeader('YERBAS ADDRESS', addressLabel(data.address) || 'Address', data.address, '<a href="/">LIVE CHAIN</a>') +
+    watchedAddressNote(data.address) +
     historyNotice +
     telemetryRail([
       { label: 'BALANCE', value: yerb(balance?.balanceYerb) + ' YERB', note: 'current' },
@@ -1165,6 +1191,7 @@ function assetListHref(params, page) {
 
   const query = next.toString();
   return '/assets' + (query ? '?' + query : '');
+  void updateWatchedAddressNote();
 }
 
 async function renderAssets() {
