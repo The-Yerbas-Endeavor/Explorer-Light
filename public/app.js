@@ -955,14 +955,16 @@ async function renderRichlist() {
     + richlistAmount(item.balanceSatoshis) + '</td></tr>').join('');
   app.innerHTML = '<div class="addresses-page">'
     + ledgerHeader('YERB DISTRIBUTION', 'Rich List', 'Top 100 · confirmed unspent YERB', '<a href="/addresses">ADDRESS LOOKUP</a>')
+    + (data.stale ? '<p class="ledger-warning">This snapshot is older than the configured refresh window.</p>' : '')
+    + '<div class="richlist-content"><div class="richlist-scroll"><table class="richlist-table"><thead><tr><th>Rank</th><th>Address</th><th>YERB balance</th></tr></thead><tbody>'
+    + rows + '</tbody></table></div>' + richlistChart(data.items, data.totalSatoshis) + '</div>'
+    + '<section class="ledger-section" aria-label="Snapshot details">'
     + '<p>' + esc(data.policy) + '</p>'
     + '<p>Snapshot block <a href="/block/' + data.height + '">' + number(data.height) + '</a> · Updated '
     + esc(new Date(data.generatedAt).toLocaleString()) + '</p>'
-    + (data.stale ? '<p class="ledger-warning">This snapshot is older than the configured refresh window.</p>' : '')
     + '<p>Addresses with a positive balance: ' + number(data.addresses)
     + ' · Native YERB without a single identifiable address: ' + richlistAmount(data.unattributedSatoshis) + '</p>'
-    + '<div class="richlist-content"><div class="richlist-scroll"><table class="richlist-table"><thead><tr><th>Rank</th><th>Address</th><th>YERB balance</th></tr></thead><tbody>'
-    + rows + '</tbody></table></div>' + richlistChart(data.items, data.totalSatoshis) + '</div></div>';
+    + '</section></div>';
   bindRichlistChart(data.items, data.totalSatoshis);
 }
 
