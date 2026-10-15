@@ -867,7 +867,7 @@ function richlistAmount(value) {
 }
 
 async function renderRichlist() {
-  document.title = 'Rich list · Yerbas Explorer';
+  document.title = 'Rich List · Yerbas Explorer';
   renderLoading('Loading richest addresses');
   const data = await api('/api/v1/richlist');
   setRpcState('online', 'Core online');
@@ -876,7 +876,7 @@ async function renderRichlist() {
     + (addressLabel(item.address) ? '<br><strong>' + esc(addressLabel(item.address)) + '</strong>' : '') + '</td><td>'
     + richlistAmount(item.balanceSatoshis) + '</td></tr>').join('');
   app.innerHTML = '<div class="addresses-page">'
-    + ledgerHeader('YERB DISTRIBUTION', 'Richest addresses', 'Top 100 · confirmed unspent YERB', '<a href="/addresses">ADDRESS LOOKUP</a>')
+    + ledgerHeader('YERB DISTRIBUTION', 'Rich List', 'Top 100 · confirmed unspent YERB', '<a href="/addresses">ADDRESS LOOKUP</a>')
     + '<p>' + esc(data.policy) + '</p>'
     + '<p>Snapshot block <a href="/block/' + data.height + '">' + number(data.height) + '</a> · Updated '
     + esc(new Date(data.generatedAt).toLocaleString()) + '</p>'
