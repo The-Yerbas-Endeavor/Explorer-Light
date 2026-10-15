@@ -2701,6 +2701,12 @@ async function requestHandler(req, res) {
   try {
     const url = new URL(req.url || '/', 'http://localhost');
 
+    if (['GET', 'HEAD'].includes(req.method || '') && url.pathname === '/markets/gatevia/YERB/DOGE') {
+      res.writeHead(302, securityHeaders({ location: 'https://gatevia.io/exchange/YERB_DOGE', 'cache-control': 'no-cache' }));
+      return res.end();
+    }
+
+
     if (isAiPath(url.pathname)) {
       return await handleAi(req, res, url);
     }

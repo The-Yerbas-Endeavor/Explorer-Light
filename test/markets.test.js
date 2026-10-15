@@ -77,7 +77,7 @@ test('Gatevia YERB DOGE uses the public API with a safe degraded mode', async ()
   assert.ok(server.includes("'/api/market/gatevia/YERB/DOGE'"));
   assert.ok(app.includes("exchangeId === 'gatevia'"));
   assert.ok(app.includes("'API OFFLINE'"));
-  assert.ok(app.includes("const internalDetail = market.exchange === 'nestex' || market.exchange === 'gatevia';"));
+  assert.ok(app.includes("const internalDetail = market.exchange === 'nestex';"));
   assert.ok(app.includes("'/markets/' + encodeURIComponent(market.exchange) + '/YERB/' + encodeURIComponent(market.quote || 'USDT')"));
   assert.ok(app.includes("TRADE ON ' + esc(exchangeName.toUpperCase()) + ' ↗"));
   assert.ok(app.includes('target="_blank" rel="noopener noreferrer"'));
