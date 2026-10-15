@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { AiToolError, AI_API_VERSION, AI_PROTOCOL, AI_TOOL_DEFINITIONS, createAiGateway } from './src/ai.js';
+import { readRichlist } from './src/richlist.js';
 import { config } from './src/config.js';
 import { RpcError, YerbasRpc } from './src/rpc.js';
 import { classifySearchInput } from './src/search.js';
@@ -2103,6 +2104,7 @@ async function handlePublicApi(req, res, url) {
         block: '/api/v1/block/:height-or-hash',
         transaction: '/api/v1/tx/:txid',
         address: '/api/v1/address/:address',
+        richlist: '/api/v1/richlist',
         assets: '/api/v1/assets?q=&page=1&count=25&type=&metadata=&reissuable=',
         assetStats: '/api/v1/assets/stats',
         asset: '/api/v1/asset/:asset-name',
@@ -2350,6 +2352,20 @@ async function handlePublicApi(req, res, url) {
 }
 
 async function handleApi(req, res, url) {
+  if (url.pathname === '/api/richlist') {
+    try {
+      const data = await readRichlist(config.richlist.file, config.richlist.maxAgeMs);
+      const active = await cached('richlist-block:' + data.bestblock, config.cacheMs,
+        () => rpc.call('getblockhash', [data.height]));
+      if (active !== data.bestblock) {
+        return sendJson(res, 503, { error: 'Rich list snapshot was reorganized. Waiting for a refresh.' });
+      }
+      return sendJson(res, 200, data);
+    } catch {
+      return sendJson(res, 503, { error: 'Rich list is unavailable. A valid snapshot and reachable Core node are required.' });
+    }
+  }
+
   if (url.pathname === '/api/health') {
     const height = await rpc.call('getblockcount');
     return sendJson(res, 200, { ok: true, rpc: true, height });
@@ -2715,6 +2731,7 @@ async function requestHandler(req, res) {
       || url.pathname === '/blocks'
       || url.pathname === '/transactions'
       || url.pathname === '/addresses'
+      || url.pathname === '/richlist'
       || url.pathname.startsWith('/block/')
       || url.pathname.startsWith('/tx/')
       || url.pathname.startsWith('/address/')

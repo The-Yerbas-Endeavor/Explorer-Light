@@ -90,6 +90,13 @@ export const config = Object.freeze({
     historySnapshotMs: intEnv('MARKETS_HISTORY_SNAPSHOT_MS', 3600000, 600000, 21600000),
     historyRetentionDays: intEnv('MARKETS_HISTORY_RETENTION_DAYS', 30, 7, 90)
   }),
+  richlist: Object.freeze({
+    file: process.env.RICHLIST_FILE || (fs.existsSync('/var/lib/yerbas-explorer-light')
+      ? '/var/lib/yerbas-explorer-light/richlist.json'
+      : path.resolve('data/richlist.json')),
+    maxAgeMs: intEnv('RICHLIST_MAX_AGE_MS', 172800000, 60000, 604800000),
+    scanTimeoutMs: intEnv('RICHLIST_SCAN_TIMEOUT_MS', 1800000, 60000, 7200000)
+  }),
   recentBlocks: intEnv('RECENT_BLOCKS', 12, 5, 25),
   cacheMs: intEnv('CACHE_MS', 5000, 0, 60000)
 });

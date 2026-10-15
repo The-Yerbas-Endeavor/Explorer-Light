@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Yerbas rich list refresh
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=15m
+Unit=yerbas-richlist.service
+
+[Install]
+WantedBy=timers.target

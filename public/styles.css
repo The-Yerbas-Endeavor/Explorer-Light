@@ -9498,3 +9498,8 @@ html[data-layout-theme="original"] .original-page-status {
     flex-wrap: wrap;
   }
 }
+
+.richlist-scroll { overflow-x: auto; }
+.richlist-table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
+.richlist-table th, .richlist-table td { padding: .8rem; text-align: left; border-bottom: 1px solid currentColor; }
+.richlist-table td:last-child, .richlist-table th:last-child { text-align: right; white-space: nowrap; }
