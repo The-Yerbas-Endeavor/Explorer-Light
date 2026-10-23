@@ -202,13 +202,28 @@ async function cancelResponseBody(response) {
   }
 }
 
+// Bound each gateway attempt so a stalled host cannot starve the fallbacks.
+async function fetchIpfsGateway(url, options) {
+  const controller = new AbortController();
+  const parentSignal = options.signal;
+  const abort = () => controller.abort();
+  if (parentSignal?.aborted) abort();
+  else parentSignal?.addEventListener('abort', abort, { once: true });
+  const timer = setTimeout(abort, 8000);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchIpfsPreviewResponse(cid, relativePath, signal) {
   let lastStatus = null;
   let lastError = null;
 
   for (const gateway of config.ipfs.previewGateways) {
     try {
-      const response = await fetch(ipfsGatewayUrl(gateway, cid, relativePath), {
+      const response = await fetchIpfsGateway(ipfsGatewayUrl(gateway, cid, relativePath), {
         headers: {
           accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.9,text/html;q=0.2,*/*;q=0.1',
           'user-agent': 'Yerbas-Explorer-Light/1.0'
@@ -224,7 +239,7 @@ async function fetchIpfsPreviewResponse(cid, relativePath, signal) {
       lastStatus = response.status;
       await cancelResponseBody(response);
     } catch (error) {
-      if (error?.name === 'AbortError') throw error;
+      if (signal.aborted) throw error;
       lastError = error;
     }
   }
@@ -300,7 +315,7 @@ async function fetchIpfsDirectoryTarImage(cid, signal) {
     let response;
 
     try {
-      response = await fetch(ipfsGatewayUrl(gateway, cid, null, 'tar'), {
+      response = await fetchIpfsGateway(ipfsGatewayUrl(gateway, cid, null, 'tar'), {
         headers: {
           accept: 'application/x-tar,application/octet-stream;q=0.9,*/*;q=0.1',
           'user-agent': 'Yerbas-Explorer-Light/1.0'
@@ -323,7 +338,7 @@ async function fetchIpfsDirectoryTarImage(cid, signal) {
         };
       }
     } catch (error) {
-      if (error?.name === 'AbortError') throw error;
+      if (signal.aborted) throw error;
     }
   }
 
