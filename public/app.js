@@ -1280,6 +1280,61 @@ async function renderAssets() {
 }
 
 
+function browserIpfsUrl(cid) {
+  let canonical = String(cid || '');
+  if (/^Qm[1-9A-HJ-NP-Za-km-z]{44}$/.test(canonical)) {
+    const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    let value = 0n;
+    for (const char of canonical) value = value * 58n + BigInt(alphabet.indexOf(char));
+    const hex = value.toString(16).padStart(68, '0');
+    const bytes = [1, 112, ...hex.match(/../g).map(byte => parseInt(byte, 16))];
+    const base32 = 'abcdefghijklmnopqrstuvwxyz234567';
+    let bits = 0, accumulator = 0, encoded = '';
+    for (const byte of bytes) {
+      accumulator = (accumulator << 8) | byte;
+      bits += 8;
+      while (bits >= 5) {
+        bits -= 5;
+        encoded += base32[(accumulator >>> bits) & 31];
+      }
+    }
+    if (bits) encoded += base32[(accumulator << (5 - bits)) & 31];
+    canonical = 'b' + encoded;
+  }
+  // Subdomain labels cannot exceed 63 characters.
+  if (/^b[a-z2-7]{10,62}$/.test(canonical)) {
+    return 'https://' + canonical + '.ipfs.inbrowser.link/';
+  }
+  return 'https://ipfs.io/ipfs/' + encodeURIComponent(canonical);
+}
+
+function initializeAssetPreview(url) {
+  const image = app.querySelector('.ipfs-image');
+  const status = app.querySelector('.ipfs-preview-status');
+  const retry = app.querySelector('.ipfs-preview-retry');
+  if (!image || !status || !retry) return;
+  const load = () => {
+    image.hidden = true;
+    status.hidden = false;
+    status.textContent = 'Loading image from IPFS… Large animations may take longer.';
+    retry.hidden = true;
+    image.src = url;
+  };
+  image.addEventListener('load', () => {
+    image.hidden = false;
+    status.hidden = true;
+    retry.hidden = true;
+  });
+  image.addEventListener('error', () => {
+    image.hidden = true;
+    status.hidden = false;
+    status.textContent = 'Preview unavailable. The gateways could not return a supported image. Try again or open the content in the browser gateway.';
+    retry.hidden = false;
+  });
+  retry.addEventListener('click', load);
+  load();
+}
+
 async function renderAsset(name) {
   renderLoading('Reading asset data from Yerbas Core');
 
@@ -1311,7 +1366,7 @@ async function renderAsset(name) {
   const txidHash = metadata.txid_hash || metadata.txid || null;
   const metadataValue = ipfsHash || txidHash || null;
   const metadataType = ipfsHash ? 'IPFS' : (txidHash ? 'TXID' : 'NONE');
-  const ipfsUrl = ipfsHash ? 'https://ipfs.io/ipfs/' + encodeURIComponent(ipfsHash) : null;
+  const ipfsUrl = ipfsHash ? browserIpfsUrl(ipfsHash) : null;
   const ipfsPreviewUrl = ipfsHash ? '/api/ipfs-preview/' + encodeURIComponent(ipfsHash) : null;
   const metadataRefHtml = ipfsUrl
     ? '<a class="asset-ipfs-ref" href="' + ipfsUrl + '" target="_blank" rel="noopener noreferrer">' +
@@ -1327,12 +1382,14 @@ async function renderAsset(name) {
     ? '<section class="ipfs-display">' +
         '<div class="ipfs-display-head">' +
           '<div><span>IPFS CONTENT</span><strong>Asset metadata preview</strong></div>' +
-          '<a href="' + ipfsUrl + '" target="_blank" rel="noopener noreferrer">OPEN IN IPFS ↗</a>' +
+          '<a href="' + ipfsUrl + '" target="_blank" rel="noopener noreferrer">OPEN IN BROWSER GATEWAY ↗</a>' +
         '</div>' +
         '<div class="ipfs-frame-shell ipfs-image-shell">' +
-          '<img class="ipfs-image" src="' + ipfsPreviewUrl + '" alt="' + esc(data.name) + ' IPFS asset content" loading="lazy" decoding="async">' +
+          '<p class="ipfs-preview-status" role="status" aria-live="polite">Loading image from IPFS…</p>' +
+          '<img class="ipfs-image" hidden alt="' + esc(data.name) + ' IPFS asset content" decoding="async">' +
+          '<button class="ipfs-preview-retry" type="button" hidden>Try again</button>' +
         '</div>' +
-        '<div class="ipfs-display-foot"><code>' + esc(ipfsHash) + '</code><span>SAME-ORIGIN PREVIEW · IPFS.IO SOURCE</span></div>' +
+        '<div class="ipfs-display-foot"><code>' + esc(ipfsHash) + '</code><span>IMAGE PREVIEW · IPFS CONTENT</span></div>' +
       '</section>'
     : '';
 
@@ -1355,6 +1412,7 @@ async function renderAsset(name) {
       railHeading('OWNERSHIP RAIL', 'Top holders', data.holders?.total === null ? 'availability unknown' : number(data.holders?.total) + ' total') +
       '<div class="holder-rail">' + holderRows + '</div>' +
     '</section>';
+  if (ipfsPreviewUrl) initializeAssetPreview(ipfsPreviewUrl);
 }
 
 

@@ -9538,3 +9538,8 @@ html[data-layout-theme="original"] .original-page-status {
 @media (max-width: 520px) { .richlist-content .richlist-chart-layout { grid-template-columns: 1fr; } }
 
 .address-last-sent { display: block; margin-top: .3rem; font-size: .72rem; line-height: 1.5; }
+
+/* Explicit preview states override the image layout's display rule. */
+.ipfs-image[hidden], .ipfs-preview-status[hidden], .ipfs-preview-retry[hidden] { display: none; }
+.ipfs-preview-status { max-width: 48ch; text-align: center; line-height: 1.6; }
+.ipfs-preview-retry { padding: 10px 20px; cursor: pointer; color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 4px; }

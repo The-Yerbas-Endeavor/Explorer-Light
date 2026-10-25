@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { AiToolError, AI_API_VERSION, AI_PROTOCOL, AI_TOOL_DEFINITIONS, createAiGateway } from './src/ai.js';
 import { lastXeggeXSend } from './src/address-watch.js';
 import { readRichlist } from './src/richlist.js';
+import { ImageCache } from './src/image-cache.js';
 import { config } from './src/config.js';
 import { RpcError, YerbasRpc } from './src/rpc.js';
 import { classifySearchInput } from './src/search.js';
@@ -16,6 +17,7 @@ const publicDir = path.join(__dirname, 'public');
 const rpc = new YerbasRpc(config.rpc);
 const cache = new Map();
 const networkGeoCache = new Map();
+const ipfsImageCache = new ImageCache();
 
 function securityHeaders(extra = {}) {
   return {
@@ -345,10 +347,25 @@ async function fetchIpfsDirectoryTarImage(cid, signal) {
   return null;
 }
 
+function sendCachedIpfsImage(req, res, image) {
+  res.writeHead(200, securityHeaders({
+    'content-type': image.contentType,
+    'cache-control': 'public, max-age=86400, immutable',
+    'content-length': image.data.length,
+    'content-disposition': 'inline',
+    'cross-origin-resource-policy': 'same-origin',
+    'x-ipfs-gateway': new URL(image.gateway).host
+  }));
+  return res.end(req.method === 'HEAD' ? undefined : image.data);
+}
+
 async function sendIpfsImagePreview(req, res, cid) {
   if (!validIpfsCid(cid)) {
     return sendJson(res, 400, { error: 'Invalid IPFS CID.' });
   }
+
+  const cachedImage = ipfsImageCache.get(cid);
+  if (cachedImage) return sendCachedIpfsImage(req, res, cachedImage);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), IPFS_PREVIEW_TIMEOUT_MS);
@@ -401,17 +418,9 @@ async function sendIpfsImagePreview(req, res, cid) {
       }
     }
 
-    res.writeHead(200, securityHeaders({
-      'content-type': contentType,
-      'cache-control': 'public, max-age=86400, immutable',
-      'content-length': data.length,
-      'content-disposition': 'inline',
-      'cross-origin-resource-policy': 'same-origin',
-      'x-ipfs-gateway': new URL(gatewayUsed).host
-    }));
-
-    if (req.method === 'HEAD') return res.end();
-    return res.end(data);
+    const image = { data, contentType, gateway: gatewayUsed };
+    ipfsImageCache.set(cid, image);
+    return sendCachedIpfsImage(req, res, image);
   } catch (error) {
     if (error?.name === 'AbortError') {
       return sendJson(res, 504, { error: 'IPFS gateway request timed out.' });
