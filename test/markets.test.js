@@ -41,12 +41,12 @@ test('asset pages proxy IPFS image previews through the Explorer origin', async 
   const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
   const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
 
-  assert.ok(app.includes("'https://ipfs.io/ipfs/' + encodeURIComponent(ipfsHash)"));
+  assert.ok(app.includes("browserIpfsUrl(ipfsHash)"));
   assert.ok(app.includes("'/api/ipfs-preview/' + encodeURIComponent(ipfsHash)"));
   assert.ok(app.includes('OPEN IPFS ↗'));
-  assert.ok(app.includes('OPEN IN IPFS ↗'));
+  assert.ok(app.includes('OPEN IN BROWSER GATEWAY ↗'));
   assert.ok(app.includes('class="ipfs-image"'));
-  assert.ok(app.includes('SAME-ORIGIN PREVIEW · IPFS.IO SOURCE'));
+  assert.ok(app.includes('IMAGE PREVIEW · IPFS CONTENT'));
   assert.ok(!app.includes('class="ipfs-frame"'));
   assert.ok(css.includes('.ipfs-image'));
   assert.ok(css.includes('object-fit: contain'));
@@ -232,7 +232,7 @@ test('IPFS preview retries independent public gateways after rate limits or gate
   assert.ok(config.includes('https://ipfs.io,https://ipfs.filebase.io,https://gateway.pinata.cloud'));
   assert.ok(server.includes('for (const gateway of config.ipfs.previewGateways)'));
   assert.ok(server.includes('All IPFS gateways failed; last HTTP'));
-  assert.ok(server.includes("'x-ipfs-gateway': new URL(gatewayUsed).host"));
+  assert.ok(server.includes("'x-ipfs-gateway': new URL(image.gateway).host"));
   assert.ok(env.includes('IPFS_PREVIEW_GATEWAYS=https://ipfs.io,https://ipfs.filebase.io,https://gateway.pinata.cloud'));
 });
 
