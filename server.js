@@ -2634,9 +2634,15 @@ async function handleApi(req, res, url) {
       return sendJson(res, 400, { error: 'Invalid Yerbas address.' });
     }
 
+    const requestedPage = Number(url.searchParams.get('page') || 1);
+    if (!Number.isSafeInteger(requestedPage) || requestedPage < 1 || requestedPage > 1000000) {
+      return sendJson(res, 400, { error: 'Invalid address history page.' });
+    }
+
     const result = await ai.invoke('get_address', {
       address,
-      tx_limit: 100,
+      tx_limit: 40,
+      tx_offset: (requestedPage - 1) * 40,
       utxo_limit: 100
     });
 

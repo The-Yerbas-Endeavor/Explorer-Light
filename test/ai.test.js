@@ -139,3 +139,25 @@ test('manifest explicitly denies signing, broadcasting, wallet, and shell capabi
     assert.ok(manifest.prohibitedCapabilities.includes(capability));
   }
 });
+
+test('address history pages cover every transaction newest first without overlap', async () => {
+  const txids = Array.from({ length: 103 }, (_, index) => String(index));
+  const gateway = createAiGateway({ rpc: fakeRpc({
+    validateaddress: { isvalid: true },
+    getaddressbalance: { balance: 0, received: 0 },
+    getaddresstxids: txids,
+    getaddressutxos: [],
+    listassetbalancesbyaddress: {}
+  }) });
+  const pages = [];
+  for (const offset of [0, 40, 80]) {
+    const result = await gateway.invoke('get_address', { address: 'yauGhoF3Gve84SssUBpeKGGtmWR7MYzQ9N', tx_limit: 40, tx_offset: offset });
+    assert.equal(result.data.history.txidsTotal, 103);
+    assert.equal(result.data.history.txOffset, offset);
+    pages.push(...result.data.history.txids);
+  }
+  assert.deepEqual(pages, [...txids].reverse());
+  const last = await gateway.invoke('get_address', { address: 'yauGhoF3Gve84SssUBpeKGGtmWR7MYzQ9N', tx_limit: 40, tx_offset: 400 });
+  assert.equal(last.data.history.txOffset, 80);
+  await assert.rejects(gateway.invoke('get_address', { address: 'yauGhoF3Gve84SssUBpeKGGtmWR7MYzQ9N', tx_offset: -1 }));
+});

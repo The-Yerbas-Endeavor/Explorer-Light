@@ -153,6 +153,7 @@ export const AI_TOOL_DEFINITIONS = Object.freeze([
         start_height: { type: 'integer', minimum: 0 },
         end_height: { type: 'integer', minimum: 0 },
         tx_limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 },
+        tx_offset: { type: 'integer', minimum: 0, default: 0 },
         utxo_limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 }
       },
       required: ['address'],
@@ -376,6 +377,7 @@ export function createAiGateway({ rpc, cached, marketPriceUrl = '' }) {
     }
 
     const txLimit = intArg(args.tx_limit, 50, 1, 200, 'tx_limit');
+    const requestedTxOffset = intArg(args.tx_offset, 0, 0, Number.MAX_SAFE_INTEGER, 'tx_offset');
     const utxoLimit = intArg(args.utxo_limit, 50, 1, 200, 'utxo_limit');
     const start = args.start_height === undefined
       ? null
@@ -407,8 +409,12 @@ export function createAiGateway({ rpc, cached, marketPriceUrl = '' }) {
     ]);
 
     const indexed = [balanceResult, txidResult, utxoResult].some((result) => result.status === 'fulfilled');
-    const txids = txidResult.status === 'fulfilled' && Array.isArray(txidResult.value)
-      ? txidResult.value.slice(-txLimit).reverse()
+    const txidsAvailable = txidResult.status === 'fulfilled' && Array.isArray(txidResult.value);
+    const txidsTotal = txidsAvailable ? txidResult.value.length : null;
+    const txOffset = Math.min(requestedTxOffset, Math.max(0, Math.ceil((txidsTotal || 0) / txLimit) - 1) * txLimit);
+    const txEnd = (txidsTotal || 0) - txOffset;
+    const txids = txidsAvailable
+      ? txidResult.value.slice(Math.max(0, txEnd - txLimit), txEnd).reverse()
       : [];
     const utxos = utxoResult.status === 'fulfilled' && Array.isArray(utxoResult.value)
       ? utxoResult.value.slice(-utxoLimit).reverse()
@@ -438,6 +444,10 @@ export function createAiGateway({ rpc, cached, marketPriceUrl = '' }) {
           : null,
         txids,
         txidsReturned: txids.length,
+        txidsTotal,
+        txidsAvailable,
+        txOffset,
+        txLimit,
         utxos,
         utxosReturned: utxos.length,
         unavailableReason: indexed

@@ -991,6 +991,7 @@ async function renderRichlist() {
     + '</section></div>';
   bindRichlistChart(data.items, data.totalSatoshis);
   void updateWatchedAddressNote();
+  if (location.hash === '#activity') document.getElementById('activity')?.scrollIntoView();
 }
 
 async function renderAddresses() {
@@ -1057,12 +1058,26 @@ async function renderAddresses() {
 async function renderAddress(address) {
   renderLoading('Reading address index from Yerbas Core');
 
-  const data = await api('/api/address/' + encodeURIComponent(address));
+  const params = new URLSearchParams(location.search);
+  const requestedPage = Number(params.get('page') || 1);
+  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 && requestedPage <= 1000000 ? requestedPage : 1;
+  const data = await api('/api/address/' + encodeURIComponent(address) + '?page=' + page);
   setRpcState('online', 'Core online');
   document.title = 'Address ' + data.address + ' · Yerbas Explorer';
 
   const balance = data.history?.balance;
   const txids = Array.isArray(data.history?.txids) ? data.history.txids : [];
+  const totalTransactions = data.history?.txidsTotal ?? null;
+  const txOffset = data.history?.txOffset || 0;
+  const currentPage = Math.floor(txOffset / 40) + 1;
+  const totalPages = Math.max(1, Math.ceil((totalTransactions || 0) / 40));
+  const pageHref = (nextPage) => '/address/' + encodeURIComponent(address) + '?page=' + nextPage + '#activity';
+  const pagination = data.history?.txidsAvailable
+    ? '<nav class="rail-pagination" aria-label="Address transaction pages">' +
+      (currentPage > 1 ? '<a href="' + pageHref(currentPage - 1) + '">← PREV</a>' : '<span></span>') +
+      '<span>PAGE ' + number(currentPage) + ' / ' + number(totalPages) + '</span>' +
+      (currentPage < totalPages ? '<a href="' + pageHref(currentPage + 1) + '">NEXT →</a>' : '<span></span>') +
+      '</nav>' : '';
   const utxos = Array.isArray(data.history?.utxos) ? data.history.utxos : [];
   const assetBalances = data.assets?.available && data.assets?.balances && typeof data.assets.balances === 'object'
     ? Object.entries(data.assets.balances)
@@ -1080,9 +1095,9 @@ async function renderAddress(address) {
     : '<div class="ledger-empty">No indexed asset balances.</div>';
 
   const txRows = txids.length
-    ? txids.slice(0, 40).map((txid, index) =>
+    ? txids.map((txid, index) =>
         '<a class="ledger-row tx-ledger-row" href="/tx/' + encodeURIComponent(txid) + '">' +
-          '<span class="ledger-index">' + String(index + 1).padStart(2, '0') + '</span>' +
+          '<span class="ledger-index">' + String(txOffset + index + 1).padStart(2, '0') + '</span>' +
           '<span class="ledger-row-label">TX</span>' +
           '<code>' + esc(txid) + '</code>' +
           '<span class="ledger-open">↗</span>' +
@@ -1114,7 +1129,7 @@ async function renderAddress(address) {
     telemetryRail([
       { label: 'BALANCE', value: yerb(balance?.balanceYerb) + ' YERB', note: 'current' },
       { label: 'RECEIVED', value: yerb(balance?.receivedYerb) + ' YERB', note: 'lifetime' },
-      { label: 'TRANSACTIONS', value: number(txids.length), note: 'indexed' },
+      { label: 'TRANSACTIONS', value: totalTransactions === null ? '—' : number(totalTransactions), note: 'indexed' },
       { label: 'UTXOS', value: number(utxos.length), note: 'unspent' },
       { label: 'ASSETS', value: number(assetBalances.length), note: 'positions' }
     ]) +
@@ -1128,11 +1143,14 @@ async function renderAddress(address) {
         '<div class="ledger-list">' + utxoRows + '</div>' +
       '</div>' +
     '</section>' +
-    '<section class="ledger-section">' +
-      railHeading('ACTIVITY', 'Address transactions', number(txids.length) + ' indexed') +
+    '<section class="ledger-section" id="activity">' +
+      railHeading('ACTIVITY', 'Address transactions', totalTransactions === null ? 'History unavailable' : number(totalTransactions) + ' indexed · newest first') +
+      pagination +
       '<div class="ledger-list">' + txRows + '</div>' +
+      pagination +
     '</section>';
   void updateWatchedAddressNote();
+  if (location.hash === '#activity') document.getElementById('activity')?.scrollIntoView();
 }
 
 
