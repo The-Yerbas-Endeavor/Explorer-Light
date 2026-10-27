@@ -1151,7 +1151,9 @@ async function renderAddress(address) {
       ).join('')
     : '<div class="ledger-empty">' + (data.history?.utxosAvailable ? 'No unspent outputs.' : 'Unspent outputs unavailable.') + '</div>';
 
-  const historyNotice = balance && data.history?.txidsAvailable && data.history?.utxosAvailable
+  const historyNotice = data.history?.limited
+    ? '<div class="ledger-warning">Current balance is verified from confirmed unspent outputs. Transaction history is limited to the latest 1,000 blocks to keep this high-volume address responsive. Lifetime received is unavailable.</div>'
+    : balance && data.history?.txidsAvailable && data.history?.utxosAvailable
     ? ''
     : '<div class="ledger-warning">Some address data is unavailable from Core. Unavailable values are not zero balances. Try again shortly.</div>';
 
@@ -1160,13 +1162,13 @@ async function renderAddress(address) {
     watchedAddressNote(data.address) +
     '<details class="address-qr"><summary>Show address QR code</summary><img width="200" height="200" loading="lazy" src="/api/qr/' + encodeURIComponent(data.address) + '" alt="QR code for ' + esc(data.address) + '"><p>' + esc(data.address) + '</p></details>' +
     historyNotice +
-    telemetryRail([
+    '<div class="address-summary">' + telemetryRail([
       { label: 'BALANCE', value: balance?.balanceYerb == null ? 'Unavailable' : yerb(balance.balanceYerb) + ' YERB', note: balance?.source === 'unspent outputs' ? 'from confirmed UTXOs' : 'current' },
       { label: 'RECEIVED', value: balance?.receivedYerb == null ? 'Unavailable' : yerb(balance.receivedYerb) + ' YERB', note: 'lifetime' },
-      { label: 'TRANSACTIONS', value: totalTransactions === null ? '—' : number(totalTransactions), note: 'indexed' },
+      { label: data.history?.limited ? 'RECENT TRANSACTIONS' : 'TRANSACTIONS', value: totalTransactions === null ? '—' : number(totalTransactions), note: data.history?.limited ? 'latest 1,000 blocks' : 'indexed' },
       { label: 'UTXOS', value: utxoTotal === null ? '—' : number(utxoTotal), note: 'unspent' },
       { label: 'ASSETS', value: data.assets?.available ? number(assetBalances.length) : 'Unavailable', note: 'positions' }
-    ]) +
+    ]) + '</div>' +
     '<section class="split-ledger">' +
       '<div class="ledger-pane">' +
         railHeading('PORTFOLIO', 'Native assets', data.assets?.available ? number(assetBalances.length) + ' positions' : 'Unavailable') +
@@ -1178,7 +1180,7 @@ async function renderAddress(address) {
       '</div>' +
     '</section>' +
     '<section class="ledger-section" id="activity">' +
-      railHeading('ACTIVITY', 'Address transactions', totalTransactions === null ? 'History unavailable' : number(totalTransactions) + ' indexed · newest first') +
+      railHeading('ACTIVITY', 'Address transactions', totalTransactions === null ? 'History unavailable' : number(totalTransactions) + (data.history?.limited ? ' in blocks ' + number(data.history.startHeight) + '–' + number(data.history.endHeight) : ' indexed') + ' · newest first') +
       '<p class="address-activity-note">Amounts are the net change in this address’s native YERB balance, including change and fees. Dates use your local time.</p>' +
       pagination +
       '<div class="ledger-list">' + txRows + '</div>' +

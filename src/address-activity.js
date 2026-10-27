@@ -1,7 +1,8 @@
 // Native address-index deltas include change; report the net balance change.
-export async function addressActivity(rpc, address, txids, cached) {
+export async function addressActivity(rpc, address, txids, cached, range = null) {
+  if (!txids.length) return [];
   const [deltas, tip] = await Promise.all([
-    cached('address-deltas:' + address, 15000, () => rpc.call('getaddressdeltas', [{ addresses: [address] }])),
+    cached('address-deltas:' + address + ':' + (range ? range.start + ':' + range.end : 'all'), 15000, () => rpc.call('getaddressdeltas', [{ addresses: [address], ...(range || {}) }])),
     cached('activity-tip', 5000, () => rpc.call('getblockcount'))
   ]);
   if (!Array.isArray(deltas)) throw new Error('Address deltas unavailable');

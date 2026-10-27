@@ -189,3 +189,17 @@ test('configured high-volume address guard skips lifetime scans but retains curr
     else process.env.ADDRESS_UTXO_ONLY = previous;
   }
 });
+test('guarded address history always uses a bounded recent block range', async () => {
+  const address = 'yaDfcdCupB1T5YoVRjYr8fXCvB8U5AuNX8';
+  const previous = process.env.ADDRESS_UTXO_ONLY;
+  process.env.ADDRESS_UTXO_ONLY = address;
+  try {
+    const gateway = createAiGateway({ rpc: fakeRpc({ validateaddress: { isvalid: true }, getblockcount: 2000,
+      getaddresstxids: ([params]) => { assert.equal(params.start, 1001); assert.equal(params.end, 2000); return ['recent']; },
+      getaddressutxos: [{ satoshis: 400000000 }], listassetbalancesbyaddress: {} }) });
+    const { data } = await gateway.invoke('get_address', { address });
+    assert.equal(data.history.limited, true);
+    assert.deepEqual(data.history.txids, ['recent']);
+    assert.equal(data.history.balance.balanceYerb, '4.00000000');
+  } finally { if (previous === undefined) delete process.env.ADDRESS_UTXO_ONLY; else process.env.ADDRESS_UTXO_ONLY = previous; }
+});

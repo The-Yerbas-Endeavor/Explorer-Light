@@ -40,3 +40,13 @@ test('unspent-output pages cover the full index independently of transaction pag
   }
   assert.deepEqual(all, [...outputs].reverse());
 });
+test('empty activity never scans history and recent activity keeps its range', async () => {
+  const cache = (key, ttl, producer) => producer();
+  assert.deepEqual(await addressActivity({ call() { throw new Error('Unexpected full scan'); } }, 'a', [], cache), []);
+  const rpc = { async call(method, params) {
+    if (method === 'getaddressdeltas') { assert.deepEqual(params, [{ addresses: ['a'], start: 100, end: 200 }]); return []; }
+    if (method === 'getblockcount') return 200;
+    throw new Error('Unexpected RPC');
+  } };
+  assert.deepEqual(await addressActivity(rpc, 'a', ['tx'], cache, { start: 100, end: 200 }), [{ txid: 'tx', available: false }]);
+});

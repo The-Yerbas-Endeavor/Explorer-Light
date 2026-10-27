@@ -2724,7 +2724,7 @@ async function handleApi(req, res, url) {
     }
 
     try {
-      result.data.history.transactions = await addressActivity(rpc, address, result.data.history.txids || [], cached);
+      result.data.history.transactions = await addressActivity(rpc, address, result.data.history.txids || [], cached, result.data.history.limited && result.data.history.startHeight ? { start: result.data.history.startHeight, end: result.data.history.endHeight } : null);
     } catch {
       result.data.history.transactions = [];
     }
