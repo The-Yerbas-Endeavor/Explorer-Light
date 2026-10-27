@@ -9635,3 +9635,15 @@ button.map-legend-item.active { border-color: var(--line-strong); border-radius:
   .map-tour-controls { left: 10px; bottom: 10px; max-width: calc(100% - 20px); padding: 8px; gap: 8px; }
   .map-tour-controls span { font-size: 11px; }
 }
+
+/* Local vector geography stays crisp through the camera tour. */
+.network-map-workspace div.network-map-base { opacity: 1; filter: none; mix-blend-mode: normal; }
+.network-map-vector { display: block; width: 100%; height: 100%; }
+.network-map-vector .map-land path { fill: #193e42; stroke: #5e9290; stroke-opacity: .65; stroke-width: .65; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.network-map-vector .map-lakes path { fill: #071c24; stroke: #568986; stroke-opacity: .5; stroke-width: .4; vector-effect: non-scaling-stroke; }
+.map-ocean-labels { fill: #70aaa9; opacity: .38; font: 24px sans-serif; letter-spacing: 5px; text-anchor: middle; pointer-events: none; }
+.map-country-labels { fill: #c2ded8; font: 17px sans-serif; text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: #102b32; stroke-width: 3px; stroke-linejoin: round; }
+.map-country-labels text { opacity: 0; transition: opacity 1s ease; }
+.map-detail-zoom .map-country-labels .map-label-major { opacity: .9; }
+.map-close-zoom .map-country-labels .map-label-minor { opacity: .8; }
+@media (prefers-reduced-motion: reduce) { .map-country-labels text { transition: none; } }

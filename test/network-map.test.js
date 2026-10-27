@@ -55,3 +55,18 @@ test('map camera tour selects geographically distinct stops and stays within bou
   assert.ok(!app.includes('id="map-directory-list"'));
   assert.ok(app.includes("window.matchMedia('(prefers-reduced-motion: reduce)')"));
 });
+
+test('detailed basemap is a local vector asset with borders, lakes and zoom labels', async () => {
+  const svg = await readFile(new URL('../public/world-map.svg', import.meta.url), 'utf8');
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const server = await readFile(new URL('../server.js', import.meta.url), 'utf8');
+  assert.ok(svg.includes('viewBox="0 0 3600 1800"'));
+  assert.ok(svg.includes('class="map-land"'));
+  assert.ok(svg.includes('class="map-lakes"'));
+  assert.ok(svg.includes('class="map-country-labels"'));
+  assert.ok((svg.match(/<path /g) || []).length > 300);
+  assert.ok(!/<script|<foreignObject|\son\w+=|href=/i.test(svg));
+  assert.ok(server.includes("['/world-map.svg', ['world-map.svg', 'image/svg+xml']]"));
+  assert.ok(app.includes("fetch('/world-map.svg?v="));
+  assert.ok(app.includes("canvas.classList.toggle('map-detail-zoom'"));
+});

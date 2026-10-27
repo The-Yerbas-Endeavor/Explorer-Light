@@ -2738,6 +2738,7 @@ async function handleApi(req, res, url) {
 }
 
 const staticFiles = new Map([
+  ['/world-map.svg', ['world-map.svg', 'image/svg+xml']],
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
   ['/theme.js', ['theme.js', 'text/javascript; charset=utf-8']],
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],

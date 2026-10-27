@@ -1781,7 +1781,10 @@ async function renderNetworkMap() {
   const allowedFilters = new Set(['all', 'countries', 'reachable', 'offline', 'pose-banned', 'plotted', 'unlocated', 'online', 'slow', 'penalized']);
   let activeFilter = allowedFilters.has(params.get('filter')) ? params.get('filter') : 'all';
 
-  const data = await api('/api/network-map?view=' + encodeURIComponent(view));
+  const [data, mapSvg] = await Promise.all([
+    api('/api/network-map?view=' + encodeURIComponent(view)),
+    fetch('/world-map.svg?v=20261026-1').then(response => response.ok ? response.text() : '').catch(() => '')
+  ]);
 
   setRpcState('online', 'Core online');
   document.title = 'Network Map · Yerbas Explorer';
@@ -1855,7 +1858,7 @@ async function renderNetworkMap() {
     '<div class="network-map-workspace"><section class="panel network-map-panel">' +
       '<div id="network-map-canvas" class="network-map-canvas" tabindex="0" role="region" aria-label="Interactive node map. Plus and minus zoom; arrow keys pan; zero resets.">' +
         '<div id="network-map-stage" class="network-map-stage">' +
-          '<img class="network-map-base" src="https://upload.wikimedia.org/wikipedia/commons/5/51/BlankMap-Equirectangular.svg" alt="" aria-hidden="true">' +
+          (mapSvg ? '<div class="network-map-base" aria-hidden="true">' + mapSvg + '</div>' : '<img class="network-map-base" src="https://upload.wikimedia.org/wikipedia/commons/5/51/BlankMap-Equirectangular.svg" alt="" aria-hidden="true">') +
           '<div class="network-map-grid" aria-hidden="true"></div>' +
           '<div id="network-map-pins" class="network-map-pins"></div>' +
         '</div>' +
@@ -1872,7 +1875,7 @@ async function renderNetworkMap() {
         '<span>' + esc(data.source) + '</span>' +
         '<span id="network-map-filter-status" role="status" aria-live="polite"></span>' +
         '<span>Node locations are approximate and derived from IP geolocation. Exact operator locations are not exposed.</span>' +
-        '<span>Geo: HackMyIP · Map: Wikimedia Commons CC0</span>' +
+        '<span>Geo: HackMyIP · Map: ' + (mapSvg ? 'Natural Earth · 1:50m · public domain' : 'Wikimedia Commons CC0') + '</span>' +
       '</div>' +
     '</section></div>';
   const canvas = document.querySelector('#network-map-canvas');
@@ -1968,6 +1971,8 @@ async function renderNetworkMap() {
     if (!stage) return;
     clampMapView();
     canvas.classList.toggle('is-zoomed', mapView.scale > 1);
+    canvas.classList.toggle('map-detail-zoom', mapView.scale >= 1.6);
+    canvas.classList.toggle('map-close-zoom', mapView.scale >= 2.1);
     document.getElementById('map-zoom-level').textContent = mapView.scale.toFixed(1) + '×';
     stage.style.transform =
       'translate(' + mapView.x.toFixed(2) + 'px,' + mapView.y.toFixed(2) + 'px) scale(' +
