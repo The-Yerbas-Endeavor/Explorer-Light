@@ -175,3 +175,17 @@ test('balance falls back to all unspent outputs when lifetime index lookup fails
   assert.equal(result.data.history.balance.receivedYerb, null);
   assert.equal(result.data.history.utxos.length, 1);
 });
+test('configured high-volume address guard skips lifetime scans but retains current balance', async () => {
+  const address = 'yaDfcdCupB1T5YoVRjYr8fXCvB8U5AuNX8';
+  const previous = process.env.ADDRESS_UTXO_ONLY;
+  process.env.ADDRESS_UTXO_ONLY = address;
+  try {
+    const gateway = createAiGateway({ rpc: fakeRpc({ validateaddress: { isvalid: true }, getaddressutxos: [{ satoshis: 400000000 }], listassetbalancesbyaddress: {} }) });
+    const result = await gateway.invoke('get_address', { address });
+    assert.equal(result.data.history.balance.balanceYerb, '4.00000000');
+    assert.equal(result.data.history.txidsAvailable, false);
+  } finally {
+    if (previous === undefined) delete process.env.ADDRESS_UTXO_ONLY;
+    else process.env.ADDRESS_UTXO_ONLY = previous;
+  }
+});

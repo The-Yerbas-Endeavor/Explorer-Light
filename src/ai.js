@@ -404,9 +404,11 @@ export function createAiGateway({ rpc, cached, marketPriceUrl = '' }) {
       addressParams.end = end;
     }
 
+    const utxoOnly = (process.env.ADDRESS_UTXO_ONLY || '').split(',').map(value => value.trim()).includes(address);
+    const unavailableHistory = () => Promise.reject(new Error('Lifetime history temporarily disabled for this high-volume address; current balance uses confirmed UTXOs.'));
     const [balanceResult, txidResult, utxoResult, assetResult] = await Promise.allSettled([
-      rpc.call('getaddressbalance', [{ addresses: [address] }]),
-      rpc.call('getaddresstxids', [addressParams]),
+      utxoOnly ? unavailableHistory() : rpc.call('getaddressbalance', [{ addresses: [address] }]),
+      utxoOnly ? unavailableHistory() : rpc.call('getaddresstxids', [addressParams]),
       rpc.call('getaddressutxos', [{ addresses: [address] }]),
       rpc.call('listassetbalancesbyaddress', [address, false, 500, 0])
     ]);
