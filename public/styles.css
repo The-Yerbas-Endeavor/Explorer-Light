@@ -9567,3 +9567,10 @@ html[data-layout-theme="original"] .original-page-status {
   .utxo-ledger-row code { overflow: hidden; text-overflow: ellipsis; }
   .asset-facts-rail code, .detail-hash { overflow-wrap: anywhere; }
 }
+@media (max-width: 700px) {
+  html[data-layout-theme="new"] .header-inner { flex-wrap: wrap; gap: 10px; padding: 10px 0; }
+  html[data-layout-theme="new"] .header-actions { width: 100%; min-width: 0; overflow-x: auto; padding-bottom: 6px; }
+  html[data-layout-theme="new"] .header-actions > * { flex: 0 0 auto; }
+  html[data-layout-theme="new"] .header-actions .new-nav-link { display: inline-flex; }
+  #activity, #unspent { scroll-margin-top: 160px; }
+}
