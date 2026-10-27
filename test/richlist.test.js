@@ -93,7 +93,9 @@ test('public HTTP routes serve snapshots without starting scans and reject a reo
   await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Server startup timed out: ' + output)), 5000);
     child.stdout.on('data', chunk => { output += chunk; if (output.includes('listening on')) { clearTimeout(timer); resolve(); } });
-    child.once('error', reject);
+    child.stderr.on('data', chunk => { output += chunk; });
+    child.once('exit', code => { clearTimeout(timer); reject(new Error('Server exited before startup (' + code + '): ' + output)); });
+    child.once('error', error => { clearTimeout(timer); reject(error); });
   });
   const get = route => fetch('http://127.0.0.1:' + port + route);
   assert.equal((await get('/api/v1/richlist')).status, 503);
