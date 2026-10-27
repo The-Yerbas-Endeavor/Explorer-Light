@@ -1755,6 +1755,24 @@ function networkMapNodeDetail(node, view) {
   '</div>';
 }
 
+function networkMapTourStops(clusters) {
+  const selected = [];
+  for (const cluster of [...clusters].sort((a, b) => b.nodes.length - a.nodes.length)) {
+    if (selected.some(other => Math.abs(other.latitude - cluster.latitude) < 15 && Math.abs(other.longitude - cluster.longitude) < 25)) continue;
+    selected.push(cluster);
+    if (selected.length === 7) break;
+  }
+  return selected.flatMap(cluster => [cluster, null]);
+}
+
+function networkMapTourPose(cluster, width, height) {
+  const scale = 2.25;
+  const point = networkMapPinPosition(cluster.latitude, cluster.longitude);
+  return { scale,
+    x: Math.min(0, Math.max(width * (1 - scale), width / 2 - point.left / 100 * width * scale)),
+    y: Math.min(0, Math.max(height * (1 - scale), height / 2 - point.top / 100 * height * scale)) };
+}
+
 async function renderNetworkMap() {
   renderLoading('Locating Yerbas network nodes');
 
@@ -1771,7 +1789,6 @@ async function renderNetworkMap() {
   const allItems = Array.isArray(data.items) ? data.items : [];
   let searchQuery = (params.get('q') || '').slice(0, 200);
   let countryFilter = params.get('country') || '';
-  let directoryPage = 1;
   let matchingItems = [];
   const countryCounts = new Map();
   for (const item of allItems) {
@@ -1847,7 +1864,8 @@ async function renderNetworkMap() {
           '<button type="button" data-map-zoom="out" title="Zoom out" aria-label="Zoom out">−</button>' +
           '<button type="button" data-map-zoom="reset" title="Reset map" aria-label="Reset map">↺</button>' +
         '</div>' +
-        '<div class="network-map-hint">Ctrl + scroll to zoom · + / − controls · drag when zoomed</div><span id="map-zoom-level" class="map-zoom-level">1.0×</span>' +
+        '<div class="network-map-hint">Ctrl + scroll to zoom · drag to explore</div><span id="map-zoom-level" class="map-zoom-level">1.0×</span>' +
+        '<div class="map-tour-controls"><button type="button" id="map-tour-toggle">Pause tour</button><span id="map-tour-location">World overview</span></div>' +
         '<aside id="network-map-detail" class="network-map-detail hidden"></aside>' +
       '</div>' +
       '<div class="network-map-foot">' +
@@ -1856,8 +1874,7 @@ async function renderNetworkMap() {
         '<span>Node locations are approximate and derived from IP geolocation. Exact operator locations are not exposed.</span>' +
         '<span>Geo: HackMyIP · Map: Wikimedia Commons CC0</span>' +
       '</div>' +
-    '</section><aside class="map-directory"><h3>Node directory</h3><p id="map-directory-count"></p>' +
-    '<div id="map-directory-list"></div><div class="map-directory-pages"><button id="map-list-prev" type="button">← Prev</button><span id="map-list-page"></span><button id="map-list-next" type="button">Next →</button></div></aside></div>';
+    '</section></div>';
   const canvas = document.querySelector('#network-map-canvas');
   const stage = document.querySelector('#network-map-stage');
   const pinsElement = document.querySelector('#network-map-pins');
@@ -1867,6 +1884,69 @@ async function renderNetworkMap() {
   let currentClusters = [];
   let mapView = { scale: 1, x: 0, y: 0 };
   let dragState = null;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let touring = !reducedMotion.matches;
+  let tourVisible = false;
+  let tourFrame = null;
+  let tourStarted = null;
+  let tourIndex = -1;
+  let tourFrom = null;
+  let tourTo = null;
+  let tourStops = [];
+
+  function updateTourButton() {
+    const button = document.getElementById('map-tour-toggle');
+    button.textContent = touring ? 'Pause tour' : 'Play tour';
+    button.setAttribute('aria-pressed', String(touring));
+  }
+  function pauseTour() {
+    touring = false; updateTourButton();
+    if (tourFrame !== null) cancelAnimationFrame(tourFrame);
+    tourFrame = null; tourStarted = null;
+  }
+  function startTour() {
+    if (!touring || !tourVisible || document.hidden || tourFrame !== null || !canvas.isConnected) return;
+    tourFrame = requestAnimationFrame(animateTour);
+  }
+  function animateTour(now) {
+    tourFrame = null;
+    if (!canvas.isConnected) { observer.disconnect(); return; }
+    if (!touring || !tourVisible || document.hidden) { tourStarted = null; return; }
+    if (tourStarted === null) {
+      tourStarted = now;
+      tourIndex = (tourIndex + 1) % Math.max(1, tourStops.length);
+      const stop = tourStops[tourIndex];
+      const rect = canvas.getBoundingClientRect();
+      tourFrom = { ...mapView };
+      tourTo = stop ? networkMapTourPose(stop, rect.width, rect.height) : { scale: 1, x: 0, y: 0 };
+      document.getElementById('map-tour-location').textContent = stop
+        ? networkMapLocationLabel(stop) + ' · ' + number(stop.nodes.length) + ' nodes'
+        : 'World overview';
+    }
+    const progress = Math.min(1, (now - tourStarted) / 6500);
+    const smooth = progress * progress * (3 - 2 * progress);
+    mapView = {
+      scale: tourFrom.scale + (tourTo.scale - tourFrom.scale) * smooth,
+      x: tourFrom.x + (tourTo.x - tourFrom.x) * smooth,
+      y: tourFrom.y + (tourTo.y - tourFrom.y) * smooth
+    };
+    applyMapView();
+    if (now - tourStarted >= 10500) tourStarted = null;
+    startTour();
+  }
+  const observer = new IntersectionObserver(entries => {
+    tourVisible = entries[0].isIntersecting;
+    if (!tourVisible) { if (tourFrame !== null) cancelAnimationFrame(tourFrame); tourFrame = null; tourStarted = null; }
+    else startTour();
+  }, { threshold: .15 });
+  observer.observe(canvas);
+  document.getElementById('map-tour-toggle').addEventListener('click', () => {
+    if (touring) pauseTour();
+    else { touring = true; detail.classList.add('hidden'); updateTourButton(); startTour(); }
+  });
+  document.addEventListener('visibilitychange', () => { if (canvas.isConnected) startTour(); });
+  reducedMotion.addEventListener('change', () => { if (reducedMotion.matches) pauseTour(); });
+
 
   function clampMapView() {
     if (!canvas) return;
@@ -1962,6 +2042,7 @@ async function renderNetworkMap() {
     const location = cluster.unlocated ? 'Location unavailable' : networkMapLocationLabel(cluster);
     const nodes = cluster.nodes.slice(0, 20);
 
+    pauseTour();
     detail.classList.remove('hidden');
     detail.innerHTML =
       '<button class="map-detail-close" type="button" aria-label="Close">×</button>' +
@@ -1987,8 +2068,9 @@ async function renderNetworkMap() {
     if (!pinsElement) return;
 
     matchingItems = networkMapSearch(allItems, activeFilter, searchQuery, countryFilter);
-    renderDirectory();
     currentClusters = networkMapClusters(matchingItems);
+    tourStops = networkMapTourStops(currentClusters);
+    tourIndex = -1; tourStarted = null;
 
     pinsElement.innerHTML = currentClusters.map((cluster, index) => {
       const label = networkMapLocationLabel(cluster);
@@ -2026,47 +2108,21 @@ async function renderNetworkMap() {
     if (detail) detail.classList.add('hidden');
   }
 
-  function renderDirectory() {
-    const pageCount = Math.max(1, Math.ceil(matchingItems.length / 20));
-    directoryPage = Math.min(directoryPage, pageCount);
-    document.getElementById('map-directory-count').textContent = number(matchingItems.length) + ' matching nodes · ' + number(matchingItems.filter(networkMapHasGeo).length) + ' mapped';
-    const start = (directoryPage - 1) * 20;
-    document.getElementById('map-directory-list').innerHTML = matchingItems.slice(start, start + 20).map((node, index) =>
-      '<button type="button" class="map-directory-node" data-map-node="' + (start + index) + '"><strong>' + esc(node.service || node.id) + '</strong>' +
-      '<span>' + esc(node.geo ? [node.geo.city, node.geo.country].filter(Boolean).join(', ') : 'Location unavailable') + '</span>' +
-      '<small>' + esc(String(node.status).replaceAll('-', ' ')) + '</small></button>').join('') || '<p class="map-empty">No nodes match these filters. Clear the filters to see all nodes.</p>';
-    document.getElementById('map-list-page').textContent = directoryPage + ' / ' + pageCount;
-    document.getElementById('map-list-prev').disabled = directoryPage <= 1;
-    document.getElementById('map-list-next').disabled = directoryPage >= pageCount;
-    document.querySelectorAll('[data-map-node]').forEach(button => button.addEventListener('click', () => {
-      const node = matchingItems[Number(button.dataset.mapNode)];
-      if (!networkMapHasGeo(node)) {
-        openCluster({ unlocated: true, nodes: [node] }); return;
-      }
-      const index = currentClusters.findIndex(cluster => cluster.nodes.includes(node));
-      const rect = canvas.getBoundingClientRect();
-      const point = networkMapPinPosition(node.geo.latitude, node.geo.longitude);
-      mapView = { scale: 3, x: rect.width / 2 - point.left / 100 * rect.width * 3, y: rect.height / 2 - point.top / 100 * rect.height * 3 };
-      applyMapView(); openCluster(index);
-    }));
-  }
-
   document.getElementById('map-filter-form').addEventListener('submit', event => event.preventDefault());
   document.getElementById('map-search').addEventListener('input', event => {
-    searchQuery = event.target.value.slice(0, 200); directoryPage = 1; updateFilterUrl(); renderMapPins();
+    pauseTour(); searchQuery = event.target.value.slice(0, 200); updateFilterUrl(); renderMapPins();
   });
   document.getElementById('map-country').addEventListener('change', event => {
-    countryFilter = event.target.value; directoryPage = 1; updateFilterUrl(); renderMapPins();
+    pauseTour(); countryFilter = event.target.value; updateFilterUrl(); renderMapPins();
   });
   document.getElementById('map-clear').addEventListener('click', () => {
-    activeFilter = 'all'; searchQuery = ''; countryFilter = ''; directoryPage = 1;
+    pauseTour(); activeFilter = 'all'; searchQuery = ''; countryFilter = '';
     document.getElementById('map-search').value = ''; document.getElementById('map-country').value = '';
     updateFilterUrl(); updateStatButtons(); renderMapPins(); resetMapView();
   });
-  document.getElementById('map-list-prev').addEventListener('click', () => { directoryPage--; renderDirectory(); });
-  document.getElementById('map-list-next').addEventListener('click', () => { directoryPage++; renderDirectory(); });
   canvas?.addEventListener('keydown', event => {
     if (event.target !== canvas) return;
+    pauseTour();
     if (['+', '=', '-', '0', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Escape'].includes(event.key)) event.preventDefault();
     if (event.key === '+' || event.key === '=') zoomMapCentered(1.35);
     else if (event.key === '-') zoomMapCentered(1 / 1.35);
@@ -2083,8 +2139,9 @@ async function renderNetworkMap() {
 
   document.querySelectorAll('[data-map-filter]').forEach((button) => {
     button.addEventListener('click', () => {
+      pauseTour();
       activeFilter = allowedFilters.has(button.dataset.mapFilter) ? button.dataset.mapFilter : 'all';
-      directoryPage = 1;
+     
       updateFilterUrl();
       updateStatButtons();
       renderMapPins();
@@ -2093,6 +2150,7 @@ async function renderNetworkMap() {
 
   document.querySelectorAll('[data-map-zoom]').forEach((button) => {
     button.addEventListener('click', () => {
+      pauseTour();
       const action = button.dataset.mapZoom;
       if (action === 'in') zoomMapCentered(1.35);
       else if (action === 'out') zoomMapCentered(1 / 1.35);
@@ -2102,20 +2160,23 @@ async function renderNetworkMap() {
 
   canvas?.addEventListener('wheel', (event) => {
     if (!event.ctrlKey && !event.metaKey) return;
+    pauseTour();
     if (event.target.closest('.network-map-detail')) return;
     event.preventDefault();
     zoomMapAt(event.clientX, event.clientY, mapView.scale * (event.deltaY < 0 ? 1.18 : 1 / 1.18));
   }, { passive: false });
 
   canvas?.addEventListener('dblclick', (event) => {
-    if (event.target.closest('.network-pin, .network-map-controls, .network-map-detail')) return;
+    if (event.target.closest('.network-pin, .network-map-controls, .network-map-detail, .map-tour-controls')) return;
     event.preventDefault();
     zoomMapAt(event.clientX, event.clientY, mapView.scale * 1.5);
   });
 
   canvas?.addEventListener('pointerdown', (event) => {
+    if (event.target.closest('.map-tour-controls')) return;
+    pauseTour();
     if (event.pointerType === 'touch' && mapView.scale <= 1) return;
-    if (event.target.closest('.network-pin, .network-map-controls, .network-map-detail')) return;
+    if (event.target.closest('.network-pin, .network-map-controls, .network-map-detail, .map-tour-controls')) return;
     dragState = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -2147,6 +2208,8 @@ async function renderNetworkMap() {
   updateStatButtons();
   renderMapPins();
   applyMapView();
+  updateTourButton();
+  startTour();
 }
 
 async function renderTransaction(txid) {

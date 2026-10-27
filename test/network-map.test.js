@@ -31,3 +31,27 @@ test('map search combines status, country and case-insensitive node fields', asy
   assert.equal(context.networkMapHasGeo({ geo: { latitude: 91, longitude: 0 } }), false);
   assert.equal(context.networkMapHasGeo({ geo: { latitude: 0, longitude: 0 } }), true);
 });
+
+test('map camera tour selects geographically distinct stops and stays within bounds', async () => {
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const context = vm.createContext({});
+  vm.runInContext(app.slice(app.indexOf('function networkMapPinPosition('), app.indexOf('function networkMapLocationLabel(')), context);
+  vm.runInContext(app.slice(app.indexOf('function networkMapTourStops('), app.indexOf('async function renderNetworkMap(')), context);
+  const clusters = [
+    { latitude: 40, longitude: -74, nodes: Array(10) },
+    { latitude: 41, longitude: -73, nodes: Array(4) },
+    { latitude: 35, longitude: 139, nodes: Array(6) }
+  ];
+  const stops = context.networkMapTourStops(clusters);
+  assert.equal(stops.length, 4);
+  assert.equal(stops[0], clusters[0]);
+  assert.equal(stops[1], null);
+  assert.equal(stops[2], clusters[2]);
+  for (const cluster of [...clusters, { latitude: 89, longitude: -179 }]) {
+    const pose = context.networkMapTourPose(cluster, 1000, 500);
+    assert.ok(pose.x <= 0 && pose.x >= 1000 * (1 - pose.scale));
+    assert.ok(pose.y <= 0 && pose.y >= 500 * (1 - pose.scale));
+  }
+  assert.ok(!app.includes('id="map-directory-list"'));
+  assert.ok(app.includes("window.matchMedia('(prefers-reduced-motion: reduce)')"));
+});
