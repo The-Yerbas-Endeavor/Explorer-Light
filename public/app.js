@@ -798,13 +798,13 @@ function outputAddresses(vout) {
   return '<span class="muted">' + esc(script.type || 'script') + '</span>';
 }
 
-function yerb(value) {
-  if (value === null || value === undefined || value === '') return '0.00000000';
+function yerb(value, digits = 8) {
+  if (value === null || value === undefined || value === '') return Number(0).toFixed(digits);
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return String(value);
   return parsed.toLocaleString(undefined, {
-    minimumFractionDigits: 8,
-    maximumFractionDigits: 8
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits
   });
 }
 
@@ -1129,7 +1129,7 @@ async function renderAddress(address) {
       const info = detail?.available
         ? '<span class="address-tx-facts"><time>' + esc(detail.time ? new Date(detail.time * 1000).toLocaleString() : 'Date unavailable') + '</time>' +
           '<strong>' + esc(detail.direction === 'sent' ? 'Sent' : detail.direction === 'received' ? 'Received' : 'No net change') +
-          ' ' + esc(detail.amountYerb) + ' YERB</strong><span>' + number(detail.confirmations) + ' confirmations</span></span>'
+          ' ' + esc(yerb(detail.amountYerb, 3)) + ' YERB</strong><span>' + number(detail.confirmations) + ' confirmations</span></span>'
         : '<span class="address-tx-facts">Transaction details unavailable</span>';
       return '<div class="address-activity-row"><a class="ledger-row tx-ledger-row" href="/tx/' + encodeURIComponent(txid) + (detail?.blockHash ? '?block=' + encodeURIComponent(detail.blockHash) : '') + '">' +
         '<span class="ledger-index">' + String(txOffset + index + 1).padStart(2, '0') + '</span>' +
@@ -1142,7 +1142,7 @@ async function renderAddress(address) {
     ? utxos.map((utxo) =>
         '<a class="ledger-row utxo-ledger-row" href="/tx/' + encodeURIComponent(utxo.txid) + '">' +
           '<span class="ledger-row-label">UTXO</span>' +
-          '<strong>' + yerb(Number(utxo.satoshis || 0) / 100000000) + ' YERB</strong>' +
+          '<strong>' + yerb(Number(utxo.satoshis || 0) / 100000000, 3) + ' YERB</strong>' +
           '<span>vout ' + number(utxo.outputIndex) + '</span>' +
           '<span>block ' + number(utxo.height) + '</span>' +
           '<code>' + esc(compactHash(utxo.txid)) + '</code>' +
@@ -1163,8 +1163,8 @@ async function renderAddress(address) {
     '<details class="address-qr"><summary>Show address QR code</summary><img width="200" height="200" loading="lazy" src="/api/qr/' + encodeURIComponent(data.address) + '" alt="QR code for ' + esc(data.address) + '"><p>' + esc(data.address) + '</p></details>' +
     historyNotice +
     '<div class="address-summary">' + telemetryRail([
-      { label: 'BALANCE', value: balance?.balanceYerb == null ? 'Unavailable' : yerb(balance.balanceYerb) + ' YERB', note: balance?.source === 'unspent outputs' ? 'from confirmed UTXOs' : 'current' },
-      { label: 'RECEIVED', value: balance?.receivedYerb == null ? 'Unavailable' : yerb(balance.receivedYerb) + ' YERB', note: data.history?.receivedSnapshot ? 'through block ' + number(data.history.receivedSnapshot.height) : 'lifetime' },
+      { label: 'BALANCE', value: balance?.balanceYerb == null ? 'Unavailable' : yerb(balance.balanceYerb, 3) + ' YERB', note: balance?.source === 'unspent outputs' ? 'from confirmed UTXOs' : 'current' },
+      { label: 'RECEIVED', value: balance?.receivedYerb == null ? 'Unavailable' : yerb(balance.receivedYerb, 3) + ' YERB', note: data.history?.receivedSnapshot ? 'through block ' + number(data.history.receivedSnapshot.height) : 'lifetime' },
       { label: data.history?.limited ? 'RECENT TRANSACTIONS' : 'TRANSACTIONS', value: totalTransactions === null ? '—' : number(totalTransactions), note: data.history?.limited ? 'latest 100 blocks' : 'indexed' },
       { label: 'UTXOS', value: utxoTotal === null ? '—' : number(utxoTotal), note: 'unspent' },
       { label: 'ASSETS', value: data.assets?.available ? number(assetBalances.length) : 'Unavailable', note: 'positions' }
