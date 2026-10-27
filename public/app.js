@@ -837,7 +837,7 @@ async function renderTransactions() {
         'TRANSACTION INDEX',
         'Recent transactions',
         number(items.length) + ' confirmed entries from ' + number(data.blocksScanned) + ' recent blocks',
-        '<a href="/blocks">BLOCKS</a>'
+        '<a href="/blocks">BLOCKS</a><a href="/movement">LARGE MOVEMENTS</a>'
       ) +
       telemetryRail([
         { label: 'LOADED', value: number(items.length), note: 'recent transactions' },
@@ -1156,8 +1156,9 @@ async function renderAddress(address) {
     : '<div class="ledger-warning">Address recognized, but indexed history is unavailable from Core.</div>';
 
   app.innerHTML =
-    ledgerHeader('YERBAS ADDRESS', addressLabel(data.address) || 'Address', data.address, '<a href="/">LIVE CHAIN</a>' + copyButton(data.address, 'address')) +
+    ledgerHeader('YERBAS ADDRESS', addressLabel(data.address) || 'Address', data.address, '<a href="/">LIVE CHAIN</a><a href="/rewards?address=' + encodeURIComponent(data.address) + '">PAYOUT HISTORY</a>' + copyButton(data.address, 'address')) +
     watchedAddressNote(data.address) +
+    '<details class="address-qr"><summary>Show address QR code</summary><img width="200" height="200" loading="lazy" src="/api/qr/' + encodeURIComponent(data.address) + '" alt="QR code for ' + esc(data.address) + '"><p>' + esc(data.address) + '</p></details>' +
     historyNotice +
     telemetryRail([
       { label: 'BALANCE', value: yerb(balance?.balanceYerb) + ' YERB', note: 'current' },
@@ -1390,7 +1391,8 @@ function initializeAssetPreview(url) {
 async function renderAsset(name) {
   renderLoading('Reading asset data from Yerbas Core');
 
-  const data = await api('/api/asset/' + encodeURIComponent(name));
+  const holderPage = Math.max(1, Math.min(1000000, Number(new URLSearchParams(location.search).get('page')) || 1));
+  const data = await api('/api/asset/' + encodeURIComponent(name) + '?page=' + holderPage);
   setRpcState('online', 'Core online');
   document.title = data.name + ' · Asset · Yerbas Explorer';
 
@@ -1405,7 +1407,7 @@ async function renderAsset(name) {
         const ownership = supply > 0 ? (balance / supply) * 100 : 0;
         const level = scaleLevel(balance, maxBalance);
         return '<a class="holder-rail-row" href="/address/' + encodeURIComponent(holder.address) + '">' +
-          '<span class="ledger-index">' + String(index + 1).padStart(2, '0') + '</span>' +
+          '<span class="ledger-index">' + String(((data.holders.page || 1) - 1) * 100 + index + 1).padStart(2, '0') + '</span>' +
           '<code>' + esc(holder.address) + '</code>' +
           '<strong>' + assetAmount(holder.balance, metadata.units) + '</strong>' +
           '<span>' + ownership.toFixed(2) + '%</span>' +
@@ -1461,8 +1463,13 @@ async function renderAsset(name) {
     '</section>' +
     ipfsPreview +
     '<section class="ledger-section">' +
-      railHeading('OWNERSHIP RAIL', 'Top holders', data.holders?.total === null ? 'availability unknown' : number(data.holders?.total) + ' total') +
+      railHeading('OWNERSHIP RAIL', 'Asset holders', data.holders?.total === null ? 'availability unknown' : number(data.holders?.total) + ' total') +
+      '<p>Core address order · up to 100 holders per page.</p>' +
       '<div class="holder-rail">' + holderRows + '</div>' +
+      '<nav class="rail-pagination" aria-label="Asset holder pages">' +
+      ((data.holders.page || 1) > 1 ? '<a href="/asset/' + encodeURIComponent(name) + '?page=' + (data.holders.page - 1) + '">← Prev</a>' : '<span></span>') +
+      '<span>Page ' + number(data.holders.page || 1) + ' / ' + number(data.holders.totalPages || 1) + '</span>' +
+      ((data.holders.page || 1) < data.holders.totalPages ? '<a href="/asset/' + encodeURIComponent(name) + '?page=' + (data.holders.page + 1) + '">Next →</a>' : '<span></span>') + '</nav>' +
     '</section>';
   if (ipfsPreviewUrl) initializeAssetPreview(ipfsPreviewUrl);
 }
@@ -1593,7 +1600,7 @@ async function renderSmartnodes() {
     '</div>';
 
   app.innerHTML =
-    ledgerHeader('SMARTNODE NETWORK', 'Deterministic node stream', number(enabled) + ' enabled', '<a href="/node-map?view=smartnodes">NETWORK MAP ↗</a><a href="/">LIVE CHAIN</a>') +
+    ledgerHeader('SMARTNODE NETWORK', 'Deterministic node stream', number(enabled) + ' enabled', '<a href="/node-map?view=smartnodes">NETWORK MAP ↗</a><a href="/rewards">PAYOUT HISTORY</a><a href="/">LIVE CHAIN</a>') +
     telemetryRail([
       { label: 'ENABLED', value: number(enabled), note: total ? ((enabled / total) * 100).toFixed(1) + '%' : '—' },
       { label: 'REGISTERED', value: number(total), note: 'deterministic' },
@@ -2244,6 +2251,12 @@ async function renderTransaction(txid) {
       }).join('')
     : '<div class="ledger-empty">No outputs returned.</div>';
 
+  const inputRows = (tx.inputDetails || []).map(input => input.coinbase
+    ? '<div class="ledger-empty">Coinbase · newly created coins</div>'
+    : '<div class="input-detail-row"><a href="/tx/' + encodeURIComponent(input.txid) + '"><code>' + esc(compactHash(input.txid)) + ':' + number(input.vout) + '</code></a>' +
+      '<strong>' + (input.available ? esc(input.amountYerb) + ' YERB' : 'Previous output unavailable') + '</strong><div>' +
+      (input.addresses || []).map(address => '<a class="mono" href="/address/' + encodeURIComponent(address) + '">' + esc(address) + '</a>').join('<br>') + '</div></div>').join('');
+
   const actions = '<a href="/">LIVE CHAIN</a>' + copyButton(tx.txid, 'transaction ID') +
     (tx.blockhash ? '<a href="/block/' + encodeURIComponent(tx.blockhash) + '">BLOCK ↗</a>' : '');
 
@@ -2254,7 +2267,8 @@ async function renderTransaction(txid) {
       { label: 'TOTAL OUTPUT', value: number(totalOutput, 8) + ' YERB', note: 'decoded' },
       { label: 'INPUTS', value: number(inputCount), note: 'sources' },
       { label: 'OUTPUTS', value: number(outputs.length), note: 'destinations' },
-      { label: 'SIZE', value: bytes(tx.size), note: 'serialized' }
+      { label: 'SIZE', value: bytes(tx.size), note: 'serialized' },
+      { label: 'FEE', value: tx.feeYerb === null || tx.feeYerb === undefined ? '—' : tx.feeYerb + ' YERB', note: 'resolved previous outputs' }
     ]) +
     '<section class="flow-rail">' +
       '<span><small>INPUTS</small><b>' + number(inputCount) + '</b></span>' +
@@ -2263,6 +2277,8 @@ async function renderTransaction(txid) {
       '<i>→</i>' +
       '<span><small>OUTPUTS</small><b>' + number(outputs.length) + '</b></span>' +
     '</section>' +
+    '<section class="ledger-section">' + railHeading('SOURCE RAIL', 'Transaction inputs', number(inputCount) + ' inputs') +
+      (tx.feeReason ? '<p>' + esc(tx.feeReason) + '</p>' : '') + (inputRows || '<p>Input details unavailable.</p>') + '</section>' +
     '<section class="ledger-section">' +
       railHeading('VALUE RAIL', 'Transaction outputs', 'scaled by output value') +
       '<div class="output-rail">' + outputRows + '</div>' +
@@ -2273,6 +2289,68 @@ async function renderTransaction(txid) {
 }
 
 
+function networkTrendChart(items, field, title, format) {
+  if (items.length < 2) return '<section class="network-chart"><h3>' + title + '</h3><p>Collecting observations. Charts appear after two samples, approximately five minutes apart. No earlier history is inferred.</p></section>';
+  const minTime = items[0].time, maxTime = items.at(-1).time;
+  const values = items.map(row => row[field]);
+  const minimum = Math.min(...values), maximum = Math.max(...values);
+  const segments = []; let current = [];
+  items.forEach((row, index) => {
+    if (index && row.time - items[index - 1].time > 900) { segments.push(current); current = []; }
+    current.push((20 + (row.time - minTime) / Math.max(1, maxTime - minTime) * 760).toFixed(2) + ',' + (160 - (row[field] - minimum) / Math.max(1e-12, maximum - minimum) * 130).toFixed(2));
+  });
+  segments.push(current);
+  return '<section class="network-chart"><h3>' + title + '</h3><p>' + esc(format(minimum)) + ' – ' + esc(format(maximum)) + '</p>' +
+    '<svg viewBox="0 0 800 180" role="img" aria-label="' + esc(title) + ' over the selected period"><path d="M20 20V160H780" class="chart-axis"/>' +
+    segments.filter(points => points.length > 1).map(points => '<polyline class="network-chart-line" points="' + points.join(' ') + '"/>').join('') + '</svg>' +
+    '<div class="chart-range"><span>' + esc(new Date(minTime * 1000).toLocaleString()) + '</span><span>' + esc(new Date(maxTime * 1000).toLocaleString()) + '</span></div></section>';
+}
+
+async function renderNetworkHealth() {
+  renderLoading('Reading network observations');
+  const days = [1,7,30].includes(Number(new URLSearchParams(location.search).get('days'))) ? Number(new URLSearchParams(location.search).get('days')) : 7;
+  const [history, peers] = await Promise.all([api('/api/network-history?days=' + days), api('/api/peers')]);
+  document.title = 'Network health · Yerbas Explorer'; setRpcState('online', 'Core online');
+  app.innerHTML = ledgerHeader('NETWORK', 'Network health', 'Observed hashrate, difficulty and current peer connections', '<a href="/node-map">GEOGRAPHIC MAP</a>') +
+    '<nav class="rail-pagination"><a href="/network?days=1">24 hours</a><a href="/network?days=7">7 days</a><a href="/network?days=30">30 days</a></nav>' +
+    '<p>' + number(history.items.length) + ' observations · sampled every five minutes · gaps remain visible · ' + days + '-day window</p>' +
+    '<div class="network-chart-grid">' + networkTrendChart(history.items, 'hashrate', 'Estimated network hashrate', hashRate) + networkTrendChart(history.items, 'difficulty', 'Difficulty', value => number(value, 8)) + '</div>' +
+    railHeading('CONNECTION TOOLS', 'Current peers', number(peers.length) + ' connected · not a list of all reachable nodes') +
+    '<p>Copy an addnode command for your own node. Inbound peers may use temporary source ports; commands are offered only for outbound peers.</p>' +
+    peers.map(peer => '<div class="peer-tools-row"><code>' + esc(peer.address) + '</code><span>' + esc(peer.subversion || 'Unknown version') + ' · protocol ' + number(peer.version) + '</span>' +
+      '<span>' + (peer.inbound ? 'Inbound' : 'Outbound') + '</span>' + (!peer.inbound ? copyButton('addnode "' + peer.address + '" onetry', 'addnode command') : '') + '</div>').join('');
+}
+
+async function renderMovements() {
+  renderLoading('Scanning the latest 100 confirmed blocks');
+  const raw = new URLSearchParams(location.search).get('minimum') || '1000';
+  const minimum = /^\d{1,12}(?:\.\d{1,8})?$/.test(raw) ? raw : '1000';
+  const data = await api('/api/movement?minimum=' + encodeURIComponent(minimum));
+  document.title = 'Large movements · Yerbas Explorer'; setRpcState('online', 'Core online');
+  app.innerHTML = ledgerHeader('RECENT CHAIN ACTIVITY', 'Large movements', 'Non-coinbase transactions by total native output value', '<a href="/transactions">TRANSACTIONS</a>') +
+    '<form class="tool-form" action="/movement"><label>Minimum total output (YERB)<input name="minimum" value="' + esc(minimum) + '" inputmode="decimal"></label><button>Filter</button></form>' +
+    '<p>Scanned blocks ' + number(data.fromHeight) + '–' + number(data.tip) + ' (' + number(data.blocksScanned) + ' blocks). Output totals include change and are not the amount sent to another owner.</p>' +
+    (data.items.length ? data.items.map(tx => '<a class="movement-row" href="/tx/' + encodeURIComponent(tx.txid) + '?block=' + encodeURIComponent(tx.blockHash) + '"><code>' + esc(compactHash(tx.txid)) + '</code><strong>' + esc(tx.outputYerb) + ' YERB</strong><span>' + esc(isoTime(tx.time)) + '</span><span>Block ' + number(tx.height) + '</span></a>').join('') : '<div class="ledger-empty">No transactions meet this threshold in the scanned block range.</div>');
+}
+
+async function renderRewards() {
+  const params = new URLSearchParams(location.search);
+  const address = (params.get('address') || '').trim();
+  const blocks = [100,500,1000,2000].includes(Number(params.get('blocks'))) ? Number(params.get('blocks')) : 1000;
+  document.title = 'Smartnode payouts · Yerbas Explorer';
+  const form = '<form class="tool-form" action="/rewards"><label>Payout address<input name="address" required maxlength="40" value="' + esc(address) + '" placeholder="Yerbas payout address"></label><label>Recent blocks<select name="blocks">' + [100,500,1000,2000].map(count => '<option' + (count === blocks ? ' selected' : '') + '>' + count + '</option>').join('') + '</select></label><button>Check payouts</button></form>';
+  app.innerHTML = ledgerHeader('SMARTNODE PAYMENTS', 'Verified recent payouts', 'Scheduled payees checked against confirmed coinbase outputs', '<a href="/smartnodes">SMARTNODES</a>') + form +
+    '<p>This is a recent block-window lookup, not lifetime earnings. Only confirmed coinbase outputs to the scheduled Smartnode payee are counted. If mining or other coinbase rewards use the same address, those outputs can also be included.</p><div id="reward-results"></div>';
+  if (!address) return;
+  const target = document.getElementById('reward-results'); target.textContent = 'Checking scheduled payouts…';
+  try {
+    const data = await api('/api/rewards/' + encodeURIComponent(address) + '?blocks=' + blocks);
+    setRpcState('online', 'Core online');
+    target.innerHTML = '<p>Blocks ' + number(data.fromHeight) + '–' + number(data.toHeight) + ' · ' + number(data.items.length) + ' verified payouts · total ' + esc(data.totalYerb) + ' YERB' + (data.truncated ? ' · latest 100 matching blocks only' : '') + '</p>' +
+      (data.items.length ? data.items.map(row => '<a class="movement-row" href="/tx/' + encodeURIComponent(row.txid) + '?block=' + encodeURIComponent(row.blockHash) + '"><span>Block ' + number(row.height) + '</span><strong>' + esc(row.amountYerb) + ' YERB</strong><time>' + esc(isoTime(row.time)) + '</time></a>').join('') : '<div class="ledger-empty">No verified payouts to this address in the selected range.</div>');
+  } catch(error) { target.textContent = 'Payout lookup unavailable: ' + error.message; }
+}
+
 async function route() {
   clearNotice();
   const parts = location.pathname.split('/').filter(Boolean);
@@ -2281,6 +2359,10 @@ async function route() {
     if (parts[0] === 'blocks') {
       return await renderHome();
     }
+
+    if (parts[0] === 'network') return await renderNetworkHealth();
+    if (parts[0] === 'movement') return await renderMovements();
+    if (parts[0] === 'rewards') return await renderRewards();
 
     if (parts[0] === 'transactions') {
       return await renderTransactions();

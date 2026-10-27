@@ -404,3 +404,15 @@ Address pages show 40 transactions and 30 unspent outputs per page, with separat
 Successful raster asset previews are cached in memory and persisted under `IPFS_IMAGE_CACHE_DIR` (default `/var/lib/yerbas-explorer-light/ipfs-images`). The disk cache is bounded to 512 MiB and evicts oldest stored files. Ensure that directory is writable by the service; `StateDirectory=yerbas-explorer-light` provides this under systemd. A disk-cache error does not prevent live previews.
 
 JSON metadata may reference an image through `image` or `image_url`. IPFS URLs, IPFS gateway URLs, and relative IPFS paths are resolved through the configured gateways; arbitrary external URLs are not fetched. Browser gateway links remain available when an embedded preview cannot load.
+
+
+### Additional lightweight chain tools
+
+- `/network`: five-minute hashrate/difficulty samples retained for 30 days, plus current peer information and outbound-peer `addnode` commands. Samples start when deployed; missing periods are not backfilled. Set `NETWORK_HISTORY_FILE` to override the default alongside the market-history file.
+- `/movement`: filters non-coinbase transactions in the last 100 blocks by total native output value. Totals include change and do not identify transfers between owners.
+- `/rewards`: checks up to 2,000 recent blocks using Core's scheduled Smartnode winners and matching confirmed coinbase outputs. Totals cover only the displayed range, with at most 100 matching blocks. Another coinbase reward to the same address can be included; this is not a lifetime-earnings calculation.
+- Address QR codes are generated locally by the pinned `qrcode` package. Run `npm ci --omit=dev --ignore-scripts` after updating dependencies.
+- Transaction fees are calculated only when every previous output resolves and input value is at least output value. Coinbase and unavailable previous outputs are explicitly labelled. Resolution is capped at 200 inputs with a bounded previous-output cache.
+- Asset holders are paginated in Core's address order, 100 per page. This is not a balance ranking.
+
+New API routes mirror these pages: `/api/network-history?days=7`, `/api/peers`, `/api/movement?minimum=1000`, `/api/rewards/:address?blocks=1000`, `/api/qr/:address`, and `/api/asset/:name?page=2`.

@@ -1,4 +1,7 @@
 import fs from 'node:fs/promises';
+import QRCode from 'qrcode';
+import { enrichTransaction, recentMovementBlocks, smartnodeRewards, toDuffs } from './src/chain-tools.js';
+import { NetworkHistory } from './src/network-history.js';
 import http from 'node:http';
 import { isIP } from 'node:net';
 import path from 'node:path';
@@ -20,6 +23,17 @@ const publicDir = path.join(__dirname, 'public');
 const rpc = new YerbasRpc(config.rpc);
 const cache = new Map();
 const networkGeoCache = new Map();
+const previousOutputCache = new Map();
+function cachedPreviousOutput(key, ttl, producer) {
+  const entry = previousOutputCache.get(key);
+  if (entry && entry.expires > Date.now()) return entry.promise;
+  previousOutputCache.delete(key);
+  while (previousOutputCache.size >= 64) previousOutputCache.delete(previousOutputCache.keys().next().value);
+  const promise = Promise.resolve().then(producer).catch(error => { previousOutputCache.delete(key); throw error; });
+  previousOutputCache.set(key, { expires: Date.now() + ttl, promise });
+  return promise;
+}
+const networkHistory = new NetworkHistory(process.env.NETWORK_HISTORY_FILE || path.join(path.dirname(config.markets.historyFile), 'network-history.json'));
 const ipfsImageCache = new ImageCache();
 const ipfsDiskCache = new DiskImageCache(process.env.IPFS_IMAGE_CACHE_DIR || '/var/lib/yerbas-explorer-light/ipfs-images');
 
@@ -2501,23 +2515,54 @@ async function handleApi(req, res, url) {
         ? block.tx.find((item) => item && typeof item === 'object' && item.txid === txid)
         : null;
       if (!tx) return sendJson(res, 404, { error: 'Transaction was not found in the supplied block.' });
-      return sendJson(res, 200, {
+      return sendJson(res, 200, await enrichTransaction(rpc, {
         ...tx,
         blockhash: tx.blockhash || block.hash || knownBlock,
         confirmations: tx.confirmations ?? block.confirmations,
         blocktime: tx.blocktime || block.time
-      });
+      }, cachedPreviousOutput));
     }
 
     try {
       const tx = await rpc.call('getrawtransaction', [txid, true]);
-      return sendJson(res, 200, tx);
+      return sendJson(res, 200, await enrichTransaction(rpc, tx, cachedPreviousOutput));
     } catch (error) {
       if (error instanceof RpcError && error.code === -5) {
         error.message = 'Transaction not found. Direct historical TXID lookup needs txindex=1, but transactions opened from a block work without it.';
       }
       throw error;
     }
+  }
+
+  if (url.pathname.startsWith('/api/qr/')) {
+    const address = decodeURIComponent(url.pathname.slice('/api/qr/'.length));
+    if (!/^[1-9A-HJ-NP-Za-km-z]{26,40}$/.test(address)) return sendJson(res, 400, { error: 'Invalid address.' });
+    const validation = await cached('qr-address:' + address, 60000, () => rpc.call('validateaddress', [address]));
+    if (!validation.isvalid) return sendJson(res, 400, { error: 'Invalid address.' });
+    const svg = await QRCode.toString(address, { type: 'svg', errorCorrectionLevel: 'M', margin: 4, width: 200 });
+    res.writeHead(200, securityHeaders({ 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=86400' }));
+    return res.end(req.method === 'HEAD' ? undefined : svg);
+  }
+  if (url.pathname === '/api/network-history') {
+    const days = apiInt(url.searchParams.get('days'), 7, 1, 30);
+    const since = Date.now() / 1000 - days * 86400;
+    const items = (await networkHistory.read()).filter(row => row.time >= since);
+    return sendJson(res, 200, { days, intervalSeconds: 300, items });
+  }
+  if (url.pathname === '/api/peers') return sendJson(res, 200, await cached('connection-tools-peers', 15000, currentPeers));
+  if (url.pathname === '/api/movement') {
+    const minimum = url.searchParams.get('minimum') || '1000';
+    if (!/^\d{1,12}(?:\.\d{1,8})?$/.test(minimum)) return sendJson(res, 400, { error: 'Invalid minimum amount.' });
+    const data = await cached('movement:100', 60000, () => recentMovementBlocks(rpc, 100));
+    return sendJson(res, 200, { ...data, minimum, items: data.items.filter(tx => toDuffs(tx.outputYerb) >= toDuffs(minimum)) });
+  }
+  if (url.pathname.startsWith('/api/rewards/')) {
+    const address = decodeURIComponent(url.pathname.slice('/api/rewards/'.length));
+    if (!/^[1-9A-HJ-NP-Za-km-z]{26,40}$/.test(address)) return sendJson(res, 400, { error: 'Invalid address.' });
+    const validation = await rpc.call('validateaddress', [address]);
+    if (!validation.isvalid) return sendJson(res, 400, { error: 'Invalid address.' });
+    const blocks = apiInt(url.searchParams.get('blocks'), 1000, 100, 2000);
+    return sendJson(res, 200, await cached('rewards:' + address + ':' + blocks, 60000, () => smartnodeRewards(rpc, address, blocks, cached)));
   }
 
   if (url.pathname === '/api/network-map') {
@@ -2604,11 +2649,11 @@ async function handleApi(req, res, url) {
       return sendJson(res, 400, { error: 'Invalid Yerbas asset name.' });
     }
 
-    const [metadataResult, directoryResult, holderCountResult, holdersResult] = await Promise.allSettled([
+    const requestedHolderPage = apiInt(url.searchParams.get('page'), 1, 1, 1000000);
+    const [metadataResult, directoryResult, holderCountResult] = await Promise.allSettled([
       rpc.call('getassetdata', [assetName]),
       rpc.call('listassets', [assetName, true, 1, 0]),
-      rpc.call('listaddressesbyasset', [assetName, true]),
-      rpc.call('listaddressesbyasset', [assetName, false, 100, 0])
+      rpc.call('listaddressesbyasset', [assetName, true])
     ]);
 
     const metadata = metadataResult.status === 'fulfilled' ? metadataResult.value : null;
@@ -2624,7 +2669,10 @@ async function handleApi(req, res, url) {
       ? Number(holderCountResult.value)
       : null;
 
-    const holderValue = holdersResult.status === 'fulfilled' ? holdersResult.value : null;
+    const holderPages = Math.max(1, Math.ceil((holderCount || 0) / 100));
+    const holderPage = Math.min(requestedHolderPage, holderPages);
+    const holdersResult = await Promise.allSettled([rpc.call('listaddressesbyasset', [assetName, false, 100, (holderPage - 1) * 100])]);
+    const holderValue = holdersResult[0].status === 'fulfilled' ? holdersResult[0].value : null;
     const holdersAvailable = holderValue && typeof holderValue === 'object' && !Array.isArray(holderValue);
     const holders = holdersAvailable
       ? Object.entries(holderValue).map(([address, balance]) => ({ address, balance }))
@@ -2639,7 +2687,7 @@ async function handleApi(req, res, url) {
       } : null,
       holders: {
         available: holdersAvailable,
-        total: holderCount,
+        total: holderCount, page: holderPage, totalPages: holderPages, limit: 100,
         returned: holders.length,
         items: holders,
         unavailableReason: typeof holderValue === 'string' ? holderValue.replace(/^_/, '') : null
@@ -2801,6 +2849,7 @@ async function requestHandler(req, res) {
 
     if (url.pathname === '/'
       || url.pathname === '/blocks'
+      || ['/network', '/movement', '/rewards'].includes(url.pathname)
       || url.pathname === '/transactions'
       || url.pathname === '/addresses'
       || url.pathname === '/richlist'
@@ -2848,6 +2897,18 @@ server.listen(config.port, config.host, () => {
   console.log('AI gateway: ' + (config.ai.enabled ? 'enabled (read-only)' : 'disabled'));
   console.log('Market history: ' + config.markets.historyFile);
   startMarketHistorySnapshots();
+  let historyRunning = false;
+  const sampleNetwork = async () => {
+    if (historyRunning) return;
+    historyRunning = true;
+    try {
+      const [chain, hashrate] = await Promise.all([rpc.call('getblockchaininfo'), rpc.call('getnetworkhashps')]);
+      if (!chain.initialblockdownload) await networkHistory.record({ time: Math.floor(Date.now() / 1000), height: chain.blocks, difficulty: Number(chain.difficulty), hashrate: Number(hashrate) });
+    } catch (error) { console.warn('Network history sample unavailable:', error.message); }
+    finally { historyRunning = false; }
+  };
+  const historyWarmup = setTimeout(sampleNetwork, 5000); historyWarmup.unref();
+  const historyTimer = setInterval(sampleNetwork, 300000); historyTimer.unref();
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
