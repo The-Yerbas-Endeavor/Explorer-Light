@@ -2725,7 +2725,7 @@ async function handleApi(req, res, url) {
 
     try {
       if (result.data.history.limited) {
-        Object.assign(result.data.history, await recentAddressHistory(rpc, address, (requestedPage - 1) * 40, 40, cached));
+        Object.assign(result.data.history, await recentAddressHistory(rpc, address, (requestedPage - 1) * 40, 40, cachedPreviousOutput));
       } else {
         result.data.history.transactions = await addressActivity(rpc, address, result.data.history.txids || [], cached);
       }
