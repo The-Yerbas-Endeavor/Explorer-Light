@@ -405,17 +405,10 @@ export function createAiGateway({ rpc, cached, marketPriceUrl = '' }) {
     }
 
     const utxoOnly = (process.env.ADDRESS_UTXO_ONLY || '').split(',').map(value => value.trim()).includes(address);
-    let recentRange = null;
-    if (utxoOnly) {
-      try {
-        const tip = await rpc.call('getblockcount');
-        if (Number.isSafeInteger(tip) && tip > 0) recentRange = { start: Math.max(1, tip - 999), end: tip };
-      } catch { /* Never fall back to an unrestricted history scan. */ }
-    }
     const unavailableHistory = () => Promise.reject(new Error('Lifetime history temporarily disabled for this high-volume address; current balance uses confirmed UTXOs.'));
     const [balanceResult, txidResult, utxoResult, assetResult] = await Promise.allSettled([
       utxoOnly ? unavailableHistory() : rpc.call('getaddressbalance', [{ addresses: [address] }]),
-      utxoOnly ? (recentRange ? rpc.call('getaddresstxids', [{ addresses: [address], ...recentRange }]) : unavailableHistory()) : rpc.call('getaddresstxids', [addressParams]),
+      utxoOnly ? unavailableHistory() : rpc.call('getaddresstxids', [addressParams]),
       rpc.call('getaddressutxos', [{ addresses: [address] }]),
       rpc.call('listassetbalancesbyaddress', [address, false, 500, 0])
     ]);
@@ -451,8 +444,8 @@ export function createAiGateway({ rpc, cached, marketPriceUrl = '' }) {
       history: {
         available: indexed,
         limited: utxoOnly,
-        startHeight: recentRange?.start ?? start,
-        endHeight: recentRange?.end ?? end,
+        startHeight: start,
+        endHeight: end,
         balance: balanceResult.status === 'fulfilled'
           ? {
               balanceDuffs: balanceResult.value.balance,

@@ -1131,7 +1131,7 @@ async function renderAddress(address) {
           '<strong>' + esc(detail.direction === 'sent' ? 'Sent' : detail.direction === 'received' ? 'Received' : 'No net change') +
           ' ' + esc(detail.amountYerb) + ' YERB</strong><span>' + number(detail.confirmations) + ' confirmations</span></span>'
         : '<span class="address-tx-facts">Transaction details unavailable</span>';
-      return '<div class="address-activity-row"><a class="ledger-row tx-ledger-row" href="/tx/' + encodeURIComponent(txid) + '">' +
+      return '<div class="address-activity-row"><a class="ledger-row tx-ledger-row" href="/tx/' + encodeURIComponent(txid) + (detail?.blockHash ? '?block=' + encodeURIComponent(detail.blockHash) : '') + '">' +
         '<span class="ledger-index">' + String(txOffset + index + 1).padStart(2, '0') + '</span>' +
         '<span class="ledger-row-label">TX</span><span class="address-tx-content"><code title="' + esc(txid) + '">' + esc(txid) + '</code>' + info + '</span>' +
         '<span class="ledger-open">↗</span></a>' + copyButton(txid, 'transaction ID') + '</div>';
@@ -1152,7 +1152,7 @@ async function renderAddress(address) {
     : '<div class="ledger-empty">' + (data.history?.utxosAvailable ? 'No unspent outputs.' : 'Unspent outputs unavailable.') + '</div>';
 
   const historyNotice = data.history?.limited
-    ? '<div class="ledger-warning">Current balance is verified from confirmed unspent outputs. Transaction history is limited to the latest 1,000 blocks to keep this high-volume address responsive. Lifetime received is unavailable.</div>'
+    ? '<div class="ledger-warning">Lifetime received and full transaction history are disabled for this high-volume address. Current balance uses confirmed unspent outputs. Recent activity covers only the latest 100 blocks when available.</div>'
     : balance && data.history?.txidsAvailable && data.history?.utxosAvailable
     ? ''
     : '<div class="ledger-warning">Some address data is unavailable from Core. Unavailable values are not zero balances. Try again shortly.</div>';
@@ -1165,7 +1165,7 @@ async function renderAddress(address) {
     '<div class="address-summary">' + telemetryRail([
       { label: 'BALANCE', value: balance?.balanceYerb == null ? 'Unavailable' : yerb(balance.balanceYerb) + ' YERB', note: balance?.source === 'unspent outputs' ? 'from confirmed UTXOs' : 'current' },
       { label: 'RECEIVED', value: balance?.receivedYerb == null ? 'Unavailable' : yerb(balance.receivedYerb) + ' YERB', note: 'lifetime' },
-      { label: data.history?.limited ? 'RECENT TRANSACTIONS' : 'TRANSACTIONS', value: totalTransactions === null ? '—' : number(totalTransactions), note: data.history?.limited ? 'latest 1,000 blocks' : 'indexed' },
+      { label: data.history?.limited ? 'RECENT TRANSACTIONS' : 'TRANSACTIONS', value: totalTransactions === null ? '—' : number(totalTransactions), note: data.history?.limited ? 'latest 100 blocks' : 'indexed' },
       { label: 'UTXOS', value: utxoTotal === null ? '—' : number(utxoTotal), note: 'unspent' },
       { label: 'ASSETS', value: data.assets?.available ? number(assetBalances.length) : 'Unavailable', note: 'positions' }
     ]) + '</div>' +

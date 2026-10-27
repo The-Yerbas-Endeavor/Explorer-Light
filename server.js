@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { AiToolError, AI_API_VERSION, AI_PROTOCOL, AI_TOOL_DEFINITIONS, createAiGateway } from './src/ai.js';
 import { lastXeggeXSend } from './src/address-watch.js';
 import { readRichlist } from './src/richlist.js';
-import { addressActivity } from './src/address-activity.js';
+import { addressActivity, recentAddressHistory } from './src/address-activity.js';
 import { DiskImageCache } from './src/disk-image-cache.js';
 import { metadataImageTarget } from './src/ipfs-metadata.js';
 import { ImageCache } from './src/image-cache.js';
@@ -2724,7 +2724,11 @@ async function handleApi(req, res, url) {
     }
 
     try {
-      result.data.history.transactions = await addressActivity(rpc, address, result.data.history.txids || [], cached, result.data.history.limited && result.data.history.startHeight ? { start: result.data.history.startHeight, end: result.data.history.endHeight } : null);
+      if (result.data.history.limited) {
+        Object.assign(result.data.history, await recentAddressHistory(rpc, address, (requestedPage - 1) * 40, 40, cached));
+      } else {
+        result.data.history.transactions = await addressActivity(rpc, address, result.data.history.txids || [], cached);
+      }
     } catch {
       result.data.history.transactions = [];
     }

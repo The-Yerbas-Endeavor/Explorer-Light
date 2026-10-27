@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addressActivity } from '../src/address-activity.js';
+import { addressActivity, recentAddressHistory } from '../src/address-activity.js';
 import { createAiGateway } from '../src/ai.js';
 
 test('address activity uses exact native net amounts, block dates and confirmations', async () => {
@@ -49,4 +49,21 @@ test('empty activity never scans history and recent activity keeps its range', a
     throw new Error('Unexpected RPC');
   } };
   assert.deepEqual(await addressActivity(rpc, 'a', ['tx'], cache, { start: 100, end: 200 }), [{ txid: 'tx', available: false }]);
+});
+
+test('recent address history reads only 100 blocks and never calls lifetime indexes', async () => {
+  let reads = 0;
+  const rpc = { async call(method, params) {
+    if (method === 'getblockcount') return 2000;
+    if (method === 'getblockhash') return String(params[0]);
+    if (method === 'getblock') { reads++; return { hash: params[0], height: Number(params[0]), time: 1, tx: [{ txid: 'tx' + params[0], vin: [{ coinbase: '00' }], vout: [{ valueSat: 400000000, scriptPubKey: { addresses: ['a'] } }] }] }; }
+    throw new Error('Unexpected index call: ' + method);
+  } };
+  const result = await recentAddressHistory(rpc, 'a', 40, 40, (key, ttl, producer) => producer());
+  assert.equal(reads, 100);
+  assert.equal(result.startHeight, 1901);
+  assert.equal(result.txidsTotal, 100);
+  assert.equal(result.transactions[0].amountYerb, '4.00000000');
+  assert.equal(result.transactions[0].height, 1960);
+  assert.equal(result.transactions.length, 40);
 });
