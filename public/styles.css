@@ -9574,3 +9574,11 @@ html[data-layout-theme="original"] .original-page-status {
   html[data-layout-theme="new"] .header-actions .new-nav-link { display: inline-flex; }
   #activity, #unspent { scroll-margin-top: 160px; }
 }
+
+html[data-layout-theme="new"] .header-actions { min-width: 0; gap: 12px; overflow-x: auto; }
+html[data-layout-theme="new"] .header-actions > * { flex: 0 0 auto; }
+html[data-layout-theme="new"] .brand { flex-shrink: 0; }
+@media (min-width: 701px) and (max-width: 1150px) {
+  html[data-layout-theme="new"] .header-inner { flex-wrap: wrap; gap: 10px; padding: 10px 0; }
+  html[data-layout-theme="new"] .header-actions { width: 100%; padding-bottom: 6px; }
+}

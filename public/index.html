@@ -9,7 +9,7 @@
   <link rel="icon" type="image/png" href="/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c">
   <link rel="apple-touch-icon" href="/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c">
   <script src="/theme.js?v=20260922-layout1"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261026-address-assets2">
+  <link rel="stylesheet" href="/styles.css?v=20261026-single-nav1">
 </head>
 <body>
   <div class="page-noise" aria-hidden="true"></div>
@@ -26,7 +26,11 @@
         </span>
       </a>
 
-      <div class="header-actions">
+      <nav class="header-actions" aria-label="Primary navigation">
+        <a class="header-link new-nav-link" href="/blocks">Blocks</a>
+        <a class="header-link new-nav-link" href="/transactions">Transactions</a>
+        <a class="header-link new-nav-link" href="/addresses">Addresses</a>
+        <a class="header-link new-nav-link" href="/richlist">Rich list</a>
         <a class="header-link new-nav-link assets-link" href="/assets">Assets</a>
         <a class="header-link new-nav-link assets-link" href="/smartnodes">Smartnodes</a>
         <a class="header-link new-nav-link assets-link" href="/markets">Markets</a>
@@ -54,7 +58,7 @@
           <span class="rpc-dot" aria-hidden="true"></span>
           <span>Connecting</span>
         </span>
-      </div>
+      </nav>
     </div>
   </header>
 
@@ -72,22 +76,7 @@
           <span class="mast-slash">//</span>
           <span class="mast-channel">LIVE CHAIN</span>
         </h1>
-        <nav class="mast-subtitle mast-nav" aria-label="Explorer sections">
-          <a href="/blocks">BLOCKS</a>
-          <span class="mast-nav-separator" aria-hidden="true">·</span>
-          <a href="/transactions">TRANSACTIONS</a>
-          <span class="mast-nav-separator" aria-hidden="true">·</span>
-          <a href="/addresses">ADDRESSES</a>
-          <span class="mast-nav-separator" aria-hidden="true">·</span>
-          <a href="/richlist">RICH LIST</a>
-          <span class="mast-nav-separator" aria-hidden="true">·</span>
-          <a href="/assets">ASSETS</a>
-          <span class="mast-nav-separator" aria-hidden="true">·</span>
-          <a href="/smartnodes">SMARTNODES</a>
-          <span class="mast-nav-separator" aria-hidden="true">·</span>
-          <a href="/markets">MARKETS</a>
-          <span class="mast-core-note">DIRECT FROM CORE</span>
-        </nav>
+
       </div>
 
       <div class="mast-telemetry" aria-label="Explorer architecture">
@@ -146,6 +135,6 @@
     </div>
   </footer>
 
-  <script type="module" src="/app.js?v=20261026-address-assets2"></script>
+  <script type="module" src="/app.js?v=20261026-single-nav1"></script>
 </body>
 </html>

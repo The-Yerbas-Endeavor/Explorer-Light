@@ -264,17 +264,13 @@ test('market overview uses larger readable typography without returning to overs
 });
 
 
-test('mast section labels are real navigation links', async () => {
+test('navigation is consolidated in the primary header', async () => {
   const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
-  const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
-
-  assert.ok(html.includes('<a href="/blocks">BLOCKS</a>'));
-  assert.ok(html.includes('<a href="/transactions">TRANSACTIONS</a>'));
-  assert.ok(html.includes('<a href="/addresses">ADDRESSES</a>'));
-  assert.ok(html.includes('<a href="/assets">ASSETS</a>'));
-  assert.ok(html.includes('<a href="/smartnodes">SMARTNODES</a>'));
-  assert.ok(html.includes('<a href="/markets">MARKETS</a>'));
-  assert.ok(css.includes('.mast-nav a:hover'));
+  assert.ok(html.includes('aria-label="Primary navigation"'));
+  assert.ok(!html.includes('class="mast-subtitle mast-nav"'));
+  for (const section of ['blocks', 'transactions', 'addresses', 'richlist', 'assets', 'smartnodes', 'markets']) {
+    assert.ok(html.includes('href="/' + section + '"'));
+  }
 });
 
 test('recent transaction index is decoded directly from recent blocks', async () => {
