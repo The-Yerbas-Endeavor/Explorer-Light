@@ -9664,3 +9664,18 @@ button.map-legend-item.active { border-color: var(--line-strong); border-radius:
 .chart-axis { fill: none; stroke: var(--line-strong); stroke-width: 1; }
 .chart-range { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; }
 @media(max-width:700px) { .network-chart-grid { grid-template-columns: 1fr; } .movement-row, .peer-tools-row { display: grid; grid-template-columns: minmax(0,1fr); } }
+
+/* Transaction tracing */
+.tx-flow-grid { display:grid; grid-template-columns:minmax(0,1fr) 32px minmax(0,1fr); gap:16px; margin:28px 0; align-items:start; }
+.tx-flow-grid h2 { font-size:23px; margin:0 0 18px; }
+.tx-flow-grid h2 small { font-size:13px; font-weight:400; }
+.tx-flow-arrow { padding-top:76px; font-size:28px; text-align:center; }
+.tx-flow-card { border:1px solid var(--border, #29483c); padding:16px; margin-bottom:12px; border-radius:8px; scroll-margin-top:110px; }
+.tx-flow-card:target { outline:2px solid #82eeb1; }
+.tx-flow-card > small, .tx-flow-card > strong { display:block; margin-bottom:10px; }
+.tx-flow-card > strong { font-size:17px; }
+.tx-flow-address { overflow-wrap:anywhere; font-family:monospace; line-height:1.8; }
+.tx-follow { margin-top:14px; font-size:13px; }
+.tx-follow span { opacity:.65; }
+.tx-kind { margin-top:24px; }
+@media(max-width:760px) { .tx-flow-grid { grid-template-columns:minmax(0,1fr); } .tx-flow-arrow { padding:0; transform:rotate(90deg); } }

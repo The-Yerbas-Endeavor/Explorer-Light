@@ -59,3 +59,11 @@ test('network samples persist, deduplicate buckets and prune old observations', 
     assert.equal((await store.read()).length, 1);
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
+test('large indexed transactions resolve inputs without previous transaction calls', async () => {
+  const vin = Array.from({ length: 314 }, (_, i) => ({ txid: 'previous' + i, vout: 0, valueSat: 100000000, address: 'sender' }));
+  const result = await enrichTransaction({ call: async () => { throw new Error('Unexpected lookup'); } }, { vin, vout: [{ value: 313.99999, spentTxId: 'next', spentIndex: 2 }] }, cached);
+  assert.equal(result.inputDetails.length, 314);
+  assert.ok(result.inputDetails.every(input => input.available));
+  assert.equal(result.feeYerb, '0.00001000');
+  assert.equal(result.vout[0].spentTxId, 'next');
+});

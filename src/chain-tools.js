@@ -16,11 +16,14 @@ export function outputDestinations(output) {
 export async function enrichTransaction(rpc, tx, cached) {
   const inputs = tx.vin || [];
   if (inputs.some(input => input.coinbase)) return { ...tx, inputDetails: [{ coinbase: true }], feeYerb: null, feeReason: 'Newly created coinbase coins do not have a transaction fee.' };
-  if (inputs.length > 200) return { ...tx, inputDetails: [], feeYerb: null, feeReason: 'Input resolution is limited to 200 inputs.' };
   const details = [];
   for (let i = 0; i < inputs.length; i += 5) {
     details.push(...await Promise.all(inputs.slice(i, i + 5).map(async input => {
       try {
+        if (input.value !== undefined || Number.isSafeInteger(input.valueSat)) {
+          return { txid: input.txid, vout: input.vout, available: true, amountYerb: Number.isSafeInteger(input.valueSat) ? fromDuffs(BigInt(input.valueSat)) : fromDuffs(toDuffs(input.value)), addresses: input.address ? [input.address] : [] };
+        }
+        if (inputs.length > 200) return { txid: input.txid, vout: input.vout, available: false };
         const previous = await cached('prevout:' + input.txid, 60000, () => rpc.call('getrawtransaction', [input.txid, true]));
         const output = previous.vout.find(output => output.n === input.vout);
         if (!output) throw new Error('Missing previous output');

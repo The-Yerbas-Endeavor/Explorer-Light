@@ -2237,25 +2237,29 @@ async function renderTransaction(txid) {
   const inputCount = Array.isArray(tx.vin) ? tx.vin.length : 0;
   const outputs = Array.isArray(tx.vout) ? tx.vout : [];
   const totalOutput = outputs.reduce((sum, vout) => sum + Number(vout.value || 0), 0);
-  const maxOutput = Math.max(0.00000001, ...outputs.map((vout) => Number(vout.value || 0)));
-
-  const outputRows = outputs.length
-    ? outputs.map((vout) => {
-        const level = scaleLevel(Number(vout.value || 0), maxOutput);
-        return '<div class="output-rail-row">' +
-          '<span class="ledger-index">' + String(vout.n).padStart(2, '0') + '</span>' +
-          '<strong>' + number(vout.value, 8) + ' YERB</strong>' +
-          '<div class="output-rail-address"><small>YERBAS ADDRESS / SCRIPT</small>' + outputAddresses(vout) + '</div>' +
-          '<span class="output-microbar"><i class="level-' + level + '"></i></span>' +
-        '</div>';
-      }).join('')
-    : '<div class="ledger-empty">No outputs returned.</div>';
-
-  const inputRows = (tx.inputDetails || []).map(input => input.coinbase
-    ? '<div class="ledger-empty">Coinbase · newly created coins</div>'
-    : '<div class="input-detail-row"><a href="/tx/' + encodeURIComponent(input.txid) + '"><code>' + esc(compactHash(input.txid)) + ':' + number(input.vout) + '</code></a>' +
-      '<strong>' + (input.available ? esc(input.amountYerb) + ' YERB' : 'Previous output unavailable') + '</strong><div>' +
-      (input.addresses || []).map(address => '<a class="mono" href="/address/' + encodeURIComponent(address) + '">' + esc(address) + '</a>').join('<br>') + '</div></div>').join('');
+  const types = { 1: 'Smartnode registration', 2: 'Smartnode service update', 3: 'Smartnode registrar update', 4: 'Smartnode revocation', 5: 'Block reward', 6: 'Quorum commitment', 7: 'Future transaction', 8: 'Asset registration', 9: 'Asset reissue' };
+  const isReward = tx.vin?.some(input => input.coinbase);
+  const kind = isReward ? 'Block reward' : types[tx.type] || (outputs.some(output => output.scriptPubKey?.asset) ? 'Asset transfer' : 'YERB transfer');
+  const inputs = tx.inputDetails || tx.vin || [];
+  const pageSize = 20;
+  const pages = { inputs: 0, outputs: 0 };
+  function flowRows(side) {
+    const rows = side === 'inputs' ? inputs : outputs;
+    const start = pages[side] * pageSize;
+    const cards = rows.slice(start, start + pageSize).map((row, index) => {
+      if (row.coinbase) return '<article class="tx-flow-card"><strong>Newly created coins</strong><p>Block reward and transaction fees</p></article>';
+      const incoming = side === 'inputs';
+      const asset = row.scriptPubKey?.asset;
+      const addresses = incoming ? (row.addresses || []) : (row.scriptPubKey?.addresses || (row.scriptPubKey?.address ? [row.scriptPubKey.address] : []));
+      const amount = incoming ? (row.available ? number(row.amountYerb, 8) + ' YERB' : 'Amount unavailable') : number(row.value, 8) + ' YERB';
+      const link = incoming ? '<a href="/tx/' + encodeURIComponent(row.txid) + '#output-' + row.vout + '">← Previous transaction · output ' + esc(row.vout) + '</a>' :
+        (row.spentTxId ? '<a href="/tx/' + encodeURIComponent(row.spentTxId) + '#input-' + row.spentIndex + '">Spent → Follow transaction</a>' : '<span>Spend status unavailable</span>');
+      return '<article class="tx-flow-card" id="' + (incoming ? 'input-' + (start + index) : 'output-' + row.n) + '"><small>' + (incoming ? 'INPUT ' + (start + index) : 'OUTPUT ' + row.n) + '</small><strong>' + esc(amount) + '</strong>' +
+        (asset ? '<p><a href="/asset/' + encodeURIComponent(asset.name) + '">' + esc(asset.name) + '</a> · ' + number(asset.amount, 8) + '</p>' : '') +
+        '<div class="tx-flow-address">' + (addresses.length ? addresses.map(address => '<a href="/address/' + encodeURIComponent(address) + '">' + esc(address) + '</a>').join('<br>') : '<span>Script / address unavailable</span>') + '</div><div class="tx-follow">' + link + '</div></article>';
+    }).join('');
+    return (cards || '<p>No ' + side + ' in this transaction.</p>') + (rows.length > pageSize ? '<nav class="rail-pagination" aria-label="' + side + ' pages"><button data-flow="' + side + '" data-step="-1" ' + (!pages[side] ? 'disabled' : '') + '>Previous</button><span>' + (start + 1) + '–' + Math.min(start + pageSize, rows.length) + ' of ' + rows.length + '</span><button data-flow="' + side + '" data-step="1" ' + (start + pageSize >= rows.length ? 'disabled' : '') + '>Next</button></nav>' : '');
+  }
 
   const actions = '<a href="/">LIVE CHAIN</a>' + copyButton(tx.txid, 'transaction ID') +
     (tx.blockhash ? '<a href="/block/' + encodeURIComponent(tx.blockhash) + '">BLOCK ↗</a>' : '');
@@ -2270,21 +2274,30 @@ async function renderTransaction(txid) {
       { label: 'SIZE', value: bytes(tx.size), note: 'serialized' },
       { label: 'FEE', value: tx.feeYerb === null || tx.feeYerb === undefined ? '—' : tx.feeYerb + ' YERB', note: 'resolved previous outputs' }
     ]) +
-    '<section class="flow-rail">' +
-      '<span><small>INPUTS</small><b>' + number(inputCount) + '</b></span>' +
-      '<i>→</i>' +
-      '<span class="flow-center"><small>TX</small><b>' + number(totalOutput, 8) + ' YERB</b></span>' +
-      '<i>→</i>' +
-      '<span><small>OUTPUTS</small><b>' + number(outputs.length) + '</b></span>' +
-    '</section>' +
-    '<section class="ledger-section">' + railHeading('SOURCE RAIL', 'Transaction inputs', number(inputCount) + ' inputs') +
-      (tx.feeReason ? '<p>' + esc(tx.feeReason) + '</p>' : '') + (inputRows || '<p>Input details unavailable.</p>') + '</section>' +
-    '<section class="ledger-section">' +
-      railHeading('VALUE RAIL', 'Transaction outputs', 'scaled by output value') +
-      '<div class="output-rail">' + outputRows + '</div>' +
-    '</section>' +
+    '<p class="tx-kind"><strong>' + esc(kind) + '</strong>' + (tx.blocktime || tx.time ? ' · ' + esc(new Date((tx.blocktime || tx.time) * 1000).toLocaleString()) : '') + '</p>' +
+    '<p>Follow an input back to its previous transaction, or a spent output forward to see where its coins went. Outputs may include coins returned to the sender.</p>' +
+    '<section class="tx-flow-grid"><div><h2>From <small>· ' + number(inputCount) + ' inputs</small></h2><div id="tx-inputs">' + flowRows('inputs') + '</div></div><span class="tx-flow-arrow" aria-hidden="true">→</span><div><h2>To <small>· ' + number(outputs.length) + ' outputs</small></h2><div id="tx-outputs">' + flowRows('outputs') + '</div></div></section>' +
+    (tx.feeReason ? '<p>' + esc(tx.feeReason) + '</p>' : '') +
     '<details class="raw-ledger"><summary>RAW RPC RESPONSE</summary><pre id="raw-json"></pre></details>';
 
+  app.querySelector('.tx-flow-grid').addEventListener('click', event => {
+    const button = event.target.closest('button[data-flow]');
+    if (!button) return;
+    const side = button.dataset.flow;
+    pages[side] += Number(button.dataset.step);
+    document.querySelector('#tx-' + side).innerHTML = flowRows(side);
+  });
+  const target = /^#(input|output)-(\d+)$/.exec(location.hash);
+  if (target) {
+    const side = target[1] === 'input' ? 'inputs' : 'outputs';
+    const rows = side === 'inputs' ? inputs : outputs;
+    const index = side === 'inputs' ? Number(target[2]) : rows.findIndex(row => row.n === Number(target[2]));
+    if (index >= 0 && index < rows.length) {
+      pages[side] = Math.floor(index / pageSize);
+      document.querySelector('#tx-' + side).innerHTML = flowRows(side);
+      document.getElementById(target[0].slice(1))?.scrollIntoView({ block: 'center' });
+    }
+  }
   document.querySelector('#raw-json').textContent = JSON.stringify(tx, null, 2);
 }
 
