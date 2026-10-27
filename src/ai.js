@@ -239,7 +239,7 @@ const PROHIBITED_CAPABILITIES = Object.freeze([
   'shell_execution'
 ]);
 
-export function createAiGateway({ rpc, cached, marketPriceUrl = '' }) {
+export function createAiGateway({ rpc, cached, marketPriceUrl = '', lifetimeReceived = async () => null }) {
   if (!rpc || typeof rpc.call !== 'function') throw new Error('createAiGateway requires an RPC client.');
   const cache = typeof cached === 'function'
     ? cached
@@ -431,6 +431,10 @@ export function createAiGateway({ rpc, cached, marketPriceUrl = '' }) {
     const fallbackBalance = utxosAvailable && utxoResult.value.every(row => Number.isSafeInteger(row.satoshis) && row.satoshis >= 0)
       ? utxoResult.value.reduce((sum, row) => sum + BigInt(row.satoshis), 0n) : null;
 
+    let receivedSnapshot = null;
+    if (utxoOnly) {
+      try { receivedSnapshot = await lifetimeReceived(address); } catch { /* Preserve a verified current balance if the checkpoint is unavailable. */ }
+    }
     let assetBalances = null;
     let assetIndexAvailable = false;
     if (assetResult.status === 'fulfilled' && typeof assetResult.value !== 'string') {
@@ -444,6 +448,7 @@ export function createAiGateway({ rpc, cached, marketPriceUrl = '' }) {
       history: {
         available: indexed,
         limited: utxoOnly,
+        receivedSnapshot: receivedSnapshot ? { height: receivedSnapshot.height, updatedAt: receivedSnapshot.updatedAt } : null,
         startHeight: start,
         endHeight: end,
         balance: balanceResult.status === 'fulfilled'
@@ -455,7 +460,7 @@ export function createAiGateway({ rpc, cached, marketPriceUrl = '' }) {
             }
           : fallbackBalance !== null ? {
               balanceDuffs: fallbackBalance.toString(), balanceYerb: fromDuffs(fallbackBalance),
-              receivedDuffs: null, receivedYerb: null, source: 'unspent outputs'
+              receivedDuffs: receivedSnapshot?.receivedDuffs ?? null, receivedYerb: receivedSnapshot?.receivedYerb ?? null, source: 'unspent outputs'
             } : null,
         txids,
         txidsReturned: txids.length,

@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { AddressReceived } from './src/address-received.js';
 import { createTimedCache } from './src/timed-cache.js';
 import QRCode from 'qrcode';
 import { enrichTransaction, recentMovementBlocks, smartnodeRewards, toDuffs } from './src/chain-tools.js';
@@ -23,6 +24,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, 'public');
 const rpc = new YerbasRpc(config.rpc);
 const cached = createTimedCache();
+const receivedAddresses = [...new Set((process.env.ADDRESS_UTXO_ONLY || '').split(',').map(value => value.trim()).filter(value => /^[A-Za-z0-9]{20,64}$/.test(value)))].slice(0, 16);
+const addressReceived = new AddressReceived(process.env.ADDRESS_RECEIVED_DIR || '/var/lib/yerbas-explorer-light/address-received');
 const networkGeoCache = new Map();
 const previousOutputCache = new Map();
 function cachedPreviousOutput(key, ttl, producer) {
@@ -477,6 +480,7 @@ function apiInt(value, fallback, min, max) {
 const ai = createAiGateway({
   rpc,
   cached,
+  lifetimeReceived: address => receivedAddresses.includes(address) ? cachedPreviousOutput('received-snapshot:' + address, 15000, () => addressReceived.snapshot(rpc, address)) : null,
   marketPriceUrl: config.ai.marketPriceUrl
 });
 
@@ -2902,6 +2906,23 @@ server.listen(config.port, config.host, () => {
     } catch (error) { console.warn('Network history sample unavailable:', error.message); }
     finally { historyRunning = false; }
   };
+  let receivedRunning = false;
+  const updateReceived = async () => {
+    if (receivedRunning) return;
+    receivedRunning = true;
+    try {
+      if (!receivedAddresses.length) return;
+      const chain = await rpc.call('getblockchaininfo');
+      if (chain.initialblockdownload) return;
+      for (const address of receivedAddresses) {
+        try { await addressReceived.refresh(rpc, address); }
+        catch (error) { console.warn('Lifetime received update unavailable:', error.message); }
+      }
+    } catch (error) { console.warn('Lifetime received worker unavailable:', error.message); }
+    finally { receivedRunning = false; }
+  };
+  const receivedWarmup = setTimeout(updateReceived, 10000); receivedWarmup.unref();
+  const receivedTimer = setInterval(updateReceived, 60000); receivedTimer.unref();
   const historyWarmup = setTimeout(sampleNetwork, 5000); historyWarmup.unref();
   const historyTimer = setInterval(sampleNetwork, 300000); historyTimer.unref();
 });

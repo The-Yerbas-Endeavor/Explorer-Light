@@ -12,7 +12,7 @@
     "richlist:update": "node scripts/update-richlist.js",
     "dev": "node --watch server.js",
     "test": "node --test",
-    "check": "node --check server.js && node --check src/ai.js && node --check src/config.js && node --check src/timed-cache.js && node --check src/rpc.js && node --check src/search.js && node --check src/richlist.js && node --check src/address-watch.js && node --check src/address-activity.js && node --check src/image-cache.js && node --check src/disk-image-cache.js && node --check src/ipfs-metadata.js && node --check src/chain-tools.js && node --check src/network-history.js && node --check scripts/update-richlist.js && node --check public/app.js && node --check public/theme.js && bash -n scripts/install-fresh-server.sh && bash -n scripts/install-nginx-bot-guard.sh && bash -n install.sh"
+    "check": "node --check server.js && node --check src/ai.js && node --check src/config.js && node --check src/address-received.js && node --check src/timed-cache.js && node --check src/rpc.js && node --check src/search.js && node --check src/richlist.js && node --check src/address-watch.js && node --check src/address-activity.js && node --check src/image-cache.js && node --check src/disk-image-cache.js && node --check src/ipfs-metadata.js && node --check src/chain-tools.js && node --check src/network-history.js && node --check scripts/update-richlist.js && node --check public/app.js && node --check public/theme.js && bash -n scripts/install-fresh-server.sh && bash -n scripts/install-nginx-bot-guard.sh && bash -n install.sh"
   },
   "dependencies": {
     "qrcode": "1.5.4"

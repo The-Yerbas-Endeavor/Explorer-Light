@@ -189,3 +189,17 @@ test('configured high-volume address guard skips lifetime scans but retains curr
     else process.env.ADDRESS_UTXO_ONLY = previous;
   }
 });
+
+test('saved lifetime received is exposed without a lifetime RPC lookup', async () => {
+  const address = 'yaDfcdCupB1T5YoVRjYr8fXCvB8U5AuNX8';
+  const previous = process.env.ADDRESS_UTXO_ONLY;
+  process.env.ADDRESS_UTXO_ONLY = address;
+  try {
+    const gateway = createAiGateway({ rpc: fakeRpc({ validateaddress: { isvalid: true }, getaddressutxos: [{ satoshis: 400000000 }], listassetbalancesbyaddress: {} }),
+      lifetimeReceived: async () => ({ receivedDuffs: '746402338289568', receivedYerb: '7464023.38289568', height: 1148912, updatedAt: '2026-10-27T02:00:00Z' }) });
+    const { data } = await gateway.invoke('get_address', { address });
+    assert.equal(data.history.balance.receivedYerb, '7464023.38289568');
+    assert.equal(data.history.balance.balanceYerb, '4.00000000');
+    assert.equal(data.history.receivedSnapshot.height, 1148912);
+  } finally { if (previous === undefined) delete process.env.ADDRESS_UTXO_ONLY; else process.env.ADDRESS_UTXO_ONLY = previous; }
+});

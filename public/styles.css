@@ -9711,3 +9711,5 @@ button.map-legend-item.active { border-color: var(--line-strong); border-radius:
 html[data-layout-theme] .address-summary .telemetry-cell > strong { white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; font-size:clamp(16px,1.5vw,22px); }
 @media(max-width:900px) { .address-summary .telemetry-rail { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:480px) { .address-summary .telemetry-cell:first-child { grid-column:1/-1; } }
+
+@media(min-width:901px) { .address-summary .telemetry-rail { grid-template-columns:minmax(220px,1.2fr) minmax(280px,1.6fr) repeat(3,minmax(0,1fr)); } }

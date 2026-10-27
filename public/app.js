@@ -1152,7 +1152,7 @@ async function renderAddress(address) {
     : '<div class="ledger-empty">' + (data.history?.utxosAvailable ? 'No unspent outputs.' : 'Unspent outputs unavailable.') + '</div>';
 
   const historyNotice = data.history?.limited
-    ? '<div class="ledger-warning">Lifetime received and full transaction history are disabled for this high-volume address. Current balance uses confirmed unspent outputs. Recent activity covers only the latest 100 blocks when available.</div>'
+    ? '<div class="ledger-warning">Full transaction history is limited to the latest 100 blocks for this high-volume address. Current balance uses confirmed unspent outputs. ' + (data.history?.receivedSnapshot ? 'Lifetime received includes change and is saved through block ' + number(data.history.receivedSnapshot.height) + '.' : 'Lifetime received is being calculated in the background.') + '</div>'
     : balance && data.history?.txidsAvailable && data.history?.utxosAvailable
     ? ''
     : '<div class="ledger-warning">Some address data is unavailable from Core. Unavailable values are not zero balances. Try again shortly.</div>';
@@ -1164,7 +1164,7 @@ async function renderAddress(address) {
     historyNotice +
     '<div class="address-summary">' + telemetryRail([
       { label: 'BALANCE', value: balance?.balanceYerb == null ? 'Unavailable' : yerb(balance.balanceYerb) + ' YERB', note: balance?.source === 'unspent outputs' ? 'from confirmed UTXOs' : 'current' },
-      { label: 'RECEIVED', value: balance?.receivedYerb == null ? 'Unavailable' : yerb(balance.receivedYerb) + ' YERB', note: 'lifetime' },
+      { label: 'RECEIVED', value: balance?.receivedYerb == null ? 'Unavailable' : yerb(balance.receivedYerb) + ' YERB', note: data.history?.receivedSnapshot ? 'through block ' + number(data.history.receivedSnapshot.height) : 'lifetime' },
       { label: data.history?.limited ? 'RECENT TRANSACTIONS' : 'TRANSACTIONS', value: totalTransactions === null ? '—' : number(totalTransactions), note: data.history?.limited ? 'latest 100 blocks' : 'indexed' },
       { label: 'UTXOS', value: utxoTotal === null ? '—' : number(utxoTotal), note: 'unspent' },
       { label: 'ASSETS', value: data.assets?.available ? number(assetBalances.length) : 'Unavailable', note: 'positions' }
