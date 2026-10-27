@@ -47,11 +47,17 @@ export class YerbasRpc {
         signal: controller.signal
       });
 
-      if (!response.ok) {
+      // Core returns JSON-RPC errors with HTTP 500/404; retain their code and message.
+      let reply;
+      try { reply = await response.json(); } catch {
+        throw new RpcError('Yerbas RPC returned an invalid response (HTTP ' + response.status + ').', { status: response.status });
+      }
+      if (!response.ok && !(reply && (reply.error || Array.isArray(reply)))) {
         throw new RpcError('Yerbas RPC returned HTTP ' + response.status + '.', { status: response.status });
       }
 
-      return await response.json();
+      if (!reply || typeof reply !== 'object') throw new RpcError('Invalid Yerbas RPC response.');
+      return reply;
     } catch (error) {
       if (error?.name === 'AbortError') {
         throw new RpcError('Yerbas RPC request timed out after ' + this.options.timeoutMs + ' ms.');
@@ -66,6 +72,7 @@ export class YerbasRpc {
   async call(method, params = []) {
     const id = this.nextId++;
     const reply = await this.post({ jsonrpc: '1.0', id, method, params });
+    if (reply.id !== id) throw new RpcError('Mismatched Yerbas RPC response ID.', { method });
     if (reply.error) {
       throw new RpcError(reply.error.message || 'Yerbas RPC error.', {
         code: reply.error.code,
@@ -86,6 +93,7 @@ export class YerbasRpc {
     }));
     const ids = entries.map((entry) => entry.id);
     const reply = await this.post(entries);
+    if (!Array.isArray(reply)) throw new RpcError('Invalid Yerbas RPC batch response.');
     const byId = new Map(reply.map((item) => [item.id, item]));
 
     return ids.map((id, index) => {

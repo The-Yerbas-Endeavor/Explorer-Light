@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { createTimedCache } from './src/timed-cache.js';
 import QRCode from 'qrcode';
 import { enrichTransaction, recentMovementBlocks, smartnodeRewards, toDuffs } from './src/chain-tools.js';
 import { NetworkHistory } from './src/network-history.js';
@@ -21,7 +22,7 @@ import { classifySearchInput } from './src/search.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, 'public');
 const rpc = new YerbasRpc(config.rpc);
-const cache = new Map();
+const cached = createTimedCache();
 const networkGeoCache = new Map();
 const previousOutputCache = new Map();
 function cachedPreviousOutput(key, ttl, producer) {
@@ -472,18 +473,6 @@ function apiInt(value, fallback, min, max) {
   return Math.min(max, Math.max(min, parsed));
 }
 
-function cached(key, ttl, producer) {
-  const hit = cache.get(key);
-  const now = Date.now();
-  if (hit && hit.expires > now) return hit.promise;
-
-  const promise = Promise.resolve().then(producer).catch((error) => {
-    cache.delete(key);
-    throw error;
-  });
-  cache.set(key, { expires: now + ttl, promise });
-  return promise;
-}
 
 const ai = createAiGateway({
   rpc,
@@ -2873,6 +2862,7 @@ async function requestHandler(req, res) {
 
     return sendJson(res, 404, { error: 'Page not found.' });
   } catch (error) {
+    if (error instanceof URIError) return sendJson(res, 400, { error: 'Invalid URL encoding.' });
     if (error instanceof AiToolError) {
       return sendJson(res, error.status, {
         ok: false,
