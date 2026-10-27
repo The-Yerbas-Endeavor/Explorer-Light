@@ -161,3 +161,17 @@ test('address history pages cover every transaction newest first without overlap
   assert.equal(last.data.history.txOffset, 80);
   await assert.rejects(gateway.invoke('get_address', { address: 'yauGhoF3Gve84SssUBpeKGGtmWR7MYzQ9N', tx_offset: -1 }));
 });
+
+test('balance falls back to all unspent outputs when lifetime index lookup fails', async () => {
+  const gateway = createAiGateway({ rpc: fakeRpc({
+    validateaddress: { isvalid: true },
+    getaddressbalance: () => { throw new Error('Timed out'); },
+    getaddresstxids: () => { throw new Error('Timed out'); },
+    getaddressutxos: [{ satoshis: 100000001 }, { satoshis: 200000002 }],
+    listassetbalancesbyaddress: {}
+  }) });
+  const result = await gateway.invoke('get_address', { address: 'yaDfcdCupB1T5YoVRjYr8fXCvB8U5AuNX8', utxo_limit: 1 });
+  assert.equal(result.data.history.balance.balanceYerb, '3.00000003');
+  assert.equal(result.data.history.balance.receivedYerb, null);
+  assert.equal(result.data.history.utxos.length, 1);
+});

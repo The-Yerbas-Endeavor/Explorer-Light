@@ -1161,7 +1161,7 @@ async function renderAddress(address) {
     '<details class="address-qr"><summary>Show address QR code</summary><img width="200" height="200" loading="lazy" src="/api/qr/' + encodeURIComponent(data.address) + '" alt="QR code for ' + esc(data.address) + '"><p>' + esc(data.address) + '</p></details>' +
     historyNotice +
     telemetryRail([
-      { label: 'BALANCE', value: balance?.balanceYerb == null ? 'Unavailable' : yerb(balance.balanceYerb) + ' YERB', note: 'current' },
+      { label: 'BALANCE', value: balance?.balanceYerb == null ? 'Unavailable' : yerb(balance.balanceYerb) + ' YERB', note: balance?.source === 'unspent outputs' ? 'from confirmed UTXOs' : 'current' },
       { label: 'RECEIVED', value: balance?.receivedYerb == null ? 'Unavailable' : yerb(balance.receivedYerb) + ' YERB', note: 'lifetime' },
       { label: 'TRANSACTIONS', value: totalTransactions === null ? '—' : number(totalTransactions), note: 'indexed' },
       { label: 'UTXOS', value: utxoTotal === null ? '—' : number(utxoTotal), note: 'unspent' },

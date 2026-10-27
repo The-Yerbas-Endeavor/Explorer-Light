@@ -1,3 +1,4 @@
+import { fromDuffs } from './chain-tools.js';
 import { RpcError } from './rpc.js';
 
 export const AI_API_VERSION = '0.1.0';
@@ -424,6 +425,10 @@ export function createAiGateway({ rpc, cached, marketPriceUrl = '' }) {
     const utxoEnd = (utxosTotal || 0) - utxoOffset;
     const utxos = utxosAvailable ? utxoResult.value.slice(Math.max(0, utxoEnd - utxoLimit), utxoEnd).reverse() : [];
 
+    // Sum the complete UTXO result before slicing pages; lifetime history may time out independently.
+    const fallbackBalance = utxosAvailable && utxoResult.value.every(row => Number.isSafeInteger(row.satoshis) && row.satoshis >= 0)
+      ? utxoResult.value.reduce((sum, row) => sum + BigInt(row.satoshis), 0n) : null;
+
     let assetBalances = null;
     let assetIndexAvailable = false;
     if (assetResult.status === 'fulfilled' && typeof assetResult.value !== 'string') {
@@ -445,7 +450,10 @@ export function createAiGateway({ rpc, cached, marketPriceUrl = '' }) {
               receivedDuffs: balanceResult.value.received,
               receivedYerb: duffsToYerb(balanceResult.value.received)
             }
-          : null,
+          : fallbackBalance !== null ? {
+              balanceDuffs: fallbackBalance.toString(), balanceYerb: fromDuffs(fallbackBalance),
+              receivedDuffs: null, receivedYerb: null, source: 'unspent outputs'
+            } : null,
         txids,
         txidsReturned: txids.length,
         txidsTotal,
