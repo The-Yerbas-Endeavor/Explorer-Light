@@ -2328,7 +2328,8 @@ async function handlePublicApi(req, res, url) {
   if (path.startsWith('/ext/getbalance/')) {
     const address = decodeURIComponent(path.slice('/ext/getbalance/'.length));
     const data = await addressData(address, 1, 1);
-    return sendText(res, 200, data.history?.balance?.balanceYerb ?? '0.00000000');
+    if (data.history?.balance?.balanceYerb == null) return sendJson(res, 503, { error: 'Address balance unavailable from Core. Try again shortly.' });
+    return sendText(res, 200, data.history.balance.balanceYerb);
   }
 
   if (path === '/ext/getnetworkpeers') {

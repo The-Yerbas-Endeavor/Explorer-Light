@@ -1121,7 +1121,7 @@ async function renderAddress(address) {
           '<span class="ledger-open">↗</span>' +
         '</a>'
       ).join('')
-    : '<div class="ledger-empty">No indexed asset balances.</div>';
+    : '<div class="ledger-empty">' + (data.assets?.available ? 'No indexed asset balances.' : 'Asset balances unavailable.') + '</div>';
 
   const txRows = txids.length
     ? txids.map((txid, index) => {
@@ -1149,11 +1149,11 @@ async function renderAddress(address) {
           '<span class="ledger-open">↗</span>' +
         '</a>'
       ).join('')
-    : '<div class="ledger-empty">No unspent outputs.</div>';
+    : '<div class="ledger-empty">' + (data.history?.utxosAvailable ? 'No unspent outputs.' : 'Unspent outputs unavailable.') + '</div>';
 
-  const historyNotice = data.history?.available
+  const historyNotice = balance && data.history?.txidsAvailable && data.history?.utxosAvailable
     ? ''
-    : '<div class="ledger-warning">Address recognized, but indexed history is unavailable from Core.</div>';
+    : '<div class="ledger-warning">Some address data is unavailable from Core. Unavailable values are not zero balances. Try again shortly.</div>';
 
   app.innerHTML =
     ledgerHeader('YERBAS ADDRESS', addressLabel(data.address) || 'Address', data.address, '<a href="/">LIVE CHAIN</a><a href="/rewards?address=' + encodeURIComponent(data.address) + '">PAYOUT HISTORY</a>' + copyButton(data.address, 'address')) +
@@ -1161,15 +1161,15 @@ async function renderAddress(address) {
     '<details class="address-qr"><summary>Show address QR code</summary><img width="200" height="200" loading="lazy" src="/api/qr/' + encodeURIComponent(data.address) + '" alt="QR code for ' + esc(data.address) + '"><p>' + esc(data.address) + '</p></details>' +
     historyNotice +
     telemetryRail([
-      { label: 'BALANCE', value: yerb(balance?.balanceYerb) + ' YERB', note: 'current' },
-      { label: 'RECEIVED', value: yerb(balance?.receivedYerb) + ' YERB', note: 'lifetime' },
+      { label: 'BALANCE', value: balance?.balanceYerb == null ? 'Unavailable' : yerb(balance.balanceYerb) + ' YERB', note: 'current' },
+      { label: 'RECEIVED', value: balance?.receivedYerb == null ? 'Unavailable' : yerb(balance.receivedYerb) + ' YERB', note: 'lifetime' },
       { label: 'TRANSACTIONS', value: totalTransactions === null ? '—' : number(totalTransactions), note: 'indexed' },
       { label: 'UTXOS', value: utxoTotal === null ? '—' : number(utxoTotal), note: 'unspent' },
-      { label: 'ASSETS', value: number(assetBalances.length), note: 'positions' }
+      { label: 'ASSETS', value: data.assets?.available ? number(assetBalances.length) : 'Unavailable', note: 'positions' }
     ]) +
     '<section class="split-ledger">' +
       '<div class="ledger-pane">' +
-        railHeading('PORTFOLIO', 'Native assets', number(assetBalances.length) + ' positions') +
+        railHeading('PORTFOLIO', 'Native assets', data.assets?.available ? number(assetBalances.length) + ' positions' : 'Unavailable') +
         '<div class="ledger-list">' + assetRows + '</div>' +
       '</div>' +
       '<div class="ledger-pane" id="unspent">' +
