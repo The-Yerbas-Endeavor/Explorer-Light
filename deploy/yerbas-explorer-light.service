@@ -17,6 +17,7 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
 ReadWritePaths=/opt/yerbas-explorer-light
+StateDirectory=yerbas-explorer-light
 
 [Install]
 WantedBy=multi-user.target

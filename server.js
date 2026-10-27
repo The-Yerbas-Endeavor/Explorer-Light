@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url';
 import { AiToolError, AI_API_VERSION, AI_PROTOCOL, AI_TOOL_DEFINITIONS, createAiGateway } from './src/ai.js';
 import { lastXeggeXSend } from './src/address-watch.js';
 import { readRichlist } from './src/richlist.js';
+import { addressActivity } from './src/address-activity.js';
+import { DiskImageCache } from './src/disk-image-cache.js';
+import { metadataImageTarget } from './src/ipfs-metadata.js';
 import { ImageCache } from './src/image-cache.js';
 import { config } from './src/config.js';
 import { RpcError, YerbasRpc } from './src/rpc.js';
@@ -18,6 +21,7 @@ const rpc = new YerbasRpc(config.rpc);
 const cache = new Map();
 const networkGeoCache = new Map();
 const ipfsImageCache = new ImageCache();
+const ipfsDiskCache = new DiskImageCache(process.env.IPFS_IMAGE_CACHE_DIR || '/var/lib/yerbas-explorer-light/ipfs-images');
 
 function securityHeaders(extra = {}) {
   return {
@@ -366,6 +370,11 @@ async function sendIpfsImagePreview(req, res, cid) {
 
   const cachedImage = ipfsImageCache.get(cid);
   if (cachedImage) return sendCachedIpfsImage(req, res, cachedImage);
+  const diskImage = await ipfsDiskCache.get(cid);
+  if (diskImage && safeImageContentType(diskImage.data, '') === diskImage.contentType) {
+    ipfsImageCache.set(cid, diskImage);
+    return sendCachedIpfsImage(req, res, diskImage);
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), IPFS_PREVIEW_TIMEOUT_MS);
@@ -384,8 +393,17 @@ async function sendIpfsImagePreview(req, res, cid) {
     if (!contentType) {
       const upstreamType = String(response.headers.get('content-type') || '').toLowerCase();
       let resolved = false;
+      const target = metadataImageTarget(data, cid);
+      if (target) {
+        const result = await fetchIpfsPreviewResponse(target.cid, target.path, controller.signal);
+        const imageData = await readResponseLimited(result.response, IPFS_PREVIEW_MAX_BYTES);
+        const imageType = safeImageContentType(imageData, '');
+        if (imageType) {
+          data = imageData; contentType = imageType; gatewayUsed = result.gateway; resolved = true;
+        }
+      }
 
-      if (upstreamType.includes('text/html') && data.length <= IPFS_DIRECTORY_MAX_BYTES) {
+      if (!resolved && upstreamType.includes('text/html') && data.length <= IPFS_DIRECTORY_MAX_BYTES) {
         const imagePath = ipfsDirectoryImagePath(data.toString('utf8'), cid);
 
         if (imagePath) {
@@ -420,6 +438,7 @@ async function sendIpfsImagePreview(req, res, cid) {
 
     const image = { data, contentType, gateway: gatewayUsed };
     ipfsImageCache.set(cid, image);
+    void ipfsDiskCache.set(cid, image);
     return sendCachedIpfsImage(req, res, image);
   } catch (error) {
     if (error?.name === 'AbortError') {
@@ -2639,17 +2658,27 @@ async function handleApi(req, res, url) {
       return sendJson(res, 400, { error: 'Invalid address history page.' });
     }
 
+    const utxoPage = Number(url.searchParams.get('utxo_page') || 1);
+    if (!Number.isSafeInteger(utxoPage) || utxoPage < 1 || utxoPage > 1000000) {
+      return sendJson(res, 400, { error: 'Invalid unspent-output page.' });
+    }
     const result = await ai.invoke('get_address', {
       address,
       tx_limit: 40,
       tx_offset: (requestedPage - 1) * 40,
-      utxo_limit: 100
+      utxo_limit: 30,
+      utxo_offset: (utxoPage - 1) * 30
     });
 
     if (!result.data?.isValid) {
       return sendJson(res, 404, { error: 'Invalid Yerbas address.' });
     }
 
+    try {
+      result.data.history.transactions = await addressActivity(rpc, address, result.data.history.txids || [], cached);
+    } catch {
+      result.data.history.transactions = [];
+    }
     return sendJson(res, 200, result.data);
   }
 

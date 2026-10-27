@@ -1055,13 +1055,41 @@ async function renderAddresses() {
 }
 
 
+function copyButton(value, label) {
+  return '<button type="button" class="copy-value" data-copy="' + esc(value) + '" aria-label="Copy ' + esc(label) + '">Copy</button>';
+}
+
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest?.('button[data-copy]');
+  if (!button) return;
+  try {
+    await navigator.clipboard.writeText(button.dataset.copy);
+    button.textContent = 'Copied';
+  } catch { button.textContent = 'Copy failed'; }
+  setTimeout(() => { if (button.isConnected) button.textContent = 'Copy'; }, 2000);
+});
+
+function addressPager(address, page, pages, key, otherPage, anchor) {
+  const otherKey = key === 'page' ? 'utxo_page' : 'page';
+  const base = '/address/' + encodeURIComponent(address);
+  const href = target => base + '?' + key + '=' + target + '&' + otherKey + '=' + otherPage + '#' + anchor;
+  const link = (target, label, enabled) => enabled ? '<a href="' + href(target) + '">' + label + '</a>' : '<span aria-disabled="true">' + label + '</span>';
+  return '<nav class="rail-pagination address-pagination" aria-label="' + (key === 'page' ? 'Transaction' : 'Unspent output') + ' pages">' +
+    link(1, 'First', page > 1) + link(page - 1, '← Prev', page > 1) +
+    '<form method="get" action="' + base + '#' + anchor + '"><label>Page <input aria-label="' + (key === 'page' ? 'Transaction' : 'Unspent output') + ' page" type="number" name="' + key + '" min="1" max="' + pages + '" value="' + page + '"></label>' +
+    '<span> / ' + number(pages) + '</span><input type="hidden" name="' + otherKey + '" value="' + otherPage + '"><button type="submit">Go</button></form>' +
+    link(page + 1, 'Next →', page < pages) + link(pages, 'Last', page < pages) + '</nav>';
+}
+
 async function renderAddress(address) {
   renderLoading('Reading address index from Yerbas Core');
 
   const params = new URLSearchParams(location.search);
   const requestedPage = Number(params.get('page') || 1);
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 && requestedPage <= 1000000 ? requestedPage : 1;
-  const data = await api('/api/address/' + encodeURIComponent(address) + '?page=' + page);
+  const rawUtxoPage = Number(params.get('utxo_page') || 1);
+  const utxoPage = Number.isSafeInteger(rawUtxoPage) && rawUtxoPage > 0 && rawUtxoPage <= 1000000 ? rawUtxoPage : 1;
+  const data = await api('/api/address/' + encodeURIComponent(address) + '?page=' + page + '&utxo_page=' + utxoPage);
   setRpcState('online', 'Core online');
   document.title = 'Address ' + data.address + ' · Yerbas Explorer';
 
@@ -1071,13 +1099,14 @@ async function renderAddress(address) {
   const txOffset = data.history?.txOffset || 0;
   const currentPage = Math.floor(txOffset / 40) + 1;
   const totalPages = Math.max(1, Math.ceil((totalTransactions || 0) / 40));
-  const pageHref = (nextPage) => '/address/' + encodeURIComponent(address) + '?page=' + nextPage + '#activity';
   const pagination = data.history?.txidsAvailable
-    ? '<nav class="rail-pagination" aria-label="Address transaction pages">' +
-      (currentPage > 1 ? '<a href="' + pageHref(currentPage - 1) + '">← PREV</a>' : '<span></span>') +
-      '<span>PAGE ' + number(currentPage) + ' / ' + number(totalPages) + '</span>' +
-      (currentPage < totalPages ? '<a href="' + pageHref(currentPage + 1) + '">NEXT →</a>' : '<span></span>') +
-      '</nav>' : '';
+    ? addressPager(address, currentPage, totalPages, 'page', utxoPage, 'activity') : '';
+  const utxoTotal = data.history?.utxosTotal ?? null;
+  const currentUtxoPage = Math.floor((data.history?.utxoOffset || 0) / 30) + 1;
+  const utxoPages = Math.max(1, Math.ceil((utxoTotal || 0) / 30));
+  const utxoPagination = data.history?.utxosAvailable
+    ? addressPager(address, currentUtxoPage, utxoPages, 'utxo_page', currentPage, 'unspent') : '';
+  const details = new Map((data.history?.transactions || []).map(row => [row.txid, row]));
   const utxos = Array.isArray(data.history?.utxos) ? data.history.utxos : [];
   const assetBalances = data.assets?.available && data.assets?.balances && typeof data.assets.balances === 'object'
     ? Object.entries(data.assets.balances)
@@ -1095,18 +1124,22 @@ async function renderAddress(address) {
     : '<div class="ledger-empty">No indexed asset balances.</div>';
 
   const txRows = txids.length
-    ? txids.map((txid, index) =>
-        '<a class="ledger-row tx-ledger-row" href="/tx/' + encodeURIComponent(txid) + '">' +
-          '<span class="ledger-index">' + String(txOffset + index + 1).padStart(2, '0') + '</span>' +
-          '<span class="ledger-row-label">TX</span>' +
-          '<code>' + esc(txid) + '</code>' +
-          '<span class="ledger-open">↗</span>' +
-        '</a>'
-      ).join('')
-    : '<div class="ledger-empty">No indexed transactions.</div>';
+    ? txids.map((txid, index) => {
+      const detail = details.get(txid);
+      const info = detail?.available
+        ? '<span class="address-tx-facts"><time>' + esc(detail.time ? new Date(detail.time * 1000).toLocaleString() : 'Date unavailable') + '</time>' +
+          '<strong>' + esc(detail.direction === 'sent' ? 'Sent' : detail.direction === 'received' ? 'Received' : 'No net change') +
+          ' ' + esc(detail.amountYerb) + ' YERB</strong><span>' + number(detail.confirmations) + ' confirmations</span></span>'
+        : '<span class="address-tx-facts">Transaction details unavailable</span>';
+      return '<div class="address-activity-row"><a class="ledger-row tx-ledger-row" href="/tx/' + encodeURIComponent(txid) + '">' +
+        '<span class="ledger-index">' + String(txOffset + index + 1).padStart(2, '0') + '</span>' +
+        '<span class="ledger-row-label">TX</span><span class="address-tx-content"><code title="' + esc(txid) + '">' + esc(txid) + '</code>' + info + '</span>' +
+        '<span class="ledger-open">↗</span></a>' + copyButton(txid, 'transaction ID') + '</div>';
+    }).join('')
+    : '<div class="ledger-empty">' + (data.history?.txidsAvailable ? 'No indexed transactions.' : 'Transaction history unavailable.') + '</div>';
 
   const utxoRows = utxos.length
-    ? utxos.slice(0, 30).map((utxo) =>
+    ? utxos.map((utxo) =>
         '<a class="ledger-row utxo-ledger-row" href="/tx/' + encodeURIComponent(utxo.txid) + '">' +
           '<span class="ledger-row-label">UTXO</span>' +
           '<strong>' + yerb(Number(utxo.satoshis || 0) / 100000000) + ' YERB</strong>' +
@@ -1123,14 +1156,14 @@ async function renderAddress(address) {
     : '<div class="ledger-warning">Address recognized, but indexed history is unavailable from Core.</div>';
 
   app.innerHTML =
-    ledgerHeader('YERBAS ADDRESS', addressLabel(data.address) || 'Address', data.address, '<a href="/">LIVE CHAIN</a>') +
+    ledgerHeader('YERBAS ADDRESS', addressLabel(data.address) || 'Address', data.address, '<a href="/">LIVE CHAIN</a>' + copyButton(data.address, 'address')) +
     watchedAddressNote(data.address) +
     historyNotice +
     telemetryRail([
       { label: 'BALANCE', value: yerb(balance?.balanceYerb) + ' YERB', note: 'current' },
       { label: 'RECEIVED', value: yerb(balance?.receivedYerb) + ' YERB', note: 'lifetime' },
       { label: 'TRANSACTIONS', value: totalTransactions === null ? '—' : number(totalTransactions), note: 'indexed' },
-      { label: 'UTXOS', value: number(utxos.length), note: 'unspent' },
+      { label: 'UTXOS', value: utxoTotal === null ? '—' : number(utxoTotal), note: 'unspent' },
       { label: 'ASSETS', value: number(assetBalances.length), note: 'positions' }
     ]) +
     '<section class="split-ledger">' +
@@ -1138,19 +1171,20 @@ async function renderAddress(address) {
         railHeading('PORTFOLIO', 'Native assets', number(assetBalances.length) + ' positions') +
         '<div class="ledger-list">' + assetRows + '</div>' +
       '</div>' +
-      '<div class="ledger-pane">' +
-        railHeading('AVAILABLE VALUE', 'Unspent outputs', number(utxos.length) + ' UTXOs') +
-        '<div class="ledger-list">' + utxoRows + '</div>' +
+      '<div class="ledger-pane" id="unspent">' +
+        railHeading('AVAILABLE VALUE', 'Unspent outputs', utxoTotal === null ? 'Unavailable' : number(utxoTotal) + ' UTXOs') +
+        utxoPagination + '<div class="ledger-list">' + utxoRows + '</div>' + utxoPagination +
       '</div>' +
     '</section>' +
     '<section class="ledger-section" id="activity">' +
       railHeading('ACTIVITY', 'Address transactions', totalTransactions === null ? 'History unavailable' : number(totalTransactions) + ' indexed · newest first') +
+      '<p class="address-activity-note">Amounts are the net change in this address’s native YERB balance, including change and fees. Dates use your local time.</p>' +
       pagination +
       '<div class="ledger-list">' + txRows + '</div>' +
       pagination +
     '</section>';
   void updateWatchedAddressNote();
-  if (location.hash === '#activity') document.getElementById('activity')?.scrollIntoView();
+  if (['#activity', '#unspent'].includes(location.hash)) document.getElementById(location.hash.slice(1))?.scrollIntoView();
 }
 
 
@@ -1423,7 +1457,7 @@ async function renderAsset(name) {
     '<section class="asset-facts-rail">' +
       '<div><span>ISSUANCE BLOCK</span><strong>' + (data.issuance?.blockHeight !== null && data.issuance?.blockHeight !== undefined ? number(data.issuance.blockHeight) : '—') + '</strong></div>' +
       '<div><span>VERIFIER</span><code>' + esc(metadata.verifier_string || '—') + '</code></div>' +
-      '<div><span>METADATA REF</span>' + metadataRefHtml + '</div>' +
+      '<div><span>METADATA REF</span>' + metadataRefHtml + (metadataValue ? copyButton(metadataValue, 'metadata reference') : '') + '</div>' +
     '</section>' +
     ipfsPreview +
     '<section class="ledger-section">' +
@@ -2041,7 +2075,7 @@ async function renderTransaction(txid) {
       }).join('')
     : '<div class="ledger-empty">No outputs returned.</div>';
 
-  const actions = '<a href="/">LIVE CHAIN</a>' +
+  const actions = '<a href="/">LIVE CHAIN</a>' + copyButton(tx.txid, 'transaction ID') +
     (tx.blockhash ? '<a href="/block/' + encodeURIComponent(tx.blockhash) + '">BLOCK ↗</a>' : '');
 
   app.innerHTML =

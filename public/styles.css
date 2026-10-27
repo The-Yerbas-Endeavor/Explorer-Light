@@ -9543,3 +9543,27 @@ html[data-layout-theme="original"] .original-page-status {
 .ipfs-image[hidden], .ipfs-preview-status[hidden], .ipfs-preview-retry[hidden] { display: none; }
 .ipfs-preview-status { max-width: 48ch; text-align: center; line-height: 1.6; }
 .ipfs-preview-retry { padding: 10px 20px; cursor: pointer; color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 4px; }
+
+.copy-value, .address-pagination button { color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 4px; padding: 6px 10px; cursor: pointer; font: inherit; }
+.copy-value { font-size: 12px; }
+.address-pagination { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.address-pagination form { display: flex; align-items: center; gap: 6px; margin: 0; }
+.address-pagination input[type="number"] { width: 5em; padding: 6px; color: inherit; background: transparent; border: 1px solid currentColor; font: inherit; }
+.address-pagination [aria-disabled] { opacity: .4; }
+#activity, #unspent { scroll-margin-top: 100px; }
+.address-activity-row { display: flex; align-items: center; gap: 10px; }
+.address-activity-row > a { flex: 1; min-width: 0; }
+.address-tx-content { min-width: 0; }
+.address-tx-content code { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.address-tx-facts { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 13px; line-height: 1.7; }
+.address-activity-note { font-size: 13px; line-height: 1.6; opacity: .8; }
+@media (max-width: 700px) {
+  .address-pagination { justify-content: center; font-size: 12px; }
+  .address-pagination form { order: -1; flex-basis: 100%; justify-content: center; }
+  .address-activity-row .tx-ledger-row { grid-template-columns: 28px minmax(0, 1fr) 16px; gap: 8px; }
+  .address-activity-row .ledger-row-label { display: none; }
+  .address-tx-facts { display: grid; gap: 2px; font-size: 12px; }
+  .utxo-ledger-row { grid-template-columns: 1fr 1fr !important; gap: 8px; }
+  .utxo-ledger-row code { overflow: hidden; text-overflow: ellipsis; }
+  .asset-facts-rail code, .detail-hash { overflow-wrap: anywhere; }
+}

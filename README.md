@@ -395,3 +395,12 @@ Database-dependent legacy routes that cannot be reproduced faithfully without re
 A daily background job reads the patched local Core node's `getrichlist` RPC;
 web requests never scan chainstate. No explorer database or new Core index is
 required. See [docs/RICHLIST.md](docs/RICHLIST.md) for deployment and balance rules.
+
+
+### Address history and asset previews
+
+Address pages show 40 transactions and 30 unspent outputs per page, with separate page navigation. Transaction dates and confirmations come from Core block headers; amounts are the exact net native YERB change for the address (including change and fees), not the transaction's gross output value. If an index or header lookup fails, unavailable details are labelled rather than inferred. Page contents follow the live confirmed chain and can shift when new transactions arrive.
+
+Successful raster asset previews are cached in memory and persisted under `IPFS_IMAGE_CACHE_DIR` (default `/var/lib/yerbas-explorer-light/ipfs-images`). The disk cache is bounded to 512 MiB and evicts oldest stored files. Ensure that directory is writable by the service; `StateDirectory=yerbas-explorer-light` provides this under systemd. A disk-cache error does not prevent live previews.
+
+JSON metadata may reference an image through `image` or `image_url`. IPFS URLs, IPFS gateway URLs, and relative IPFS paths are resolved through the configured gateways; arbitrary external URLs are not fetched. Browser gateway links remain available when an embedded preview cannot load.

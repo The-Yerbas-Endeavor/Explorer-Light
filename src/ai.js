@@ -154,7 +154,8 @@ export const AI_TOOL_DEFINITIONS = Object.freeze([
         end_height: { type: 'integer', minimum: 0 },
         tx_limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 },
         tx_offset: { type: 'integer', minimum: 0, default: 0 },
-        utxo_limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 }
+        utxo_limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 },
+        utxo_offset: { type: 'integer', minimum: 0, default: 0 }
       },
       required: ['address'],
       additionalProperties: false
@@ -379,6 +380,7 @@ export function createAiGateway({ rpc, cached, marketPriceUrl = '' }) {
     const txLimit = intArg(args.tx_limit, 50, 1, 200, 'tx_limit');
     const requestedTxOffset = intArg(args.tx_offset, 0, 0, Number.MAX_SAFE_INTEGER, 'tx_offset');
     const utxoLimit = intArg(args.utxo_limit, 50, 1, 200, 'utxo_limit');
+    const requestedUtxoOffset = intArg(args.utxo_offset, 0, 0, Number.MAX_SAFE_INTEGER, 'utxo_offset');
     const start = args.start_height === undefined
       ? null
       : intArg(args.start_height, null, 0, Number.MAX_SAFE_INTEGER, 'start_height');
@@ -416,9 +418,11 @@ export function createAiGateway({ rpc, cached, marketPriceUrl = '' }) {
     const txids = txidsAvailable
       ? txidResult.value.slice(Math.max(0, txEnd - txLimit), txEnd).reverse()
       : [];
-    const utxos = utxoResult.status === 'fulfilled' && Array.isArray(utxoResult.value)
-      ? utxoResult.value.slice(-utxoLimit).reverse()
-      : [];
+    const utxosAvailable = utxoResult.status === 'fulfilled' && Array.isArray(utxoResult.value);
+    const utxosTotal = utxosAvailable ? utxoResult.value.length : null;
+    const utxoOffset = Math.min(requestedUtxoOffset, Math.max(0, Math.ceil((utxosTotal || 0) / utxoLimit) - 1) * utxoLimit);
+    const utxoEnd = (utxosTotal || 0) - utxoOffset;
+    const utxos = utxosAvailable ? utxoResult.value.slice(Math.max(0, utxoEnd - utxoLimit), utxoEnd).reverse() : [];
 
     let assetBalances = null;
     let assetIndexAvailable = false;
@@ -450,6 +454,7 @@ export function createAiGateway({ rpc, cached, marketPriceUrl = '' }) {
         txLimit,
         utxos,
         utxosReturned: utxos.length,
+        utxosAvailable, utxosTotal, utxoOffset, utxoLimit,
         unavailableReason: indexed
           ? null
           : rpcReason(
