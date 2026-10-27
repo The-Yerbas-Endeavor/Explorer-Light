@@ -839,7 +839,1434 @@ async function renderTransactions() {
         number(items.length) + ' confirmed entries from ' + number(data.blocksScanned) + ' recent blocks',
         '<a href="/blocks">BLOCKS</a><a href="/movement">LARGE MOVEMENTS</a>'
       ) +
-      '<div class="tx-overview">' + [
+      telemetryRail([
+        { label: 'LOADED', value: number(items.length), note: 'recent transactions' },
+        { label: 'BLOCKS SCANNED', value: number(data.blocksScanned), note: 'decoded directly' },
+        { label: 'CHAIN TIP', value: number(data.tip), note: 'Yerbas Core' },
+        { label: 'DATABASE', value: 'NONE', note: 'RPC-only' }
+      ]) +
+      '<section class="ledger-section">' +
+        railHeading('RECENT ACTIVITY', 'Confirmed transactions', 'newest blocks first') +
+        '<div class="recent-tx-list">' + rows + '</div>' +
+      '</section>' +
+    '</div>';
+}
+
+const addressLabels = Object.freeze({
+  'yYRDT2bovVEJrJ7BbcEXG3FCBwnYdX9Zg7': 'XeggeX (defunct exchange)'
+});
+
+function addressLabel(address) {
+  return Object.hasOwn(addressLabels, address) ? addressLabels[address] : '';
+}
+
+function watchedAddressNote(address) {
+  return address === 'yYRDT2bovVEJrJ7BbcEXG3FCBwnYdX9Zg7'
+    ? '<small class="address-last-sent">Last sent: checking…</small>' : '';
+}
+
+async function updateWatchedAddressNote() {
+  const notes = app.querySelectorAll('.address-last-sent');
+  if (!notes.length) return;
+  try {
+    const data = await api('/api/v1/address-watch');
+    notes.forEach(note => {
+      const sent = data.lastSent;
+      if (!sent) { note.textContent = 'No confirmed outgoing YERB found.'; return; }
+      const when = new Date(sent.time * 1000).toISOString().replace('T', ' ').replace('.000Z', ' UTC');
+      note.innerHTML = 'Last sent: <a href="/tx/' + encodeURIComponent(sent.txid) + '">'
+        + esc(when) + '</a> (confirmed)';
+      note.title = 'Last confirmed spend from this address. Incoming deposits do not change this date. Checked '
+        + new Date(data.checkedAt).toISOString();
+    });
+  } catch {
+    notes.forEach(note => { note.textContent = 'Last sent: temporarily unavailable'; });
+  }
+}
+
+function richlistAmount(value) {
+  const units = BigInt(value);
+  return (units / 100000000n).toLocaleString('en-US') + '.'
+    + (units % 100000000n).toString().padStart(8, '0');
+}
+
+function richlistDistribution(items, totalSatoshis) {
+  const total = BigInt(totalSatoshis);
+  const topTotal = items.reduce((sum, item) => sum + BigInt(item.balanceSatoshis), 0n);
+  if (total < topTotal) throw new Error('Snapshot supply is smaller than the top-100 balance.');
+  if (total === 0n) return { total, slices: [] };
+  const slices = items.slice(0, 10).map((item) => ({
+    label: addressLabel(item.address) || '#' + item.rank + ' · ' + compactHash(item.address),
+    balance: BigInt(item.balanceSatoshis)
+  }));
+  const other = items.slice(10).reduce((sum, item) => sum + BigInt(item.balanceSatoshis), 0n);
+  if (other > 0n) slices.push({ label: 'Other top-100 addresses (ranks 11–' + items.length + ')', balance: other });
+  if (total > topTotal) slices.push({ label: 'Remaining supply', balance: total - topTotal });
+  return { total, slices: slices.map((slice) => ({ ...slice,
+    fraction: Number(slice.balance * 1000000000n / total) / 1000000000,
+    percent: (Number((slice.balance * 10000n + total / 2n) / total) / 100).toFixed(2)
+  })) };
+}
+
+function richlistChart(items, totalSatoshis) {
+  const { total, slices } = richlistDistribution(items, totalSatoshis);
+  if (!slices.length) return '<p>No positive balances to chart.</p>';
+  const colors = ['#75f0ac', '#57d9ec', '#a6a2ff', '#ffc778', '#f58fb2', '#8dcdf5',
+    '#cee97b', '#cc9ce7', '#fb9f77', '#8cdac5', '#687d91', '#364851'];
+  let angle = -Math.PI / 2;
+  const paths = slices.map((slice, index) => {
+    const start = angle;
+    angle += slice.fraction * Math.PI * 2;
+    // Close the final slice exactly to avoid a rounding seam.
+    if (index === slices.length - 1) angle = Math.PI * 1.5;
+    const title = slice.label + ': ' + slice.percent + '% · ' + richlistAmount(slice.balance) + ' YERB';
+    const attrs = ' data-richlist-slice="' + index + '" fill="' + colors[index]
+      + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + esc(title) + '"';
+    if (slices.length === 1) return '<circle cx="120" cy="120" r="110"' + attrs + '><title>' + esc(title) + '</title></circle>';
+    const x1 = 120 + 110 * Math.cos(start), y1 = 120 + 110 * Math.sin(start);
+    const x2 = 120 + 110 * Math.cos(angle), y2 = 120 + 110 * Math.sin(angle);
+    return '<path d="M120 120 L' + x1 + ' ' + y1 + ' A110 110 0 '
+      + (angle - start > Math.PI ? 1 : 0) + ' 1 ' + x2 + ' ' + y2 + ' Z"' + attrs + '><title>' + esc(title) + '</title></path>';
+  }).join('');
+  const legend = slices.map((slice, index) => '<button type="button" data-richlist-slice="' + index
+    + '" aria-pressed="false"><svg width="12" height="12" aria-hidden="true"><rect width="12" height="12" fill="'
+    + colors[index] + '"/></svg><span>' + esc(slice.label) + '</span><strong>' + slice.percent + '%</strong></button>').join('');
+  return '<section class="richlist-distribution" aria-labelledby="richlist-distribution-title">'
+    + '<h3 id="richlist-distribution-title">Distribution of total supply</h3>'
+    + '<p>Percent of total unspent YERB supply at this snapshot. Ranks 11–100 are grouped; remaining supply completes the pie.</p>'
+    + '<div class="richlist-chart-layout"><svg class="richlist-pie" viewBox="0 0 240 240" role="group" aria-label="Total supply distribution">'
+    + paths + '</svg><div class="richlist-chart-legend">' + legend + '</div></div>'
+    + '<p class="richlist-chart-detail" aria-live="polite">Hover, focus, or tap a slice to see its balance.</p>'
+    + '<p>Total supply at snapshot: <strong>' + richlistAmount(total) + ' YERB</strong></p></section>';
+}
+
+function bindRichlistChart(items, totalSatoshis) {
+  const { slices } = richlistDistribution(items, totalSatoshis);
+  const chart = app.querySelector('.richlist-distribution');
+  if (!chart) return;
+  const controls = chart.querySelectorAll('[data-richlist-slice]');
+  function select(index) {
+    const slice = slices[index];
+    if (!slice) return;
+    controls.forEach((control) => {
+      const selected = Number(control.dataset.richlistSlice) === index;
+      control.classList.toggle('is-selected', selected);
+      control.setAttribute('aria-pressed', String(selected));
+    });
+    chart.querySelector('.richlist-pie').classList.add('has-selection');
+    chart.querySelector('.richlist-chart-detail').textContent = slice.label + ' · '
+      + richlistAmount(slice.balance) + ' YERB · ' + slice.percent + '% of total supply';
+  }
+  controls.forEach((control) => {
+    const activate = () => select(Number(control.dataset.richlistSlice));
+    control.addEventListener('pointerenter', activate);
+    control.addEventListener('focus', activate);
+    control.addEventListener('click', activate);
+    control.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); }
+    });
+  });
+}
+
+async function renderRichlist() {
+  document.title = 'Rich List · Yerbas Explorer';
+  renderLoading('Loading richest addresses');
+  const data = await api('/api/v1/richlist');
+  setRpcState('online', 'Core online');
+  const rows = data.items.map((item) => '<tr><td>' + item.rank + '</td><td><a href="/address/'
+    + encodeURIComponent(item.address) + '">' + esc(item.address) + '</a>'
+    + (addressLabel(item.address) ? '<br><strong>' + esc(addressLabel(item.address)) + '</strong>' : '') + watchedAddressNote(item.address) + '</td><td>'
+    + richlistAmount(item.balanceSatoshis) + '</td></tr>').join('');
+  app.innerHTML = '<div class="addresses-page">'
+    + ledgerHeader('YERB DISTRIBUTION', 'Rich List', 'Top 100 · confirmed unspent YERB', '<a href="/addresses">ADDRESS LOOKUP</a>')
+    + (data.stale ? '<p class="ledger-warning">This snapshot is older than the configured refresh window.</p>' : '')
+    + '<div class="richlist-content"><div class="richlist-scroll"><table class="richlist-table"><thead><tr><th>Rank</th><th>Address</th><th>YERB balance</th></tr></thead><tbody>'
+    + rows + '</tbody></table></div>' + richlistChart(data.items, data.totalSatoshis) + '</div>'
+    + '<section class="ledger-section" aria-label="Snapshot details">'
+    + '<p>' + esc(data.policy) + '</p>'
+    + '<p>Snapshot block <a href="/block/' + data.height + '">' + number(data.height) + '</a> · Updated '
+    + esc(new Date(data.generatedAt).toLocaleString()) + '</p>'
+    + '<p>Addresses with a positive balance: ' + number(data.addresses)
+    + ' · Native YERB without a single identifiable address: ' + richlistAmount(data.unattributedSatoshis) + '</p>'
+    + '</section></div>';
+  bindRichlistChart(data.items, data.totalSatoshis);
+  void updateWatchedAddressNote();
+  if (location.hash === '#activity') document.getElementById('activity')?.scrollIntoView();
+}
+
+async function renderAddresses() {
+  document.title = 'Addresses · Yerbas Explorer';
+  renderLoading('Checking Yerbas Core address indexes');
+  const status = await api('/api/status');
+  setRpcState('online', 'Core online');
+
+  app.innerHTML =
+    '<div class="addresses-page">' +
+      ledgerHeader(
+        'ADDRESS INDEX',
+        'Address lookup',
+        'Direct Core-index lookup · no explorer address database',
+        '<a href="/blocks">LIVE CHAIN</a>'
+      ) +
+      telemetryRail([
+        { label: 'CHAIN TIP', value: number(status.blocks), note: status.chain || 'mainnet' },
+        { label: 'DATABASE', value: 'NONE', note: 'RPC-first' },
+        { label: 'LOOKUP', value: 'CORE INDEX', note: 'address history' }
+      ]) +
+      '<section class="address-lookup-panel">' +
+        '<span class="address-lookup-eyebrow">YERBAS ADDRESS</span>' +
+        '<h3>Open an address</h3>' +
+        '<p>Enter a Yerbas address to view balance, indexed transactions, UTXOs, and asset positions reported by Core.</p>' +
+        '<form id="address-lookup-form" class="address-lookup-form">' +
+          '<input id="address-lookup-input" autocomplete="off" spellcheck="false" placeholder="Yerbas address" aria-label="Yerbas address">' +
+          '<button type="submit">OPEN ADDRESS ↗</button>' +
+        '</form>' +
+        '<div id="address-lookup-notice" class="ledger-warning hidden"></div>' +
+      '</section>' +
+    '</div>';
+
+  const form = document.querySelector('#address-lookup-form');
+  const input = document.querySelector('#address-lookup-input');
+  const notice = document.querySelector('#address-lookup-notice');
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const query = input.value.trim();
+    if (!query) {
+      notice.textContent = 'Enter a Yerbas address.';
+      notice.classList.remove('hidden');
+      return;
+    }
+
+    notice.classList.add('hidden');
+    try {
+      const result = await api('/api/search?q=' + encodeURIComponent(query));
+      if (result.type !== 'address') {
+        notice.textContent = 'That value was not recognized as a Yerbas address.';
+        notice.classList.remove('hidden');
+        return;
+      }
+      location.href = '/address/' + encodeURIComponent(result.target);
+    } catch (error) {
+      notice.textContent = error.message;
+      notice.classList.remove('hidden');
+    }
+  });
+}
+
+
+function copyButton(value, label) {
+  return '<button type="button" class="copy-value" data-copy="' + esc(value) + '" aria-label="Copy ' + esc(label) + '">Copy</button>';
+}
+
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest?.('button[data-copy]');
+  if (!button) return;
+  try {
+    await navigator.clipboard.writeText(button.dataset.copy);
+    button.textContent = 'Copied';
+  } catch { button.textContent = 'Copy failed'; }
+  setTimeout(() => { if (button.isConnected) button.textContent = 'Copy'; }, 2000);
+});
+
+function addressPager(address, page, pages, key, otherPage, anchor) {
+  const otherKey = key === 'page' ? 'utxo_page' : 'page';
+  const base = '/address/' + encodeURIComponent(address);
+  const href = target => base + '?' + key + '=' + target + '&' + otherKey + '=' + otherPage + '#' + anchor;
+  const link = (target, label, enabled) => enabled ? '<a href="' + href(target) + '">' + label + '</a>' : '<span aria-disabled="true">' + label + '</span>';
+  return '<nav class="rail-pagination address-pagination" aria-label="' + (key === 'page' ? 'Transaction' : 'Unspent output') + ' pages">' +
+    link(1, 'First', page > 1) + link(page - 1, '← Prev', page > 1) +
+    '<form method="get" action="' + base + '#' + anchor + '"><label>Page <input aria-label="' + (key === 'page' ? 'Transaction' : 'Unspent output') + ' page" type="number" name="' + key + '" min="1" max="' + pages + '" value="' + page + '"></label>' +
+    '<span> / ' + number(pages) + '</span><input type="hidden" name="' + otherKey + '" value="' + otherPage + '"><button type="submit">Go</button></form>' +
+    link(page + 1, 'Next →', page < pages) + link(pages, 'Last', page < pages) + '</nav>';
+}
+
+async function renderAddress(address) {
+  renderLoading('Reading address index from Yerbas Core');
+
+  const params = new URLSearchParams(location.search);
+  const requestedPage = Number(params.get('page') || 1);
+  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 && requestedPage <= 1000000 ? requestedPage : 1;
+  const rawUtxoPage = Number(params.get('utxo_page') || 1);
+  const utxoPage = Number.isSafeInteger(rawUtxoPage) && rawUtxoPage > 0 && rawUtxoPage <= 1000000 ? rawUtxoPage : 1;
+  const data = await api('/api/address/' + encodeURIComponent(address) + '?page=' + page + '&utxo_page=' + utxoPage);
+  setRpcState('online', 'Core online');
+  document.title = 'Address ' + data.address + ' · Yerbas Explorer';
+
+  const balance = data.history?.balance;
+  const txids = Array.isArray(data.history?.txids) ? data.history.txids : [];
+  const totalTransactions = data.history?.txidsTotal ?? null;
+  const txOffset = data.history?.txOffset || 0;
+  const currentPage = Math.floor(txOffset / 40) + 1;
+  const totalPages = Math.max(1, Math.ceil((totalTransactions || 0) / 40));
+  const pagination = data.history?.txidsAvailable
+    ? addressPager(address, currentPage, totalPages, 'page', utxoPage, 'activity') : '';
+  const utxoTotal = data.history?.utxosTotal ?? null;
+  const currentUtxoPage = Math.floor((data.history?.utxoOffset || 0) / 30) + 1;
+  const utxoPages = Math.max(1, Math.ceil((utxoTotal || 0) / 30));
+  const utxoPagination = data.history?.utxosAvailable
+    ? addressPager(address, currentUtxoPage, utxoPages, 'utxo_page', currentPage, 'unspent') : '';
+  const details = new Map((data.history?.transactions || []).map(row => [row.txid, row]));
+  const utxos = Array.isArray(data.history?.utxos) ? data.history.utxos : [];
+  const assetBalances = data.assets?.available && data.assets?.balances && typeof data.assets.balances === 'object'
+    ? Object.entries(data.assets.balances)
+    : [];
+
+  const assetRows = assetBalances.length
+    ? assetBalances.map(([name, amount]) =>
+        '<a class="ledger-row asset-ledger-row" href="/asset/' + encodeURIComponent(name) + '">' +
+          '<span class="asset-inline-type">' + esc(assetType(name)) + '</span>' +
+          '<strong>' + esc(name) + '</strong>' +
+          '<span class="asset-inline-balance">' + esc(amount) + '</span>' +
+          '<span class="ledger-open">↗</span>' +
+        '</a>'
+      ).join('')
+    : '<div class="ledger-empty">No indexed asset balances.</div>';
+
+  const txRows = txids.length
+    ? txids.map((txid, index) => {
+      const detail = details.get(txid);
+      const info = detail?.available
+        ? '<span class="address-tx-facts"><time>' + esc(detail.time ? new Date(detail.time * 1000).toLocaleString() : 'Date unavailable') + '</time>' +
+          '<strong>' + esc(detail.direction === 'sent' ? 'Sent' : detail.direction === 'received' ? 'Received' : 'No net change') +
+          ' ' + esc(detail.amountYerb) + ' YERB</strong><span>' + number(detail.confirmations) + ' confirmations</span></span>'
+        : '<span class="address-tx-facts">Transaction details unavailable</span>';
+      return '<div class="address-activity-row"><a class="ledger-row tx-ledger-row" href="/tx/' + encodeURIComponent(txid) + '">' +
+        '<span class="ledger-index">' + String(txOffset + index + 1).padStart(2, '0') + '</span>' +
+        '<span class="ledger-row-label">TX</span><span class="address-tx-content"><code title="' + esc(txid) + '">' + esc(txid) + '</code>' + info + '</span>' +
+        '<span class="ledger-open">↗</span></a>' + copyButton(txid, 'transaction ID') + '</div>';
+    }).join('')
+    : '<div class="ledger-empty">' + (data.history?.txidsAvailable ? 'No indexed transactions.' : 'Transaction history unavailable.') + '</div>';
+
+  const utxoRows = utxos.length
+    ? utxos.map((utxo) =>
+        '<a class="ledger-row utxo-ledger-row" href="/tx/' + encodeURIComponent(utxo.txid) + '">' +
+          '<span class="ledger-row-label">UTXO</span>' +
+          '<strong>' + yerb(Number(utxo.satoshis || 0) / 100000000) + ' YERB</strong>' +
+          '<span>vout ' + number(utxo.outputIndex) + '</span>' +
+          '<span>block ' + number(utxo.height) + '</span>' +
+          '<code>' + esc(compactHash(utxo.txid)) + '</code>' +
+          '<span class="ledger-open">↗</span>' +
+        '</a>'
+      ).join('')
+    : '<div class="ledger-empty">No unspent outputs.</div>';
+
+  const historyNotice = data.history?.available
+    ? ''
+    : '<div class="ledger-warning">Address recognized, but indexed history is unavailable from Core.</div>';
+
+  app.innerHTML =
+    ledgerHeader('YERBAS ADDRESS', addressLabel(data.address) || 'Address', data.address, '<a href="/">LIVE CHAIN</a><a href="/rewards?address=' + encodeURIComponent(data.address) + '">PAYOUT HISTORY</a>' + copyButton(data.address, 'address')) +
+    watchedAddressNote(data.address) +
+    '<details class="address-qr"><summary>Show address QR code</summary><img width="200" height="200" loading="lazy" src="/api/qr/' + encodeURIComponent(data.address) + '" alt="QR code for ' + esc(data.address) + '"><p>' + esc(data.address) + '</p></details>' +
+    historyNotice +
+    telemetryRail([
+      { label: 'BALANCE', value: yerb(balance?.balanceYerb) + ' YERB', note: 'current' },
+      { label: 'RECEIVED', value: yerb(balance?.receivedYerb) + ' YERB', note: 'lifetime' },
+      { label: 'TRANSACTIONS', value: totalTransactions === null ? '—' : number(totalTransactions), note: 'indexed' },
+      { label: 'UTXOS', value: utxoTotal === null ? '—' : number(utxoTotal), note: 'unspent' },
+      { label: 'ASSETS', value: number(assetBalances.length), note: 'positions' }
+    ]) +
+    '<section class="split-ledger">' +
+      '<div class="ledger-pane">' +
+        railHeading('PORTFOLIO', 'Native assets', number(assetBalances.length) + ' positions') +
+        '<div class="ledger-list">' + assetRows + '</div>' +
+      '</div>' +
+      '<div class="ledger-pane" id="unspent">' +
+        railHeading('AVAILABLE VALUE', 'Unspent outputs', utxoTotal === null ? 'Unavailable' : number(utxoTotal) + ' UTXOs') +
+        utxoPagination + '<div class="ledger-list">' + utxoRows + '</div>' + utxoPagination +
+      '</div>' +
+    '</section>' +
+    '<section class="ledger-section" id="activity">' +
+      railHeading('ACTIVITY', 'Address transactions', totalTransactions === null ? 'History unavailable' : number(totalTransactions) + ' indexed · newest first') +
+      '<p class="address-activity-note">Amounts are the net change in this address’s native YERB balance, including change and fees. Dates use your local time.</p>' +
+      pagination +
+      '<div class="ledger-list">' + txRows + '</div>' +
+      pagination +
+    '</section>';
+  void updateWatchedAddressNote();
+  if (['#activity', '#unspent'].includes(location.hash)) document.getElementById(location.hash.slice(1))?.scrollIntoView();
+}
+
+
+function assetType(name) {
+  if (name.endsWith('!')) return 'Owner';
+  if (name.startsWith('$')) return 'Restricted';
+  if (name.startsWith('#')) return 'Qualifier';
+  if (name.includes('#')) return 'Unique';
+  if (name.includes('/')) return 'Sub-asset';
+  return 'Root';
+}
+function assetAmount(value, units = null) {
+  if (value === null || value === undefined || value === '') return '—';
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return String(value);
+
+  const digits = Number.isInteger(Number(units))
+    ? Math.min(8, Math.max(0, Number(units)))
+    : 8;
+
+  return parsed.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits
+  });
+}
+
+function assetMetadataLink(asset) {
+  const ref = asset?.metadataRef;
+  if (!ref?.value) return '<span class="muted">—</span>';
+
+  if (ref.type === 'ipfs') {
+    const href = 'https://ipfs.io/ipfs/' + encodeURIComponent(ref.value);
+    return '<a class="metadata-link" href="' + href + '" target="_blank" rel="noopener noreferrer">IPFS ↗</a>';
+  }
+
+  if (ref.type === 'txid' && /^[0-9a-fA-F]{64}$/.test(ref.value)) {
+    return '<a class="metadata-link" href="/tx/' + encodeURIComponent(ref.value) + '">TXID</a>';
+  }
+
+  return '<span class="mono">' + esc(ref.value) + '</span>';
+}
+
+function assetListHref(params, page) {
+  const next = new URLSearchParams();
+  const q = (params.get('q') || '').trim();
+  const type = params.get('type') || '';
+  const metadata = params.get('metadata') || '';
+  const reissuable = params.get('reissuable') || '';
+  const sort = params.get('sort') || 'name';
+
+  if (q) next.set('q', q);
+  if (type) next.set('type', type);
+  if (metadata) next.set('metadata', metadata);
+  if (reissuable) next.set('reissuable', reissuable);
+  if (sort && sort !== 'name') next.set('sort', sort);
+  if (page > 1) next.set('page', String(page));
+
+  const query = next.toString();
+  return '/assets' + (query ? '?' + query : '');
+}
+
+async function renderAssets() {
+  renderLoading('Reading Yerbas asset index');
+
+  const params = new URLSearchParams(location.search);
+  const query = (params.get('q') || '').trim();
+  const type = params.get('type') || '';
+  const metadata = params.get('metadata') || '';
+  const reissuable = params.get('reissuable') || '';
+  const sort = params.get('sort') || 'name';
+  const page = Math.max(1, Number.parseInt(params.get('page') || '1', 10) || 1);
+
+  const request = new URLSearchParams({
+    q: query,
+    type,
+    metadata,
+    reissuable,
+    sort,
+    page: String(page),
+    count: '25'
+  });
+
+  const data = await api('/api/assets?' + request.toString());
+  setRpcState('online', 'Core online');
+  document.title = 'Assets · Yerbas Explorer';
+
+  const rows = data.items.length
+    ? data.items.map((asset) =>
+        '<a class="asset-matrix-row" href="/asset/' + encodeURIComponent(asset.name) + '">' +
+          '<span class="asset-inline-type">' + esc(asset.type || assetType(asset.name)) + '</span>' +
+          '<strong>' + esc(asset.name) + '</strong>' +
+          '<span><small>SUPPLY</small>' + assetAmount(asset.amount, asset.units) + '</span>' +
+          '<span><small>HOLDERS</small>' + (asset.holders === null ? '—' : number(asset.holders)) + '</span>' +
+          '<span><small>UNITS</small>' + number(asset.units) + '</span>' +
+          '<span class="asset-state">' + (asset.metadataRef?.value ? 'META' : '—') + ' / ' + (Number(asset.reissuable) ? 'REISSUE' : 'FIXED') + '</span>' +
+          '<span class="ledger-open">↗</span>' +
+        '</a>'
+      ).join('')
+    : '<div class="ledger-empty">No assets matched these filters.</div>';
+
+  const pagination =
+    '<div class="rail-pagination">' +
+      (data.page > 1 ? '<a href="' + assetListHref(params, data.page - 1) + '">← PREV</a>' : '<span></span>') +
+      '<span>PAGE ' + number(data.page) + ' / ' + number(data.totalPages) + '</span>' +
+      (data.page < data.totalPages ? '<a href="' + assetListHref(params, data.page + 1) + '">NEXT →</a>' : '<span></span>') +
+    '</div>';
+
+  app.innerHTML =
+    ledgerHeader('ASSET INDEX', 'Yerbas assets', number(data.total) + ' matching assets', '<a href="/">LIVE CHAIN</a>') +
+    '<section id="asset-summary">' +
+      telemetryRail([
+        { label: 'INDEX', value: 'LIVE', note: 'assetindex' },
+        { label: 'ASSETS', value: number(data.total), note: 'current view' },
+        { label: 'HOLDERS', value: '…', note: 'aggregate' },
+        { label: 'SOURCE', value: 'CORE', note: 'direct RPC' }
+      ]) +
+    '</section>' +
+    '<form class="rail-filter" action="/assets" method="get" role="search">' +
+      '<input name="q" value="' + esc(query) + '" placeholder="Search asset names">' +
+      '<select name="type"><option value="">ALL TYPES</option>' +
+        ['Root','Sub-asset','Unique','Qualifier','Restricted','Owner'].map((value) =>
+          '<option value="' + value + '"' + (type === value ? ' selected' : '') + '>' + value.toUpperCase() + '</option>').join('') +
+      '</select>' +
+      '<select name="metadata"><option value="">ANY META</option><option value="yes"' + (metadata === 'yes' ? ' selected' : '') + '>HAS META</option><option value="no"' + (metadata === 'no' ? ' selected' : '') + '>NO META</option></select>' +
+      '<select name="reissuable"><option value="">ANY SUPPLY</option><option value="yes"' + (reissuable === 'yes' ? ' selected' : '') + '>REISSUABLE</option><option value="no"' + (reissuable === 'no' ? ' selected' : '') + '>FIXED</option></select>' +
+      '<select name="sort"><option value="name"' + (sort === 'name' ? ' selected' : '') + '>NAME</option><option value="supply-desc"' + (sort === 'supply-desc' ? ' selected' : '') + '>SUPPLY ↓</option><option value="supply-asc"' + (sort === 'supply-asc' ? ' selected' : '') + '>SUPPLY ↑</option></select>' +
+      '<button type="submit">FILTER</button>' +
+    '</form>' +
+    '<section class="ledger-section">' +
+      railHeading('ASSET MATRIX', 'On-chain catalog', number(data.items.length) + ' shown') +
+      '<div class="asset-matrix">' + rows + '</div>' +
+      pagination +
+    '</section>';
+
+  api('/api/assets/stats').then((stats) => {
+    const summary = document.querySelector('#asset-summary');
+    if (!summary) return;
+    summary.innerHTML = telemetryRail([
+      { label: 'INDEX', value: stats.ready ? 'LIVE' : 'CHECK', note: 'assetindex' },
+      { label: 'ASSETS', value: number(stats.indexedAssets), note: 'whole directory' },
+      { label: 'HOLDERS', value: number(stats.indexedHolders), note: 'relationships' },
+      { label: 'SOURCE', value: 'CORE', note: 'direct RPC' }
+    ]);
+  }).catch(() => {});
+}
+
+
+function browserIpfsUrl(cid) {
+  let canonical = String(cid || '');
+  if (/^Qm[1-9A-HJ-NP-Za-km-z]{44}$/.test(canonical)) {
+    const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    let value = 0n;
+    for (const char of canonical) value = value * 58n + BigInt(alphabet.indexOf(char));
+    const hex = value.toString(16).padStart(68, '0');
+    const bytes = [1, 112, ...hex.match(/../g).map(byte => parseInt(byte, 16))];
+    const base32 = 'abcdefghijklmnopqrstuvwxyz234567';
+    let bits = 0, accumulator = 0, encoded = '';
+    for (const byte of bytes) {
+      accumulator = (accumulator << 8) | byte;
+      bits += 8;
+      while (bits >= 5) {
+        bits -= 5;
+        encoded += base32[(accumulator >>> bits) & 31];
+      }
+    }
+    if (bits) encoded += base32[(accumulator << (5 - bits)) & 31];
+    canonical = 'b' + encoded;
+  }
+  // Subdomain labels cannot exceed 63 characters.
+  if (/^b[a-z2-7]{10,62}$/.test(canonical)) {
+    return 'https://' + canonical + '.ipfs.inbrowser.link/';
+  }
+  return 'https://ipfs.io/ipfs/' + encodeURIComponent(canonical);
+}
+
+function initializeAssetPreview(url) {
+  const image = app.querySelector('.ipfs-image');
+  const status = app.querySelector('.ipfs-preview-status');
+  const retry = app.querySelector('.ipfs-preview-retry');
+  if (!image || !status || !retry) return;
+  const load = () => {
+    image.hidden = true;
+    status.hidden = false;
+    status.textContent = 'Loading image from IPFS… Large animations may take longer.';
+    retry.hidden = true;
+    image.src = url;
+  };
+  image.addEventListener('load', () => {
+    image.hidden = false;
+    status.hidden = true;
+    retry.hidden = true;
+  });
+  image.addEventListener('error', () => {
+    image.hidden = true;
+    status.hidden = false;
+    status.textContent = 'Preview unavailable. The gateways could not return a supported image. Try again or open the content in the browser gateway.';
+    retry.hidden = false;
+  });
+  retry.addEventListener('click', load);
+  load();
+}
+
+async function renderAsset(name) {
+  renderLoading('Reading asset data from Yerbas Core');
+
+  const holderPage = Math.max(1, Math.min(1000000, Number(new URLSearchParams(location.search).get('page')) || 1));
+  const data = await api('/api/asset/' + encodeURIComponent(name) + '?page=' + holderPage);
+  setRpcState('online', 'Core online');
+  document.title = data.name + ' · Asset · Yerbas Explorer';
+
+  const metadata = data.metadata || {};
+  const holders = data.holders?.items || [];
+  const supply = Number(metadata.amount || 0);
+  const maxBalance = Math.max(0.00000001, ...holders.map((holder) => Number(holder.balance || 0)));
+
+  const holderRows = holders.length
+    ? holders.map((holder, index) => {
+        const balance = Number(holder.balance || 0);
+        const ownership = supply > 0 ? (balance / supply) * 100 : 0;
+        const level = scaleLevel(balance, maxBalance);
+        return '<a class="holder-rail-row" href="/address/' + encodeURIComponent(holder.address) + '">' +
+          '<span class="ledger-index">' + String(((data.holders.page || 1) - 1) * 100 + index + 1).padStart(2, '0') + '</span>' +
+          '<code>' + esc(holder.address) + '</code>' +
+          '<strong>' + assetAmount(holder.balance, metadata.units) + '</strong>' +
+          '<span>' + ownership.toFixed(2) + '%</span>' +
+          '<i class="holder-microbar level-' + level + '"></i>' +
+        '</a>';
+      }).join('')
+    : '<div class="ledger-empty">' + esc(data.holders?.unavailableReason || 'No holder balances returned.') + '</div>';
+
+  const ipfsHash = metadata.ipfs_hash || null;
+  const txidHash = metadata.txid_hash || metadata.txid || null;
+  const metadataValue = ipfsHash || txidHash || null;
+  const metadataType = ipfsHash ? 'IPFS' : (txidHash ? 'TXID' : 'NONE');
+  const ipfsUrl = ipfsHash ? browserIpfsUrl(ipfsHash) : null;
+  const ipfsPreviewUrl = ipfsHash ? '/api/ipfs-preview/' + encodeURIComponent(ipfsHash) : null;
+  const metadataRefHtml = ipfsUrl
+    ? '<a class="asset-ipfs-ref" href="' + ipfsUrl + '" target="_blank" rel="noopener noreferrer">' +
+        '<code>' + esc(ipfsHash) + '</code><span>OPEN IPFS ↗</span>' +
+      '</a>'
+    : (txidHash && /^[0-9a-fA-F]{64}$/.test(txidHash)
+      ? '<a class="asset-ipfs-ref" href="/tx/' + encodeURIComponent(txidHash) + '">' +
+          '<code>' + esc(txidHash) + '</code><span>OPEN TX ↗</span>' +
+        '</a>'
+      : '<code>' + esc(metadataValue || '—') + '</code>');
+
+  const ipfsPreview = ipfsUrl
+    ? '<section class="ipfs-display">' +
+        '<div class="ipfs-display-head">' +
+          '<div><span>IPFS CONTENT</span><strong>Asset metadata preview</strong></div>' +
+          '<a href="' + ipfsUrl + '" target="_blank" rel="noopener noreferrer">OPEN IN BROWSER GATEWAY ↗</a>' +
+        '</div>' +
+        '<div class="ipfs-frame-shell ipfs-image-shell">' +
+          '<p class="ipfs-preview-status" role="status" aria-live="polite">Loading image from IPFS…</p>' +
+          '<img class="ipfs-image" hidden alt="' + esc(data.name) + ' IPFS asset content" decoding="async">' +
+          '<button class="ipfs-preview-retry" type="button" hidden>Try again</button>' +
+        '</div>' +
+        '<div class="ipfs-display-foot"><code>' + esc(ipfsHash) + '</code><span>IMAGE PREVIEW · IPFS CONTENT</span></div>' +
+      '</section>'
+    : '';
+
+  app.innerHTML =
+    ledgerHeader('ASSET', data.name, assetType(data.name), '<a href="/assets">ASSET INDEX</a><a href="/">LIVE CHAIN</a>') +
+    telemetryRail([
+      { label: 'SUPPLY', value: assetAmount(metadata.amount, metadata.units), note: 'issued' },
+      { label: 'UNITS', value: number(metadata.units), note: 'precision' },
+      { label: 'HOLDERS', value: data.holders?.total === null ? '—' : number(data.holders?.total), note: 'indexed' },
+      { label: 'REISSUABLE', value: Number(metadata.reissuable) ? 'YES' : 'NO', note: assetType(data.name) },
+      { label: 'METADATA', value: metadataType, note: metadataValue ? compactHash(metadataValue) : 'none' }
+    ]) +
+    '<section class="asset-facts-rail">' +
+      '<div><span>ISSUANCE BLOCK</span><strong>' + (data.issuance?.blockHeight !== null && data.issuance?.blockHeight !== undefined ? number(data.issuance.blockHeight) : '—') + '</strong></div>' +
+      '<div><span>VERIFIER</span><code>' + esc(metadata.verifier_string || '—') + '</code></div>' +
+      '<div><span>METADATA REF</span>' + metadataRefHtml + (metadataValue ? copyButton(metadataValue, 'metadata reference') : '') + '</div>' +
+    '</section>' +
+    ipfsPreview +
+    '<section class="ledger-section">' +
+      railHeading('OWNERSHIP RAIL', 'Asset holders', data.holders?.total === null ? 'availability unknown' : number(data.holders?.total) + ' total') +
+      '<p>Core address order · up to 100 holders per page.</p>' +
+      '<div class="holder-rail">' + holderRows + '</div>' +
+      '<nav class="rail-pagination" aria-label="Asset holder pages">' +
+      ((data.holders.page || 1) > 1 ? '<a href="/asset/' + encodeURIComponent(name) + '?page=' + (data.holders.page - 1) + '">← Prev</a>' : '<span></span>') +
+      '<span>Page ' + number(data.holders.page || 1) + ' / ' + number(data.holders.totalPages || 1) + '</span>' +
+      ((data.holders.page || 1) < data.holders.totalPages ? '<a href="/asset/' + encodeURIComponent(name) + '?page=' + (data.holders.page + 1) + '">Next →</a>' : '<span></span>') + '</nav>' +
+    '</section>';
+  if (ipfsPreviewUrl) initializeAssetPreview(ipfsPreviewUrl);
+}
+
+
+function shortService(value) {
+  return value || '—';
+}
+
+function compactMiddle(value, lead = 9, tail = 7) {
+  const text = String(value || '');
+  if (text.length <= lead + tail + 1) return text;
+  return text.slice(0, lead) + '…' + text.slice(-tail);
+}
+
+function smartnodeStatusClass(status) {
+  if (status === 'ENABLED') return 'status-enabled';
+  if (status === 'POSE_BANNED') return 'status-banned';
+  return 'status-unknown';
+}
+
+function smartnodeListHref(params, page) {
+  const next = new URLSearchParams();
+  const q = (params.get('q') || '').trim();
+  const status = params.get('status') || 'ENABLED';
+  const collateral = params.get('collateral') || '';
+  const sort = params.get('sort') || 'pay-age-asc';
+
+  if (q) next.set('q', q);
+  if (status && status !== 'ENABLED') next.set('status', status);
+  if (collateral) next.set('collateral', collateral);
+  if (sort && sort !== 'pay-age-asc') next.set('sort', sort);
+  if (page > 1) next.set('page', String(page));
+
+  const query = next.toString();
+  return '/smartnodes' + (query ? '?' + query : '');
+}
+
+function smartnodeSortHref(params, key) {
+  const current = params.get('sort') || 'pay-age-asc';
+  const nextSort = current === key + '-asc' ? key + '-desc' : key + '-asc';
+  const next = new URLSearchParams();
+
+  const q = (params.get('q') || '').trim();
+  const status = params.get('status') || 'ENABLED';
+  const collateral = params.get('collateral') || '';
+
+  if (q) next.set('q', q);
+  if (status && status !== 'ENABLED') next.set('status', status);
+  if (collateral) next.set('collateral', collateral);
+  next.set('sort', nextSort);
+
+  return '/smartnodes?' + next.toString();
+}
+
+function smartnodeSortHeader(label, key, currentSort) {
+  const activeAsc = currentSort === key + '-asc';
+  const activeDesc = currentSort === key + '-desc';
+  const arrow = activeAsc ? '↑' : (activeDesc ? '↓' : '↕');
+  const activeClass = activeAsc || activeDesc ? ' active' : '';
+
+  return '<a class="sort-header' + activeClass + '" href="' +
+    smartnodeSortHref(new URLSearchParams(location.search), key) +
+    '" title="Sort by ' + esc(label) + '">' +
+    '<span>' + esc(label) + '</span><span class="sort-arrow" aria-hidden="true">' + arrow + '</span>' +
+    '</a>';
+}
+
+async function renderSmartnodes() {
+  renderLoading('Reading smartnodes from Yerbas Core');
+
+  const params = new URLSearchParams(location.search);
+  const request = new URLSearchParams({
+    q: (params.get('q') || '').trim(),
+    status: params.get('status') || 'ENABLED',
+    collateral: params.get('collateral') || '',
+    sort: params.get('sort') || 'pay-age-asc',
+    page: String(Math.max(1, Number.parseInt(params.get('page') || '1', 10) || 1)),
+    count: '50'
+  });
+
+  const data = await api('/api/smartnodes?' + request.toString());
+  setRpcState('online', 'Core online');
+  document.title = 'Smartnodes · Yerbas Explorer';
+
+  const collateralOptions = Object.entries(data.collateralCounts || {})
+    .filter(([amount]) => amount !== 'unknown')
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([amount, count]) =>
+      '<option value="' + esc(amount) + '"' + (request.get('collateral') === amount ? ' selected' : '') +
+      '>' + number(amount) + ' YERB (' + number(count) + ')</option>'
+    ).join('');
+
+  const enabled = Number(data.network?.enabled || 0);
+  const total = Number(data.network?.total || 0);
+  const poseBanned = Number(data.network?.poseBanned || 0);
+
+  const collateralRail = Object.entries(data.collateralCounts || {})
+    .filter(([amount]) => amount !== 'unknown')
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([amount, count]) =>
+      '<span><b>' + number(amount) + '</b><small>YERB</small><strong>' + number(count) + '</strong></span>'
+    ).join('');
+
+  const nodeRows = data.items.length
+    ? data.items.map((node) => {
+        const payout = node.payoutAddress
+          ? '<a class="mono node-payout" title="' + esc(node.payoutAddress) + '" href="/address/' + encodeURIComponent(node.payoutAddress) + '">' + esc(node.payoutAddress) + '</a>'
+          : '<span class="muted">—</span>';
+        return '<div class="node-stream-row">' +
+          '<span class="node-status-dot ' + smartnodeStatusClass(node.status) + '"></span>' +
+          '<span class="node-pay-rank">' + (node.paymentAgeRank === null ? '—' : number(node.paymentAgeRank)) + '</span>' +
+          '<span class="node-service"><b>' + esc(shortService(node.service)) + '</b><code>' + esc(compactHash(node.proTxHash || node.outpoint)) + '</code></span>' +
+          '<span class="node-payout-wrap"><small>YERBAS PAYOUT</small>' + payout + '</span>' +
+          '<span class="node-collateral"><b>' + (node.collateralAmount === null ? '—' : number(node.collateralAmount)) + '</b><small>YERB</small></span>' +
+          '<span class="node-paid"><small>LAST PAID</small><b>' + (Number(node.lastPaidBlock) > 0 ? 'BLOCK ' + number(node.lastPaidBlock) : 'NEVER') + '</b></span>' +
+          '<span class="node-pose"><small>POSE</small><b>' + number(node.PoSePenalty) + '</b></span>' +
+          '<span class="smartnode-status ' + smartnodeStatusClass(node.status) + '">' + esc(node.status) + '</span>' +
+        '</div>';
+      }).join('')
+    : '<div class="ledger-empty">No smartnodes matched these filters.</div>';
+
+  const pageLinks =
+    '<div class="rail-pagination">' +
+      (data.page > 1 ? '<a href="' + smartnodeListHref(params, data.page - 1) + '">← PREV</a>' : '<span></span>') +
+      '<span>PAGE ' + number(data.page) + ' / ' + number(data.totalPages) + '</span>' +
+      (data.page < data.totalPages ? '<a href="' + smartnodeListHref(params, data.page + 1) + '">NEXT →</a>' : '<span></span>') +
+    '</div>';
+
+  app.innerHTML =
+    ledgerHeader('SMARTNODE NETWORK', 'Deterministic node stream', number(enabled) + ' enabled', '<a href="/node-map?view=smartnodes">NETWORK MAP ↗</a><a href="/rewards">PAYOUT HISTORY</a><a href="/">LIVE CHAIN</a>') +
+    telemetryRail([
+      { label: 'ENABLED', value: number(enabled), note: total ? ((enabled / total) * 100).toFixed(1) + '%' : '—' },
+      { label: 'REGISTERED', value: number(total), note: 'deterministic' },
+      { label: 'POSE BANNED', value: number(poseBanned), note: 'current' },
+      { label: 'PROTOCOL', value: data.protocolVersion === null ? '—' : number(data.protocolVersion), note: 'local Core' }
+    ]) +
+    '<section class="collateral-rail"><span class="rail-label">COLLATERAL</span>' + collateralRail + '</section>' +
+    '<form class="rail-filter smartnode-rail-filter" action="/smartnodes" method="get">' +
+      '<input name="q" value="' + esc(request.get('q')) + '" placeholder="IP, payout address, ProTx…">' +
+      '<select name="status"><option value="ENABLED"' + (request.get('status') === 'ENABLED' ? ' selected' : '') + '>ENABLED</option><option value="ALL"' + (request.get('status') === 'ALL' ? ' selected' : '') + '>ALL</option><option value="POSE_BANNED"' + (request.get('status') === 'POSE_BANNED' ? ' selected' : '') + '>POSE BANNED</option></select>' +
+      '<select name="collateral"><option value="">ALL COLLATERAL</option>' + collateralOptions + '</select>' +
+      '<select name="sort"><option value="pay-age-asc"' + (request.get('sort') === 'pay-age-asc' ? ' selected' : '') + '>PAY AGE ↑</option><option value="pay-age-desc"' + (request.get('sort') === 'pay-age-desc' ? ' selected' : '') + '>PAY AGE ↓</option><option value="collateral-desc"' + (request.get('sort') === 'collateral-desc' ? ' selected' : '') + '>COLLATERAL ↓</option><option value="last-paid-asc"' + (request.get('sort') === 'last-paid-asc' ? ' selected' : '') + '>LAST PAID ↑</option><option value="registered-asc"' + (request.get('sort') === 'registered-asc' ? ' selected' : '') + '>REGISTERED ↑</option></select>' +
+      '<button type="submit">FILTER</button>' +
+    '</form>' +
+    '<section class="ledger-section">' +
+      railHeading('NODE STREAM', number(data.total) + ' matching smartnodes', 'pay age · service · payout · collateral · state') +
+      '<div class="node-stream-head"><span></span><span>RANK</span><span>SERVICE / PROTX</span><span>YERBAS PAYOUT</span><span>COLLATERAL</span><span>LAST PAID</span><span>POSE</span><span>STATUS</span></div>' +
+      '<div class="node-stream">' + nodeRows + '</div>' +
+      pageLinks +
+    '</section>';
+}
+
+
+function networkMapSeverity(status) {
+  const order = {
+    'online': 1,
+    'slow': 2,
+    'penalized': 3,
+    'offline': 4,
+    'pose-banned': 5
+  };
+  return order[status] || 0;
+}
+
+function networkMapHasGeo(item) {
+  return Boolean(
+    item?.geo
+    && Number.isFinite(Number(item.geo.latitude))
+    && item.geo.latitude !== null && item.geo.longitude !== null
+    && item.geo.latitude !== '' && item.geo.longitude !== ''
+    && Number.isFinite(Number(item.geo.longitude))
+    && Math.abs(Number(item.geo.latitude)) <= 90 && Math.abs(Number(item.geo.longitude)) <= 180
+  );
+}
+
+function networkMapMatchesFilter(item, filter) {
+  if (filter === 'reachable') {
+    return ['online', 'slow', 'penalized'].includes(item.status);
+  }
+
+  if (filter === 'unlocated') return !networkMapHasGeo(item);
+  if (['online', 'slow', 'penalized'].includes(filter)) return item.status === filter;
+  if (filter === 'offline') return item.status === 'offline';
+  if (filter === 'pose-banned') return item.status === 'pose-banned';
+  if (filter === 'plotted') return networkMapHasGeo(item);
+
+  if (filter === 'countries') {
+    return networkMapHasGeo(item) && Boolean(item.geo.countryCode || item.geo.country);
+  }
+
+  return true;
+}
+
+function networkMapSearch(items, filter, query, country) {
+  const needle = String(query || '').trim().toLowerCase();
+  return items.filter(item => networkMapMatchesFilter(item, filter)
+    && (!country || String(item.geo?.countryCode || item.geo?.country || '') === country)
+    && (!needle || [item.service, item.id, item.payoutAddress, item.geo?.city, item.geo?.region, item.geo?.country, item.geo?.countryCode, item.geo?.isp]
+      .some(value => String(value || '').toLowerCase().includes(needle))));
+}
+
+function networkMapFilterLabel(filter) {
+  const labels = {
+    all: 'all nodes',
+    countries: 'nodes with country data',
+    reachable: 'reachable nodes',
+    offline: 'offline nodes',
+    'pose-banned': 'PoSe-banned nodes',
+    plotted: 'geolocated nodes', unlocated: 'nodes without location data', online: 'online nodes', slow: 'slow nodes', penalized: 'penalized nodes'
+  };
+  return labels[filter] || labels.all;
+}
+
+function networkMapClusters(items) {
+  const groups = new Map();
+
+  for (const item of items) {
+    if (!networkMapHasGeo(item)) continue;
+
+    const latitude = Number(item.geo.latitude);
+    const longitude = Number(item.geo.longitude);
+    const key = latitude.toFixed(2) + ',' + longitude.toFixed(2);
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        latitude,
+        longitude,
+        city: item.geo.city || null,
+        region: item.geo.region || null,
+        country: item.geo.country || item.geo.countryCode || null,
+        countryCode: item.geo.countryCode || null,
+        isp: item.geo.isp || null,
+        nodes: [],
+        status: item.status
+      });
+    }
+
+    const group = groups.get(key);
+    group.nodes.push(item);
+
+    if (networkMapSeverity(item.status) > networkMapSeverity(group.status)) {
+      group.status = item.status;
+    }
+  }
+
+  return [...groups.values()];
+}
+
+function networkMapPinPosition(latitude, longitude) {
+  const left = ((Number(longitude) + 180) / 360) * 100;
+  const top = ((90 - Number(latitude)) / 180) * 100;
+
+  return {
+    left: Math.max(0, Math.min(100, left)),
+    top: Math.max(0, Math.min(100, top))
+  };
+}
+
+function networkMapLocationLabel(cluster) {
+  return [cluster.city, cluster.region, cluster.country]
+    .filter(Boolean)
+    .filter((value, index, array) => array.indexOf(value) === index)
+    .join(', ') || 'Approximate location';
+}
+
+function networkMapNodeDetail(node, view) {
+  const service = esc(node.service || node.id || 'Unknown node');
+  const status = esc(String(node.status || 'unknown').replaceAll('-', ' '));
+
+  if (view === 'peers') {
+    return '<div class="map-node-row">' +
+      '<div><strong class="mono">' + service + '</strong><span class="map-node-status ' + esc(node.status) + '">' + status + '</span></div>' +
+      '<small>' +
+        (node.inbound ? 'Inbound' : 'Outbound') +
+        (node.subversion ? ' · ' + esc(node.subversion) : '') +
+        (Number.isFinite(Number(node.pingTime)) ? ' · ' + Math.round(Number(node.pingTime) * 1000) + ' ms' : '') +
+      '</small>' +
+    '</div>';
+  }
+
+  const payout = node.payoutAddress
+    ? '<a href="/address/' + encodeURIComponent(node.payoutAddress) + '">' + esc(compactMiddle(node.payoutAddress, 10, 7)) + '</a>'
+    : '—';
+
+  return '<div class="map-node-row">' +
+    '<div><strong class="mono">' + service + '</strong><span class="map-node-status ' + esc(node.status) + '">' + status + '</span></div>' +
+    '<small>Collateral ' + (node.collateralAmount === null || node.collateralAmount === undefined ? '—' : number(node.collateralAmount) + ' YERB') +
+      ' · Payout ' + payout + '</small>' +
+  '</div>';
+}
+
+function networkMapTourStops(clusters) {
+  const selected = [];
+  for (const cluster of [...clusters].sort((a, b) => b.nodes.length - a.nodes.length)) {
+    if (selected.some(other => Math.abs(other.latitude - cluster.latitude) < 15 && Math.abs(other.longitude - cluster.longitude) < 25)) continue;
+    selected.push(cluster);
+    if (selected.length === 7) break;
+  }
+  return selected.flatMap(cluster => [cluster, null]);
+}
+
+function networkMapTourPose(cluster, width, height) {
+  const scale = 2.25;
+  const point = networkMapPinPosition(cluster.latitude, cluster.longitude);
+  return { scale,
+    x: Math.min(0, Math.max(width * (1 - scale), width / 2 - point.left / 100 * width * scale)),
+    y: Math.min(0, Math.max(height * (1 - scale), height / 2 - point.top / 100 * height * scale)) };
+}
+
+async function renderNetworkMap() {
+  renderLoading('Locating Yerbas network nodes');
+
+  const params = new URLSearchParams(location.search);
+  const view = params.get('view') === 'peers' ? 'peers' : 'smartnodes';
+  const allowedFilters = new Set(['all', 'countries', 'reachable', 'offline', 'pose-banned', 'plotted', 'unlocated', 'online', 'slow', 'penalized']);
+  let activeFilter = allowedFilters.has(params.get('filter')) ? params.get('filter') : 'all';
+
+  const [data, mapSvg] = await Promise.all([
+    api('/api/network-map?view=' + encodeURIComponent(view)),
+    fetch('/world-map.svg?v=20261026-1').then(response => response.ok ? response.text() : '').catch(() => '')
+  ]);
+
+  setRpcState('online', 'Core online');
+  document.title = 'Network Map · Yerbas Explorer';
+
+  const allItems = Array.isArray(data.items) ? data.items : [];
+  let searchQuery = (params.get('q') || '').slice(0, 200);
+  let countryFilter = params.get('country') || '';
+  let matchingItems = [];
+  const countryCounts = new Map();
+  for (const item of allItems) {
+    const key = item.geo?.countryCode || item.geo?.country;
+    if (key) {
+      const entry = countryCounts.get(key) || { name: item.geo.country || key, count: 0 };
+      entry.count++; countryCounts.set(key, entry);
+    }
+  }
+  if (!countryCounts.has(countryFilter)) countryFilter = '';
+  const countryOptions = [...countryCounts].sort((a, b) => a[1].name.localeCompare(b[1].name)).map(([key, value]) =>
+    '<option value="' + esc(key) + '"' + (key === countryFilter ? ' selected' : '') + '>' + esc(value.name) + ' (' + value.count + ')</option>').join('');
+  const stats = data.stats || {};
+  const statDefinitions = [
+    ['Total nodes', stats.totalNodes, 'all'],
+    ['Countries', stats.countries, 'countries'],
+    [view === 'peers' ? 'Connected' : 'Active', stats.reachable, 'reachable'],
+    ['Offline', stats.offline, 'offline'],
+    ['PoSe banned', stats.poseBanned, 'pose-banned'],
+    ['Mapped', stats.plotted, 'plotted'],
+    ['No location', allItems.filter(item => !networkMapHasGeo(item)).length, 'unlocated']
+  ];
+
+  const statCards = statDefinitions.map(([label, value, filter]) =>
+    '<button type="button" class="network-stat' + (activeFilter === filter ? ' active' : '') + '"' +
+      ' data-map-filter="' + filter + '" title="Show ' + esc(networkMapFilterLabel(filter)) + '">' +
+      '<span>' + esc(label) + '</span><strong>' + number(value) + '</strong>' +
+    '</button>'
+  ).join('');
+
+  const legend = [
+    ['online', 'Online'],
+    ['slow', 'Slow'],
+    ['penalized', 'Penalized'],
+    ['offline', 'Offline'],
+    ['pose-banned', 'PoSe banned']
+  ].map(([status, label]) =>
+    '<button type="button" class="map-legend-item" data-map-filter="' + status + '"><i class="status-' + status + '"></i>' + label + '</button>'
+  ).join('');
+
+  app.innerHTML =
+    '<section class="detail-hero network-map-hero">' +
+      '<div class="detail-kicker">Yerbas peer geography / approximate IP locations</div>' +
+      '<h2>Yerbas Network Map</h2>' +
+      '<div class="detail-hash">View currently connected network peers and registered Smartnodes around the world.</div>' +
+      '<div class="detail-actions"><a class="text-link" href="/">← Back to live chain</a></div>' +
+    '</section>' +
+
+    '<section class="network-map-tabs">' +
+      '<a class="' + (view === 'peers' ? 'active' : '') + '" href="/node-map?view=peers">Network Nodes</a>' +
+      '<a class="' + (view === 'smartnodes' ? 'active' : '') + '" href="/node-map?view=smartnodes">Smartnodes</a>' +
+      '<div class="map-legend">' + legend + '</div>' +
+    '</section>' +
+
+    '<section class="network-map-stats">' + statCards + '</section>' +
+
+    '<form class="map-toolbar" id="map-filter-form">' +
+      '<label>Find a node<input id="map-search" type="search" maxlength="200" placeholder="IP, city, country, provider or payout…" value="' + esc(searchQuery) + '"></label>' +
+      '<label>Country<select id="map-country"><option value="">All countries</option>' + countryOptions + '</select></label>' +
+      '<button type="button" id="map-clear">Clear filters</button>' +
+      '<a class="map-refresh" href="/node-map?view=' + view + '">Refresh snapshot</a>' +
+      '<span class="map-updated">Updated ' + esc(data.generatedAt ? new Date(data.generatedAt).toLocaleString() : 'time unavailable') + '</span>' +
+    '</form>' +
+    '<div class="network-map-workspace"><section class="panel network-map-panel">' +
+      '<div id="network-map-canvas" class="network-map-canvas" tabindex="0" role="region" aria-label="Interactive node map. Plus and minus zoom; arrow keys pan; zero resets.">' +
+        '<div id="network-map-stage" class="network-map-stage">' +
+          (mapSvg ? '<div class="network-map-base" aria-hidden="true">' + mapSvg + '</div>' : '<img class="network-map-base" src="https://upload.wikimedia.org/wikipedia/commons/5/51/BlankMap-Equirectangular.svg" alt="" aria-hidden="true">') +
+          '<div class="network-map-grid" aria-hidden="true"></div>' +
+          '<div id="network-map-pins" class="network-map-pins"></div>' +
+        '</div>' +
+        '<div class="network-map-controls" aria-label="Map controls">' +
+          '<button type="button" data-map-zoom="in" title="Zoom in" aria-label="Zoom in">+</button>' +
+          '<button type="button" data-map-zoom="out" title="Zoom out" aria-label="Zoom out">−</button>' +
+          '<button type="button" data-map-zoom="reset" title="Reset map" aria-label="Reset map">↺</button>' +
+        '</div>' +
+        '<div class="network-map-hint">Ctrl + scroll to zoom · drag to explore</div><span id="map-zoom-level" class="map-zoom-level">1.0×</span>' +
+        '<div class="map-tour-controls"><button type="button" id="map-tour-toggle">Pause tour</button><span id="map-tour-location">World overview</span></div>' +
+        '<aside id="network-map-detail" class="network-map-detail hidden"></aside>' +
+      '</div>' +
+      '<div class="network-map-foot">' +
+        '<span>' + esc(data.source) + '</span>' +
+        '<span id="network-map-filter-status" role="status" aria-live="polite"></span>' +
+        '<span>Node locations are approximate and derived from IP geolocation. Exact operator locations are not exposed.</span>' +
+        '<span>Geo: HackMyIP · Map: ' + (mapSvg ? 'Natural Earth · 1:50m · public domain' : 'Wikimedia Commons CC0') + '</span>' +
+      '</div>' +
+    '</section></div>';
+  const canvas = document.querySelector('#network-map-canvas');
+  const stage = document.querySelector('#network-map-stage');
+  const pinsElement = document.querySelector('#network-map-pins');
+  const detail = document.querySelector('#network-map-detail');
+  const filterStatus = document.querySelector('#network-map-filter-status');
+
+  let currentClusters = [];
+  let mapView = { scale: 1, x: 0, y: 0 };
+  let dragState = null;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let touring = !reducedMotion.matches;
+  let tourVisible = false;
+  let tourFrame = null;
+  let tourStarted = null;
+  let tourIndex = -1;
+  let tourFrom = null;
+  let tourTo = null;
+  let tourStops = [];
+
+  function updateTourButton() {
+    const button = document.getElementById('map-tour-toggle');
+    button.textContent = touring ? 'Pause tour' : 'Play tour';
+    button.setAttribute('aria-pressed', String(touring));
+  }
+  function pauseTour() {
+    touring = false; updateTourButton();
+    if (tourFrame !== null) cancelAnimationFrame(tourFrame);
+    tourFrame = null; tourStarted = null;
+  }
+  function startTour() {
+    if (!touring || !tourVisible || document.hidden || tourFrame !== null || !canvas.isConnected) return;
+    tourFrame = requestAnimationFrame(animateTour);
+  }
+  function animateTour(now) {
+    tourFrame = null;
+    if (!canvas.isConnected) { observer.disconnect(); return; }
+    if (!touring || !tourVisible || document.hidden) { tourStarted = null; return; }
+    if (tourStarted === null) {
+      tourStarted = now;
+      tourIndex = (tourIndex + 1) % Math.max(1, tourStops.length);
+      const stop = tourStops[tourIndex];
+      const rect = canvas.getBoundingClientRect();
+      tourFrom = { ...mapView };
+      tourTo = stop ? networkMapTourPose(stop, rect.width, rect.height) : { scale: 1, x: 0, y: 0 };
+      document.getElementById('map-tour-location').textContent = stop
+        ? networkMapLocationLabel(stop) + ' · ' + number(stop.nodes.length) + ' nodes'
+        : 'World overview';
+    }
+    const progress = Math.min(1, (now - tourStarted) / 6500);
+    const smooth = progress * progress * (3 - 2 * progress);
+    mapView = {
+      scale: tourFrom.scale + (tourTo.scale - tourFrom.scale) * smooth,
+      x: tourFrom.x + (tourTo.x - tourFrom.x) * smooth,
+      y: tourFrom.y + (tourTo.y - tourFrom.y) * smooth
+    };
+    applyMapView();
+    if (now - tourStarted >= 10500) tourStarted = null;
+    startTour();
+  }
+  const observer = new IntersectionObserver(entries => {
+    tourVisible = entries[0].isIntersecting;
+    if (!tourVisible) { if (tourFrame !== null) cancelAnimationFrame(tourFrame); tourFrame = null; tourStarted = null; }
+    else startTour();
+  }, { threshold: .15 });
+  observer.observe(canvas);
+  document.getElementById('map-tour-toggle').addEventListener('click', () => {
+    if (touring) pauseTour();
+    else { touring = true; detail.classList.add('hidden'); updateTourButton(); startTour(); }
+  });
+  document.addEventListener('visibilitychange', () => { if (canvas.isConnected) startTour(); });
+  reducedMotion.addEventListener('change', () => { if (reducedMotion.matches) pauseTour(); });
+
+
+  function clampMapView() {
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaledWidth = rect.width * mapView.scale;
+    const scaledHeight = rect.height * mapView.scale;
+
+    if (mapView.scale <= 1) {
+      mapView.x = 0;
+      mapView.y = 0;
+      return;
+    }
+
+    mapView.x = Math.min(0, Math.max(rect.width - scaledWidth, mapView.x));
+    mapView.y = Math.min(0, Math.max(rect.height - scaledHeight, mapView.y));
+  }
+
+  function applyMapView() {
+    if (!stage) return;
+    clampMapView();
+    canvas.classList.toggle('is-zoomed', mapView.scale > 1);
+    canvas.classList.toggle('map-detail-zoom', mapView.scale >= 1.6);
+    canvas.classList.toggle('map-close-zoom', mapView.scale >= 2.1);
+    document.getElementById('map-zoom-level').textContent = mapView.scale.toFixed(1) + '×';
+    stage.style.transform =
+      'translate(' + mapView.x.toFixed(2) + 'px,' + mapView.y.toFixed(2) + 'px) scale(' +
+      mapView.scale.toFixed(4) + ')';
+
+    if (pinsElement) {
+      // The map stage scales geographic positions. Counter-scale the pins so
+      // they grow gently with zoom instead of ballooning by the full map scale.
+      const screenPinScale = Math.min(1.7, 1 + (mapView.scale - 1) * 0.1);
+      const localPinScale = screenPinScale / mapView.scale;
+      pinsElement.style.setProperty('--network-pin-scale', localPinScale.toFixed(4));
+      pinsElement.style.setProperty('--network-pin-hover-scale', (localPinScale * 1.16).toFixed(4));
+      pinsElement.dataset.mapZoom = mapView.scale.toFixed(2);
+    }
+  }
+
+  function zoomMapAt(clientX, clientY, nextScale) {
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const oldScale = mapView.scale;
+    const scale = Math.max(1, Math.min(8, nextScale));
+
+    if (Math.abs(scale - oldScale) < 0.0001) return;
+
+    const cursorX = clientX - rect.left;
+    const cursorY = clientY - rect.top;
+    const worldX = (cursorX - mapView.x) / oldScale;
+    const worldY = (cursorY - mapView.y) / oldScale;
+
+    mapView.scale = scale;
+    mapView.x = cursorX - worldX * scale;
+    mapView.y = cursorY - worldY * scale;
+    applyMapView();
+  }
+
+  function zoomMapCentered(factor) {
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    zoomMapAt(
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2,
+      mapView.scale * factor
+    );
+  }
+
+  function resetMapView() {
+    mapView = { scale: 1, x: 0, y: 0 };
+    applyMapView();
+  }
+
+  function updateFilterUrl() {
+    const url = new URL(location.href);
+    if (activeFilter === 'all') url.searchParams.delete('filter');
+    else url.searchParams.set('filter', activeFilter);
+    if (searchQuery) url.searchParams.set('q', searchQuery); else url.searchParams.delete('q');
+    if (countryFilter) url.searchParams.set('country', countryFilter); else url.searchParams.delete('country');
+    history.replaceState(null, '', url.pathname + (url.searchParams.size ? '?' + url.searchParams.toString() : ''));
+  }
+
+  function updateStatButtons() {
+    document.querySelectorAll('[data-map-filter]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.mapFilter === activeFilter);
+      button.setAttribute('aria-pressed', String(button.dataset.mapFilter === activeFilter));
+    });
+  }
+
+  function openCluster(index) {
+    const cluster = typeof index === 'object' ? index : currentClusters[index];
+    if (!cluster || !detail) return;
+
+    const location = cluster.unlocated ? 'Location unavailable' : networkMapLocationLabel(cluster);
+    const nodes = cluster.nodes.slice(0, 20);
+
+    pauseTour();
+    detail.classList.remove('hidden');
+    detail.innerHTML =
+      '<button class="map-detail-close" type="button" aria-label="Close">×</button>' +
+      '<p class="eyebrow">APPROXIMATE LOCATION</p>' +
+      '<h3>' + esc(location) + '</h3>' +
+      '<div class="map-detail-meta">' +
+        number(cluster.nodes.length) + (cluster.nodes.length === 1 ? ' node' : ' nodes') +
+        (cluster.isp ? ' · ' + esc(cluster.isp) : '') +
+      '</div>' +
+      '<div class="map-node-list">' +
+        nodes.map((node) => networkMapNodeDetail(node, view)).join('') +
+        (cluster.nodes.length > nodes.length
+          ? '<div class="map-node-more">+' + number(cluster.nodes.length - nodes.length) + ' more at this approximate location</div>'
+          : '') +
+      '</div>';
+
+    detail.querySelector('.map-detail-close')?.addEventListener('click', () => {
+      detail.classList.add('hidden');
+    });
+  }
+
+  function renderMapPins() {
+    if (!pinsElement) return;
+
+    matchingItems = networkMapSearch(allItems, activeFilter, searchQuery, countryFilter);
+    currentClusters = networkMapClusters(matchingItems);
+    tourStops = networkMapTourStops(currentClusters);
+    tourIndex = -1; tourStarted = null;
+
+    pinsElement.innerHTML = currentClusters.map((cluster, index) => {
+      const label = networkMapLocationLabel(cluster);
+      const count = cluster.nodes.length;
+      const position = networkMapPinPosition(cluster.latitude, cluster.longitude);
+
+      return '<button class="network-pin status-' + esc(cluster.status) + (count > 1 ? ' cluster' : '') + '"' +
+        ' type="button" aria-label="' + esc(label + ', ' + count + ' nodes') + '" data-map-cluster="' + index + '"' +
+        ' data-map-left="' + position.left.toFixed(4) + '"' +
+        ' data-map-top="' + position.top.toFixed(4) + '"' +
+        ' title="' + esc(label + ' · ' + count + (count === 1 ? ' node' : ' nodes')) + '">' +
+        (count > 1 ? '<span>' + number(count) + '</span>' : '') +
+      '</button>';
+    }).join('');
+
+    const plottedMatching = matchingItems.filter(networkMapHasGeo).length;
+    if (filterStatus) {
+      filterStatus.textContent =
+        'Showing ' + number(plottedMatching) + ' plotted of ' + number(matchingItems.length) +
+        ' ' + networkMapFilterLabel(activeFilter);
+    }
+
+    pinsElement.querySelectorAll('[data-map-cluster]').forEach((button) => {
+      const left = Number(button.dataset.mapLeft);
+      const top = Number(button.dataset.mapTop);
+
+      if (Number.isFinite(left) && Number.isFinite(top)) {
+        button.style.left = left.toFixed(4) + '%';
+        button.style.top = top.toFixed(4) + '%';
+      }
+
+      button.addEventListener('click', () => openCluster(Number(button.dataset.mapCluster)));
+    });
+
+    if (detail) detail.classList.add('hidden');
+  }
+
+  document.getElementById('map-filter-form').addEventListener('submit', event => event.preventDefault());
+  document.getElementById('map-search').addEventListener('input', event => {
+    pauseTour(); searchQuery = event.target.value.slice(0, 200); updateFilterUrl(); renderMapPins();
+  });
+  document.getElementById('map-country').addEventListener('change', event => {
+    pauseTour(); countryFilter = event.target.value; updateFilterUrl(); renderMapPins();
+  });
+  document.getElementById('map-clear').addEventListener('click', () => {
+    pauseTour(); activeFilter = 'all'; searchQuery = ''; countryFilter = '';
+    document.getElementById('map-search').value = ''; document.getElementById('map-country').value = '';
+    updateFilterUrl(); updateStatButtons(); renderMapPins(); resetMapView();
+  });
+  canvas?.addEventListener('keydown', event => {
+    if (event.target !== canvas) return;
+    pauseTour();
+    if (['+', '=', '-', '0', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Escape'].includes(event.key)) event.preventDefault();
+    if (event.key === '+' || event.key === '=') zoomMapCentered(1.35);
+    else if (event.key === '-') zoomMapCentered(1 / 1.35);
+    else if (event.key === '0') resetMapView();
+    else if (event.key === 'Escape') detail.classList.add('hidden');
+    else {
+      if (event.key === 'ArrowLeft') mapView.x += 60;
+      if (event.key === 'ArrowRight') mapView.x -= 60;
+      if (event.key === 'ArrowUp') mapView.y += 60;
+      if (event.key === 'ArrowDown') mapView.y -= 60;
+      applyMapView();
+    }
+  });
+
+  document.querySelectorAll('[data-map-filter]').forEach((button) => {
+    button.addEventListener('click', () => {
+      pauseTour();
+      activeFilter = allowedFilters.has(button.dataset.mapFilter) ? button.dataset.mapFilter : 'all';
+     
+      updateFilterUrl();
+      updateStatButtons();
+      renderMapPins();
+    });
+  });
+
+  document.querySelectorAll('[data-map-zoom]').forEach((button) => {
+    button.addEventListener('click', () => {
+      pauseTour();
+      const action = button.dataset.mapZoom;
+      if (action === 'in') zoomMapCentered(1.35);
+      else if (action === 'out') zoomMapCentered(1 / 1.35);
+      else resetMapView();
+    });
+  });
+
+  canvas?.addEventListener('wheel', (event) => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    pauseTour();
+    if (event.target.closest('.network-map-detail')) return;
+    event.preventDefault();
+    zoomMapAt(event.clientX, event.clientY, mapView.scale * (event.deltaY < 0 ? 1.18 : 1 / 1.18));
+  }, { passive: false });
+
+  canvas?.addEventListener('dblclick', (event) => {
+    if (event.target.closest('.network-pin, .network-map-controls, .network-map-detail, .map-tour-controls')) return;
+    event.preventDefault();
+    zoomMapAt(event.clientX, event.clientY, mapView.scale * 1.5);
+  });
+
+  canvas?.addEventListener('pointerdown', (event) => {
+    if (event.target.closest('.map-tour-controls')) return;
+    pauseTour();
+    if (event.pointerType === 'touch' && mapView.scale <= 1) return;
+    if (event.target.closest('.network-pin, .network-map-controls, .network-map-detail, .map-tour-controls')) return;
+    dragState = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      mapX: mapView.x,
+      mapY: mapView.y
+    };
+    canvas.setPointerCapture(event.pointerId);
+    canvas.classList.add('is-dragging');
+  });
+
+  canvas?.addEventListener('pointermove', (event) => {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    mapView.x = dragState.mapX + event.clientX - dragState.startX;
+    mapView.y = dragState.mapY + event.clientY - dragState.startY;
+    applyMapView();
+  });
+
+  function finishMapDrag(event) {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    dragState = null;
+    canvas?.classList.remove('is-dragging');
+  }
+
+  canvas?.addEventListener('pointerup', finishMapDrag);
+  canvas?.addEventListener('pointercancel', finishMapDrag);
+  window.addEventListener('resize', applyMapView, { passive: true });
+
+  updateStatButtons();
+  renderMapPins();
+  applyMapView();
+  updateTourButton();
+  startTour();
+}
+
+async function renderTransaction(txid) {
+  renderLoading('Resolving transaction from Yerbas Core');
+
+  const knownBlock = new URLSearchParams(location.search).get('block');
+  const query = knownBlock ? '?block=' + encodeURIComponent(knownBlock) : '';
+  const tx = await api('/api/tx/' + encodeURIComponent(txid) + query);
+
+  setRpcState('online', 'Core online');
+  document.title = 'Transaction · Yerbas Explorer';
+
+  const inputCount = Array.isArray(tx.vin) ? tx.vin.length : 0;
+  const outputs = Array.isArray(tx.vout) ? tx.vout : [];
+  const totalOutput = outputs.reduce((sum, vout) => sum + Number(vout.value || 0), 0);
+  const types = { 1: 'Smartnode registration', 2: 'Smartnode service update', 3: 'Smartnode registrar update', 4: 'Smartnode revocation', 5: 'Block reward', 6: 'Quorum commitment', 7: 'Future transaction', 8: 'Asset registration', 9: 'Asset reissue' };
+  const isReward = tx.vin?.some(input => input.coinbase);
+  const kind = isReward ? 'Block reward' : types[tx.type] || (outputs.some(output => output.scriptPubKey?.asset) ? 'Asset transfer' : 'YERB transfer');
+  const inputs = tx.inputDetails || tx.vin || [];
+  const pageSize = 20;
+  const pages = { inputs: 0, outputs: 0 };
+  function flowRows(side) {
+    const rows = side === 'inputs' ? inputs : outputs;
+    const start = pages[side] * pageSize;
+    const cards = rows.slice(start, start + pageSize).map((row, index) => {
+      if (row.coinbase) return '<article class="tx-flow-card"><strong>Newly created coins</strong><p>Block reward and transaction fees</p></article>';
+      const incoming = side === 'inputs';
+      const asset = row.scriptPubKey?.asset;
+      const addresses = incoming ? (row.addresses || []) : (row.scriptPubKey?.addresses || (row.scriptPubKey?.address ? [row.scriptPubKey.address] : []));
+      const amount = incoming ? (row.available ? number(row.amountYerb, 8) + ' YERB' : 'Amount unavailable') : number(row.value, 8) + ' YERB';
+      const link = incoming ? '<a href="/tx/' + encodeURIComponent(row.txid) + '#output-' + row.vout + '">← Source · output ' + esc(row.vout) + '</a>' :
+        (row.spentTxId ? '<a href="/tx/' + encodeURIComponent(row.spentTxId) + '#input-' + row.spentIndex + '">Follow spend →</a>' : '<span>Spend status unavailable</span>');
+      return '<article class="tx-flow-card" id="' + (incoming ? 'input-' + (start + index) : 'output-' + row.n) + '"><small>' + (incoming ? 'INPUT ' + (start + index) : 'OUTPUT ' + row.n) + '</small><strong>' + esc(amount) + '</strong>' +
+        (asset ? '<p><a href="/asset/' + encodeURIComponent(asset.name) + '">' + esc(asset.name) + '</a> · ' + number(asset.amount, 8) + '</p>' : '') +
+        '<div class="tx-flow-address">' + (addresses.length ? addresses.map(address => '<a href="/address/' + encodeURIComponent(address) + '">' + esc(address) + '</a>').join('<br>') : '<span>Script / address unavailable</span>') + '</div><div class="tx-follow">' + link + '</div></article>';
+    }).join('');
+    return (cards || '<p>No ' + side + ' in this transaction.</p>') + (rows.length > pageSize ? '<nav class="rail-pagination" aria-label="' + side + ' pages"><button data-flow="' + side + '" data-step="-1" ' + (!pages[side] ? 'disabled' : '') + '>Previous</button><span>' + (start + 1) + '–' + Math.min(start + pageSize, rows.length) + ' of ' + rows.length + '</span><button data-flow="' + side + '" data-step="1" ' + (start + pageSize >= rows.length ? 'disabled' : '') + '>Next</button></nav>' : '');
+  }
+
+  const actions = '<a href="/">LIVE CHAIN</a>' + copyButton(tx.txid, 'transaction ID') +
+    (tx.blockhash ? '<a href="/block/' + encodeURIComponent(tx.blockhash) + '">BLOCK ↗</a>' : '');
+
+  app.innerHTML =
+    ledgerHeader(tx.confirmations ? 'CONFIRMED TRANSACTION' : 'MEMPOOL TRANSACTION', 'Transaction', tx.txid, actions) +
+    '<div class="tx-overview">' + [
       ['Total output', number(totalOutput, 8) + ' YERB'],
       ['Network fee', tx.feeYerb == null ? '—' : number(tx.feeYerb, 8) + ' YERB'],
       ['Confirmations', number(tx.confirmations)],
