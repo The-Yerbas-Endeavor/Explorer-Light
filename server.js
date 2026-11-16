@@ -1690,6 +1690,19 @@ function spotexMarketListing() {
   };
 }
 
+function neoxexMarketListing() {
+  const tradeUrl = 'https://neoxa.exchange/trade/YERB_USDT';
+  return {
+    ...spotexMarketListing(),
+    exchange: 'neoxex',
+    exchangeName: 'NeoxEX',
+    tickerId: 'YERB_USDT',
+    tradeUrl,
+    source: tradeUrl,
+    apiDocsUrl: null
+  };
+}
+
 function marketReferenceSummary(markets) {
   const sources = [];
 
@@ -2438,7 +2451,7 @@ async function handleApi(req, res, url) {
       nestexMarketSummary(),
       gateviaMarketSummary()
     ]);
-    const markets = [nestex, gatevia, spotexMarketListing()];
+    const markets = [nestex, gatevia, spotexMarketListing(), neoxexMarketListing()];
     void recordMarketHistorySnapshot(markets);
     return sendJson(res, 200, {
       generatedAt: new Date().toISOString(),
