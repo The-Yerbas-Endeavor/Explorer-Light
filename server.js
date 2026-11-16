@@ -1690,17 +1690,54 @@ function spotexMarketListing() {
   };
 }
 
-function neoxexMarketListing() {
-  const tradeUrl = 'https://neoxa.exchange/trade/YERB_USDT';
-  return {
+async function neoxexMarketSummary() {
+  const listing = {
     ...spotexMarketListing(),
     exchange: 'neoxex',
     exchangeName: 'NeoxEX',
     tickerId: 'YERB_USDT',
-    tradeUrl,
-    source: tradeUrl,
-    apiDocsUrl: null
+    tradeUrl: 'https://neoxa.exchange/trade/YERB_USDT',
+    source: 'https://neoxa.exchange/api/exchange/ticker/YERB_USDT',
+    apiDocsUrl: 'https://neoxa.exchange/api-docs'
   };
+  if (!config.markets.enabled) return listing;
+  return cached('market:neoxex:YERB_USDT', config.markets.cacheMs, async () => {
+    try {
+      const response = await fetch(listing.source, {
+        headers: { accept: 'application/json' },
+        signal: AbortSignal.timeout(config.markets.timeoutMs)
+      });
+      if (!response.ok) return listing;
+      const data = await response.json();
+      const ticker = data?.ticker;
+      const numeric = value => typeof value === 'number' || (typeof value === 'string' && value.trim())
+        ? marketNumber(value) : null;
+      const positive = value => numeric(value) > 0 ? numeric(value) : null;
+      const volume = value => numeric(value) >= 0 ? numeric(value) : null;
+      const last = positive(ticker?.lastPrice);
+      if (data?.success !== true || data.pair !== listing.tickerId || last === null) return listing;
+      return {
+        ...listing,
+        available: true,
+        status: 'live-api',
+        asOf: positive(ticker.computedAt) ?? Date.now(),
+        ticker: {
+          ...listing.ticker,
+          last,
+          change24hPct: numeric(ticker.changePercent),
+          high: positive(ticker.high24h),
+          low: positive(ticker.low24h),
+          bid: positive(ticker.bestBid),
+          ask: positive(ticker.bestAsk),
+          spread: volume(ticker.spread),
+          baseVolume: volume(ticker.volume24h),
+          quoteVolume: volume(ticker.quoteVolume24h)
+        }
+      };
+    } catch {
+      return listing;
+    }
+  });
 }
 
 function marketReferenceSummary(markets) {
@@ -2447,11 +2484,12 @@ async function handleApi(req, res, url) {
   }
 
   if (url.pathname === '/api/markets') {
-    const [nestex, gatevia] = await Promise.all([
+    const [nestex, gatevia, neoxex] = await Promise.all([
       nestexMarketSummary(),
-      gateviaMarketSummary()
+      gateviaMarketSummary(),
+      neoxexMarketSummary()
     ]);
-    const markets = [nestex, gatevia, spotexMarketListing(), neoxexMarketListing()];
+    const markets = [nestex, gatevia, spotexMarketListing(), neoxex];
     void recordMarketHistorySnapshot(markets);
     return sendJson(res, 200, {
       generatedAt: new Date().toISOString(),
