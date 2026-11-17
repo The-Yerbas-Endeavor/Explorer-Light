@@ -1814,8 +1814,7 @@ function networkMapTourStops(clusters) {
   return selected.flatMap(cluster => [cluster, null]);
 }
 
-function networkMapTourPose(cluster, width, height) {
-  const scale = 2.25;
+function networkMapTourPose(cluster, width, height, scale = 2.25) {
   const point = networkMapPinPosition(cluster.latitude, cluster.longitude);
   return { scale,
     x: Math.min(0, Math.max(width * (1 - scale), width / 2 - point.left / 100 * width * scale)),
@@ -1914,9 +1913,9 @@ async function renderNetworkMap() {
         '<div class="network-map-controls" aria-label="Map controls">' +
           '<button type="button" data-map-zoom="in" title="Zoom in" aria-label="Zoom in">+</button>' +
           '<button type="button" data-map-zoom="out" title="Zoom out" aria-label="Zoom out">−</button>' +
-          '<button type="button" data-map-zoom="reset" title="Reset map" aria-label="Reset map">↺</button>' +
+          '<button type="button" data-map-zoom="reset">Reset view</button>' +
         '</div>' +
-        '<div class="network-map-hint">Ctrl + scroll to zoom · drag to explore</div><span id="map-zoom-level" class="map-zoom-level">1.0×</span>' +
+        '<div class="network-map-hint">Select a cluster to zoom · drag to explore</div><span id="map-zoom-level" class="map-zoom-level">1.0×</span>' +
         '<div class="map-tour-controls"><button type="button" id="map-tour-toggle" aria-pressed="false">Play tour</button><span id="map-tour-location">World overview</span></div>' +
         '<aside id="network-map-detail" class="network-map-detail hidden"></aside>' +
       '</div>' +
@@ -2070,6 +2069,8 @@ async function renderNetworkMap() {
 
   function resetMapView() {
     mapView = { scale: 1, x: 0, y: 0 };
+    detail.classList.add('hidden');
+    document.getElementById('map-tour-location').textContent = 'World overview';
     applyMapView();
   }
 
@@ -2132,7 +2133,7 @@ async function renderNetworkMap() {
       const position = networkMapPinPosition(cluster.latitude, cluster.longitude);
 
       return '<button class="network-pin status-' + esc(cluster.status) + (count > 1 ? ' cluster' : '') + '"' +
-        ' type="button" aria-label="' + esc(label + ', ' + count + ' nodes') + '" data-map-cluster="' + index + '"' +
+        ' type="button" aria-label="' + esc(label + ', ' + count + (count > 1 ? ' nodes. Zoom to cluster or view details' : ' node')) + '" data-map-cluster="' + index + '"' +
         ' data-map-left="' + position.left.toFixed(4) + '"' +
         ' data-map-top="' + position.top.toFixed(4) + '"' +
         ' title="' + esc(label + ' · ' + count + (count === 1 ? ' node' : ' nodes')) + '">' +
@@ -2156,7 +2157,20 @@ async function renderNetworkMap() {
         button.style.top = top.toFixed(4) + '%';
       }
 
-      button.addEventListener('click', () => openCluster(Number(button.dataset.mapCluster)));
+      button.addEventListener('click', () => {
+        const cluster = currentClusters[Number(button.dataset.mapCluster)];
+        if (!cluster) return;
+        if (cluster.nodes.length > 1 && mapView.scale < 3.25) {
+          pauseTour();
+          detail.classList.add('hidden');
+          const { width, height } = canvas.getBoundingClientRect();
+          mapView = networkMapTourPose(cluster, width, height, 3.25);
+          document.getElementById('map-tour-location').textContent = networkMapLocationLabel(cluster);
+          applyMapView();
+        } else {
+          openCluster(cluster);
+        }
+      });
     });
 
     if (detail) detail.classList.add('hidden');
