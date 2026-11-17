@@ -9715,3 +9715,8 @@ html[data-layout-theme] .address-summary .telemetry-cell > strong { white-space:
 @media(min-width:901px) { .address-summary .telemetry-rail { grid-template-columns:minmax(220px,1.2fr) minmax(280px,1.6fr) repeat(3,minmax(0,1fr)); } }
 
 .reference-price-chart { display: block; width: 100%; max-height: 210px; color: var(--green-hot); }
+
+.reference-chart-legend { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.reference-five { color: var(--green-hot); }
+.reference-four { color: var(--amber); }
+.reference-four line { stroke-dasharray: 5 4; }

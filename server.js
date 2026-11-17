@@ -1287,12 +1287,17 @@ function recordMarketHistorySnapshot(markets, now = Math.floor(Date.now() / 1000
       );
       let changed = false;
 
-      const reference = marketReferenceSummary(markets);
-      const referenceExchanges = ['nestex', 'gatevia', 'neoxex', 'filodex', 'spotex'];
-      const hasFiveQuotes = reference.sourceCount === referenceExchanges.length
-        && referenceExchanges.every(exchange => reference.sources.some(source => source.exchange === exchange));
       const observations = [...(Array.isArray(markets) ? markets : [])];
-      if (hasFiveQuotes) observations.push({ exchange: 'yerb-reference-five', quote: 'USDT', ticker: { last: reference.priceUsdt } });
+      const referenceExchanges = ['nestex', 'gatevia', 'neoxex', 'filodex'];
+      for (const [key, exchanges] of [
+        ['yerb-reference-four', referenceExchanges],
+        ['yerb-reference-five', [...referenceExchanges, 'spotex']]
+      ]) {
+        const reference = marketReferenceSummary(observations.filter(market => exchanges.includes(market?.exchange)));
+        if (exchanges.every(exchange => reference.sources.some(source => source.exchange === exchange))) {
+          observations.push({ exchange: key, quote: 'USDT', ticker: { last: reference.priceUsdt } });
+        }
+      }
 
       for (const market of observations) {
         if (!market || market.available === false) continue;
@@ -1577,6 +1582,35 @@ async function gateviaMarketHistoryEntries7d() {
       return exchangeEntries.concat(localEntries);
     }
   );
+}
+
+async function fourExchangeHistory(markets) {
+  const saved = await persistedMarketHistoryEntries('yerb-reference-four');
+  const window = marketHistoryWindow();
+  let conversion = [];
+  try {
+    const payload = await cached('market:gatevia:doge-usdt:reference-history', MARKET_HISTORY_CACHE_MS, () =>
+      gateviaMarketFetchJson('public/markets/DOGE_USDT/k-line?period=1440&time_from=' +
+        window.start + '&time_to=' + window.now, 'k-line:DOGE_USDT:1440:' + window.start));
+    conversion = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
+  } catch { /* Keep the directly observed four-exchange averages. */ }
+  const dogeByDay = new Map(conversion.map(row => [
+    marketDayStart(marketEpochSeconds(Array.isArray(row) ? row[0] : row?.timestamp)),
+    marketNumber(Array.isArray(row) ? row[4] : row?.close)
+  ]));
+  const historyByExchange = ['nestex', 'gatevia', 'neoxex', 'filodex'].map(exchange =>
+    new Map((markets.find(market => market.exchange === exchange)?.history7d?.points || [])
+      .filter(point => point.observed && point.price > 0).map(point => [point.timestamp, point.price])));
+  const backfill = [];
+  for (let day = window.start; day < window.today; day += MARKET_HISTORY_DAY_SECONDS) {
+    if (saved.some(row => marketDayStart(row.timestamp) === day)) continue;
+    const prices = historyByExchange.map(history => history.get(day));
+    const doge = dogeByDay.get(day);
+    if (!(doge > 0) || !prices.every(price => price > 0)) continue;
+    prices[1] *= doge;
+    backfill.push({ timestamp: day + MARKET_HISTORY_DAY_SECONDS - 1, price: prices.reduce((sum, price) => sum + price, 0) / 4 });
+  }
+  return marketHistory7d([...backfill, ...saved], null, 'USDT', 'Four-exchange daily history and snapshots');
 }
 
 async function gateviaMarketSummary(includeDetails = true) {
@@ -2695,6 +2729,7 @@ async function handleApi(req, res, url) {
     const referenceHistory7d = marketHistory7d(referenceEntries, null, 'USDT', 'Five-exchange reference snapshots');
     return sendJson(res, 200, {
       referenceHistory7d,
+      referenceHistoryFour7d: referenceHistory7d.observedDays < 7 ? await fourExchangeHistory(markets) : null,
       generatedAt: new Date().toISOString(),
       reference,
       markets

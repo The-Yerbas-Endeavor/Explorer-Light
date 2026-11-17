@@ -320,29 +320,44 @@ function renderLoading(label) {
     '</section>';
 }
 
-function referencePriceChart(history) {
-  const points = (history?.sparkPoints || []).filter(point => point.observed && Number.isFinite(point.price));
-  const title = railHeading('REFERENCE HISTORY', '7-day average YERB price', 'USDT · all five exchanges');
-  const note = '<p class="market-disclaimer">Only observations with quotes from all five exchanges are plotted. Coverage builds as prices are recorded.</p>';
-  if (points.length < 2) return '<section class="ledger-section">' + title +
-    '<p class="ledger-empty">Building history · ' + points.length + ' of 2 observations needed to draw the chart.</p>' + note + '</section>';
-  const prices = points.map(point => point.price);
+function referencePriceChart(history, fourExchangeHistory) {
+  const series = [
+    { history, name: 'Five exchanges (main)', css: 'reference-five' },
+    { history: fourExchangeHistory, name: 'Four exchanges · excludes SpotEx', css: 'reference-four' }
+  ].filter(line => line.history).map(line => ({
+    ...line,
+    points: (line.history.sparkPoints || []).filter(point => point.observed && Number.isFinite(point.price))
+  }));
+  const title = railHeading('REFERENCE HISTORY', '7-day average YERB price', 'USDT');
+  const legend = '<p class="reference-chart-legend">' +
+    series.map(line => '<span class="' + line.css + '">' + esc(line.name) +
+      ' · ' + line.history.observedDays + '/7 days</span>').join('') + '</p>';
+  const prices = series.flatMap(line => line.points.map(point => point.price));
+  if (!prices.length) return '<section class="ledger-section">' + title + legend +
+    '<p class="ledger-empty">Building history</p></section>';
   const low = Math.min(...prices), high = Math.max(...prices);
   const span = Math.max(1, history.windowEnd - history.windowStart);
-  const coords = points.map(point => ({
-    x: 10 + 740 * (point.timestamp - history.windowStart) / span,
-    y: high === low ? 62 : 10 + 104 * (high - point.price) / (high - low),
-    point
-  }));
-  const dots = coords.map(({ x, y, point }) => '<circle cx="' + x + '" cy="' + y +
-    '" r="3" fill="currentColor"><title>' + esc(new Date(point.timestamp * 1000).toLocaleString() +
-      ' · ' + marketPrice(point.price) + ' USDT') + '</title></circle>').join('');
-  return '<section class="ledger-section">' + title +
-    '<svg class="reference-price-chart" viewBox="0 0 760 124" role="img" aria-label="Seven-day YERB reference price in USDT">' +
-    '<polyline fill="none" stroke="currentColor" stroke-width="2" points="' +
-    coords.map(({ x, y }) => x + ',' + y).join(' ') + '"/>' + dots + '</svg>' +
-    '<p class="market-disclaimer">Observed range: ' + marketPrice(low) + '–' + marketPrice(high) +
-    ' USDT · ' + history.observedDays + '/7 days with observations</p>' + note + '</section>';
+  const plotted = [...series].reverse().map(line => {
+    const coords = line.points.map(point => ({
+      x: 10 + 740 * (point.timestamp - history.windowStart) / span,
+      y: high === low ? 62 : 10 + 104 * (high - point.price) / (high - low),
+      point
+    }));
+    const segments = coords.map(({ x, y, point }, i) => {
+      const prev = coords[i - 1];
+      if (!prev || point.timestamp - prev.point.timestamp > 90000) return '';
+      return '<line x1="' + prev.x + '" y1="' + prev.y + '" x2="' + x + '" y2="' + y +
+        '" stroke="currentColor" stroke-width="' + (line.css === 'reference-five' ? '2.5' : '1.5') + '"/>';
+    }).join('');
+    const dots = coords.map(({ x, y, point }) => '<circle cx="' + x + '" cy="' + y +
+      '" r="3" fill="currentColor"><title>' + esc(line.name + ' · ' + new Date(point.timestamp * 1000).toLocaleString() +
+        ' · ' + marketPrice(point.price) + ' USDT') + '</title></circle>').join('');
+    return '<g class="' + line.css + '">' + segments + dots + '</g>';
+  }).join('');
+  return '<section class="ledger-section">' + title + legend +
+    '<svg class="reference-price-chart" viewBox="0 0 760 124" role="img" aria-label="Seven-day YERB reference price, five-exchange main series and optional four-exchange comparison">' +
+    plotted + '</svg><p class="market-disclaimer">Observed range: ' + marketPrice(low) + '–' + marketPrice(high) +
+    ' USDT.</p>' + (fourExchangeHistory ? '<p class="market-disclaimer">The four-exchange comparison uses same-day prices for the backfill and historical DOGE/USDT to convert Gatevia quotes. It disappears when the main series has observations on all seven days.</p>' : '') + '</section>';
 }
 
 async function renderMarkets() {
@@ -403,7 +418,7 @@ async function renderMarkets() {
     '<div class="market-page">' +
       ledgerHeader('MARKET OBSERVATORY', 'Yerbas markets', number((data.markets || []).length) + ' listed market' + ((data.markets || []).length === 1 ? '' : 's'), '<a href="/">LIVE CHAIN</a>') +
       referenceRail +
-      referencePriceChart(data.referenceHistory7d) +
+      referencePriceChart(data.referenceHistory7d, data.referenceHistoryFour7d) +
       '<section class="ledger-section">' +
         railHeading('MARKET MATRIX', 'Live exchange values', 'exchange data · not consensus data') +
         '<div class="market-matrix">' + (rows || '<div class="ledger-empty">No market feeds are currently available.</div>') + '</div>' +
