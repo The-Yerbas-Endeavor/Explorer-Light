@@ -87,7 +87,7 @@ function marketTime(value) {
   return new Date(epochMs).toLocaleString();
 }
 
-function marketSparkline(history, fallbackQuote = '') {
+function marketSparkline(history, fallbackQuote = '', exchangeName = '') {
   const sparkPoints = Array.isArray(history?.sparkPoints) ? history.sparkPoints : [];
   const dailyPoints = Array.isArray(history?.points) ? history.points : [];
   const rawPoints = sparkPoints.length >= 2 ? sparkPoints : dailyPoints;
@@ -160,10 +160,10 @@ function marketSparkline(history, fallbackQuote = '') {
   }).join('');
 
   const observations = coords
-    .filter((point) => point.observed)
-    .map((point) =>
-      '<circle class="sparkline-observation" cx="' + point.x + '" cy="' + point.y + '" r="1.7"></circle>'
-    )
+    .filter(point => point.observed && Number.isFinite(point.timestamp) && Math.abs(point.timestamp) <= 8640000000000)
+    .map(point => '<circle class="sparkline-observation" cx="' + point.x + '" cy="' + point.y + '" r="1.7"' +
+      ' data-price="' + esc(marketPrice(point.price) + ' ' + quote) + '"' +
+      ' data-date="' + esc(new Date(point.timestamp * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC') + '"/>')
     .join('');
 
   const rangeTitle = '7-day ' + quote + ' range: '
@@ -174,7 +174,7 @@ function marketSparkline(history, fallbackQuote = '') {
       : (completeWindow ? '—' : pricedDays + '/' + totalDays + 'D')
   ) + ' · ' + sparkObservations + ' OBS';
 
-  return '<span class="market-sparkline ' + changeClass + '">' +
+  return '<span class="market-sparkline ' + changeClass + '" data-spark-exchange="' + esc(exchangeName) + '">' +
     '<small>7D · ' + esc(quote) + '</small>' +
     '<svg viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none" role="img" aria-label="' + esc(rangeTitle) + '">' +
       '<title>' + esc(rangeTitle) + '</title>' +
@@ -183,6 +183,7 @@ function marketSparkline(history, fallbackQuote = '') {
       observations +
     '</svg>' +
     '<em>' + esc(coverageLabel) + '</em>' +
+    '<span class="reference-tooltip sparkline-tooltip" hidden aria-hidden="true"><strong></strong><small></small><span></span></span>' +
   '</span>';
 }
 
@@ -429,7 +430,7 @@ async function renderMarkets() {
       '<span><small>VOL YERB</small>' + number(ticker.baseVolume, 2) + '</span>' +
       '<span><small>' + quoteLabel + '</small>' + marketMoney(ticker.quoteVolume) + '</span>' +
       '<span><small>VALUATION</small>' + valuation + '</span>' +
-      marketSparkline(market.history7d, market.quote) +
+      marketSparkline(market.history7d, market.quote, market.exchangeName) +
       '<a class="market-trade-link" href="' + esc(market.tradeUrl) + '" target="_blank" rel="noopener noreferrer">TRADE ↗</a>' +
     '</div>';
   }).join('');
@@ -445,6 +446,51 @@ async function renderMarkets() {
       '</section>' +
       '<div class="market-disclaimer">Market data is informational and sourced from external exchanges. Blockchain state continues to come directly from Yerbas Core.</div>' +
     '</div>';
+  app.querySelectorAll('[data-spark-exchange]').forEach(spark => {
+    const svg = spark.querySelector('svg');
+    const tooltip = spark.querySelector('.sparkline-tooltip');
+    const points = [...svg.querySelectorAll('[data-price]')];
+    let pinned = null;
+    function show(point) {
+      tooltip.hidden = !point;
+      if (!point) return;
+      tooltip.querySelector('strong').textContent = point.dataset.price;
+      tooltip.querySelector('small').textContent = point.dataset.date;
+      tooltip.querySelector('span').textContent = spark.dataset.sparkExchange;
+      const dot = point.getBoundingClientRect();
+      const box = spark.getBoundingClientRect();
+      const x = dot.left + dot.width / 2;
+      const left = x + tooltip.offsetWidth + 8 <= document.documentElement.clientWidth
+        ? x + 8 : x - tooltip.offsetWidth - 8;
+      tooltip.style.left = Math.max(4, left) - box.left + 'px';
+      const top = dot.top >= tooltip.offsetHeight + 12 ? dot.top - tooltip.offsetHeight - 8 : dot.bottom + 8;
+      tooltip.style.top = top - box.top + 'px';
+    }
+    function nearest(event) {
+      const box = svg.getBoundingClientRect();
+      const { width, height } = svg.viewBox.baseVal;
+      let distance = 15;
+      let best = null;
+      for (const point of points) {
+        const x = box.left + Number(point.getAttribute('cx')) * box.width / width;
+        const y = box.top + Number(point.getAttribute('cy')) * box.height / height;
+        const gap = Math.hypot(event.clientX - x, event.clientY - y);
+        if (gap >= distance) continue;
+        best = point;
+        distance = gap;
+      }
+      return best;
+    }
+    svg.addEventListener('pointermove', event => {
+      if (event.pointerType !== 'touch') show(nearest(event) || pinned);
+    });
+    svg.addEventListener('pointerleave', () => show(pinned));
+    svg.addEventListener('click', event => {
+      const point = nearest(event);
+      pinned = pinned === point ? null : point;
+      show(pinned);
+    });
+  });
   const picker = app.querySelector('#reference-point');
   const chart = app.querySelector('.reference-price-chart');
   if (picker && chart) {

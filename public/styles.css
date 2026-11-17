@@ -9758,3 +9758,10 @@ html[data-layout-theme] .address-summary .telemetry-cell > strong { white-space:
 .reference-tooltip > * { display: block; }
 .reference-tooltip > small, .reference-tooltip > span { color: var(--text-soft); }
 .reference-point-announcement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
+.market-sparkline[data-spark-exchange] { position: relative; }
+.market-sparkline[data-spark-exchange] svg { cursor: crosshair; }
+.market-sparkline .sparkline-tooltip { max-width: calc(100vw - 8px); text-align: left; }
+.market-sparkline:has(.sparkline-tooltip:not([hidden])) { z-index: 3; }
+
+.market-sparkline .sparkline-tooltip small { white-space: normal; }
