@@ -346,10 +346,11 @@ function referencePriceChart(history, fourExchangeHistory) {
   }).join('') + [0, .5, 1].map(ratio =>
     '<text x="' + (104 + 636 * ratio) + '" y="169" text-anchor="' + (ratio === 0 ? 'start' : ratio === 1 ? 'end' : 'middle') + '">' +
       esc(dateLabel.format(new Date((history.windowStart + ratio * span) * 1000))) + '</text>').join('');
+  const pointKey = (line, point) => line.css + ':' + point.timestamp + ':' + point.price;
   const options = series.flatMap(line => [...line.points].reverse().map(point => {
     const sources = 'NestEx, Gatevia (converted to USDT), NeoxEX, FiloDex' + (line.css === 'reference-five' ? ', SpotEx' : '');
     const time = new Date(point.timestamp * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
-    return '<option data-sources="' + esc(sources) + '">' +
+    return '<option value="' + esc(pointKey(line, point)) + '" data-sources="' + esc(sources) + '">' +
       esc(time + ' · ' + marketPrice(point.price) + ' USDT · ' + line.name) + '</option>';
   })).join('');
   const plotted = [...series].reverse().map(line => {
@@ -364,16 +365,17 @@ function referencePriceChart(history, fourExchangeHistory) {
       return '<line x1="' + prev.x + '" y1="' + prev.y + '" x2="' + x + '" y2="' + y +
         '" stroke="currentColor" stroke-width="' + (line.css === 'reference-five' ? '2.5' : '1.5') + '"/>';
     }).join('');
-    const dots = coords.map(({ x, y, point }) => '<circle cx="' + x + '" cy="' + y +
-      '" r="3" fill="currentColor"><title>' + esc(line.name + ' · ' + new Date(point.timestamp * 1000).toLocaleString() +
-        ' · ' + marketPrice(point.price) + ' USDT') + '</title></circle>').join('');
+    const dots = coords.map(({ x, y, point }) => '<g data-reference-point="' + esc(pointKey(line, point)) + '">' +
+      '<circle class="reference-point-hit" cx="' + x + '" cy="' + y + '" r="13" fill="transparent"/>' +
+      '<circle class="reference-point-dot" cx="' + x + '" cy="' + y + '" r="3" fill="currentColor"/></g>').join('');
     return '<g class="' + line.css + '">' + segments + dots + '</g>';
   }).join('');
   return '<section class="ledger-section">' + title + legend +
     '<svg class="reference-price-chart" viewBox="0 0 760 180" role="img" aria-label="Seven-day YERB reference price, five-exchange main series and optional four-exchange comparison">' +
-    axes + plotted + '</svg><div class="reference-inspector"><label>Inspect a price point <select id="reference-point">' +
+    axes + plotted + '</svg><div class="reference-point-details"><strong id="reference-point-label">Hover over or tap a point to inspect it.</strong>' +
+    '<output id="reference-point-sources" aria-live="polite"></output></div><div class="reference-inspector"><label>Inspect a price point <select id="reference-point">' +
     '<option value="">Choose a date and price</option>' + options +
-    '</select></label><output id="reference-point-sources" aria-live="polite"></output></div><p class="market-disclaimer">Observed range: ' + marketPrice(low) + '–' + marketPrice(high) +
+    '</select></label></div><p class="market-disclaimer">Observed range: ' + marketPrice(low) + '–' + marketPrice(high) +
     ' USDT.</p>' + (fourExchangeHistory ? '<p class="market-disclaimer">The four-exchange comparison uses same-day prices for the backfill and historical DOGE/USDT to convert Gatevia quotes. It disappears when the main series has observations on all seven days.</p>' : '') + '</section>';
 }
 
@@ -442,10 +444,31 @@ async function renderMarkets() {
       '</section>' +
       '<div class="market-disclaimer">Market data is informational and sourced from external exchanges. Blockchain state continues to come directly from Yerbas Core.</div>' +
     '</div>';
-  app.querySelector('#reference-point')?.addEventListener('change', event => {
-    const sources = event.target.selectedOptions[0]?.dataset.sources;
-    app.querySelector('#reference-point-sources').textContent = sources ? 'Sources: ' + sources : '';
-  });
+  const picker = app.querySelector('#reference-point');
+  const chart = app.querySelector('.reference-price-chart');
+  if (picker && chart) {
+    const showPoint = key => {
+      const option = [...picker.options].find(item => item.value === key);
+      const sources = option?.dataset.sources;
+      app.querySelector('#reference-point-label').textContent = sources
+        ? option.textContent : 'Hover over or tap a point to inspect it.';
+      app.querySelector('#reference-point-sources').textContent = sources ? 'Sources: ' + sources : '';
+      chart.querySelectorAll('[data-reference-point]').forEach(point =>
+        point.classList.toggle('is-inspected', point.dataset.referencePoint === key));
+    };
+    const inspectPointer = event => {
+      const key = event.target.closest('[data-reference-point]')?.dataset.referencePoint;
+      if (key) {
+        picker.value = key;
+        showPoint(key);
+      }
+    };
+    chart.addEventListener('pointerover', event => {
+      if (event.pointerType !== 'touch') inspectPointer(event);
+    });
+    chart.addEventListener('click', inspectPointer);
+    picker.addEventListener('change', () => showPoint(picker.value));
+  }
 
 }
 

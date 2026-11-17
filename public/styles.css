@@ -9744,3 +9744,9 @@ html[data-layout-theme] .address-summary .telemetry-cell > strong { white-space:
 .tx-follow { justify-self: end; }
 .tx-follow a { display: inline-block; padding: 4px 8px; border: 1px solid var(--line-strong); border-radius: 4px; }
 .tx-flow-card:target, .tx-flow-card:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+.reference-point-hit { cursor: pointer; }
+.reference-point-dot { pointer-events: none; }
+.is-inspected > .reference-point-dot { r: 5; stroke: var(--text); stroke-width: 1.5; }
+.reference-point-details { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); background: var(--panel-solid); }
+.reference-point-details output { color: var(--text-soft); }
