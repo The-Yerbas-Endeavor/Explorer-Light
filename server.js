@@ -1910,7 +1910,7 @@ function marketReferenceSummary(markets) {
     let priceUsdt = null;
     let conversion = 'direct';
 
-    if (market.exchange === 'nestex') {
+    if (market.base === 'YERB' && market.quote === 'USDT') {
       priceUsdt = marketNumber(market.ticker?.last);
     } else if (market.exchange === 'gatevia') {
       priceUsdt = marketNumber(market.ticker?.lastUsdt);
