@@ -1763,17 +1763,62 @@ async function neoxexMarketHistory(last) {
     candles.length && !saved.length ? 'NeoxEX hourly candle closes' : 'Explorer snapshots');
 }
 
-function filodexMarketListing() {
+async function filodexMarketSummary() {
   const tradeUrl = 'https://filodex.xyz/trade/YERB_USDT';
-  return {
+  const listing = {
     ...spotexMarketListing(),
     exchange: 'filodex',
     exchangeName: 'FiloDex',
     tickerId: 'YERB_USDT',
     tradeUrl,
-    source: tradeUrl,
+    source: 'https://api.filodex.xyz/cmc/summary',
     apiDocsUrl: null
   };
+  if (!config.markets.enabled) return listing;
+  return cached('market:filodex:YERB_USDT', config.markets.cacheMs, async () => {
+    try {
+      const response = await fetch(listing.source, {
+        headers: { accept: 'application/json' },
+        signal: AbortSignal.timeout(config.markets.timeoutMs)
+      });
+      if (!response.ok) return listing;
+      const data = await response.json();
+      const row = Array.isArray(data) && data.find(market => market?.trading_pairs === listing.tickerId
+        && market.base_currency === listing.base && market.quote_currency === listing.quote);
+      const numeric = value => (typeof value === 'number' || (typeof value === 'string' && value.trim()))
+        ? marketNumber(value) : null;
+      const positive = value => numeric(value) > 0 ? numeric(value) : null;
+      const volume = value => numeric(value) >= 0 ? numeric(value) : null;
+      const last = positive(row?.last_price);
+      if (last === null) return listing;
+      return {
+        ...listing,
+        available: true,
+        status: 'live-api',
+        asOf: Date.now(),
+        ticker: {
+          ...listing.ticker,
+          last,
+          change24hPct: numeric(row.price_change_percent_24h),
+          bid: positive(row.highest_bid),
+          ask: positive(row.lowest_ask),
+          high: positive(row.highest_price_24h),
+          low: positive(row.lowest_price_24h),
+          baseVolume: volume(row.base_volume),
+          quoteVolume: volume(row.quote_volume)
+        }
+      };
+    } catch {
+      return listing;
+    }
+  });
+}
+
+async function filodexMarketHistory(last) {
+  if (!config.markets.enabled) return null;
+  try {
+    return marketHistory7d(await persistedMarketHistoryEntries('filodex'), last, 'USDT', 'Explorer snapshots');
+  } catch { return null; }
 }
 
 function marketReferenceSummary(markets) {
@@ -1966,7 +2011,8 @@ async function snapshotMarketHistoryFromFeeds() {
   const results = await Promise.allSettled([
     nestexMarketSummary(),
     gateviaMarketSummary(),
-    neoxexMarketSummary()
+    neoxexMarketSummary(),
+    filodexMarketSummary()
   ]);
 
   const markets = results
@@ -2521,13 +2567,16 @@ async function handleApi(req, res, url) {
   }
 
   if (url.pathname === '/api/markets') {
-    const [nestex, gatevia, neoxex] = await Promise.all([
+    const [nestex, gatevia, neoxex, filodex] = await Promise.all([
       nestexMarketSummary(),
       gateviaMarketSummary(),
-      neoxexMarketSummary()
+      neoxexMarketSummary(),
+      filodexMarketSummary()
     ]);
-    const history7d = await neoxexMarketHistory(neoxex.ticker.last);
-    const markets = [nestex, gatevia, spotexMarketListing(), { ...neoxex, history7d }, filodexMarketListing()];
+    const [history7d, filoHistory] = await Promise.all([
+      neoxexMarketHistory(neoxex.ticker.last), filodexMarketHistory(filodex.ticker.last)
+    ]);
+    const markets = [nestex, gatevia, spotexMarketListing(), { ...neoxex, history7d }, { ...filodex, history7d: filoHistory }];
     void recordMarketHistorySnapshot(markets);
     return sendJson(res, 200, {
       generatedAt: new Date().toISOString(),
