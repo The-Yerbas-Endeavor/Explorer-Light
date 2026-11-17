@@ -2734,9 +2734,22 @@ async function handleApi(req, res, url) {
       neoxexMarketHistory(neoxex.ticker.last), filodexMarketHistory(filodex.ticker.last),
       spotexMarketHistory(spotex.ticker.last)
     ]);
-    const markets = [nestex, gatevia, { ...spotex, history7d: spotHistory }, { ...neoxex, history7d }, { ...filodex, history7d: filoHistory }];
+    const marketRows = [nestex, gatevia, { ...spotex, history7d: spotHistory }, { ...neoxex, history7d }, { ...filodex, history7d: filoHistory }];
+    const reference = marketReferenceSummary(marketRows);
+    const markets = marketRows.map(market => {
+      if (!['spotex', 'neoxex', 'filodex'].includes(market.exchange) || !market.available) return market;
+      const last = marketNumber(market.ticker?.last);
+      if (!(reference.supplyYerb > 0) || !(last > 0)) return market;
+      return {
+        ...market,
+        valuation: {
+          supplyYerb: reference.supplyYerb,
+          marketCapUsdt: reference.supplyYerb * last,
+          basis: 'Yerbas Core UTXO-set total amount × ' + market.exchangeName + ' last price'
+        }
+      };
+    });
     await recordMarketHistorySnapshot(markets);
-    const reference = marketReferenceSummary(markets);
     const referenceEntries = await persistedMarketHistoryEntries('yerb-reference-five');
     const referenceHistory7d = marketHistory7d(referenceEntries, null, 'USDT', 'Five-exchange reference snapshots');
     return sendJson(res, 200, {

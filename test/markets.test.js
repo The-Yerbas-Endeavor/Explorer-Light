@@ -73,7 +73,7 @@ test('Gatevia YERB DOGE uses the public API with a safe degraded mode', async ()
   assert.ok(server.includes("available ? 'live-api' : 'api-unavailable'"));
   assert.ok(server.includes("reportedSpreadPct"));
   assert.ok(server.includes("public/markets/' + tickerId + '/depth?limit=5"));
-  assert.ok(server.includes("const reference = marketReferenceSummary(markets)"));
+  assert.ok(server.includes("const reference = marketReferenceSummary(marketRows)"));
   assert.ok(server.includes("'/api/market/gatevia/YERB/DOGE'"));
   assert.ok(app.includes("exchangeId === 'gatevia'"));
   assert.ok(app.includes("'API OFFLINE'"));
@@ -312,7 +312,7 @@ test('SpotEx YERB is listed without inventing unverified ticker data', async () 
   assert.ok(server.includes("source: 'https://spotex.trade/docs/api'"));
   assert.ok(server.includes("available: false"));
   assert.ok(server.includes("status: 'external-live-market'"));
-  assert.ok(server.includes('const markets = [nestex, gatevia, { ...spotex, history7d: spotHistory }'));
+  assert.ok(server.includes('const marketRows = [nestex, gatevia, { ...spotex, history7d: spotHistory }'));
   assert.ok(app.includes("'TRADE LINK'"));
 });
 
