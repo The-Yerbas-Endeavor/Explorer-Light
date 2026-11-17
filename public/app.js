@@ -1917,7 +1917,7 @@ async function renderNetworkMap() {
           '<button type="button" data-map-zoom="reset" title="Reset map" aria-label="Reset map">↺</button>' +
         '</div>' +
         '<div class="network-map-hint">Ctrl + scroll to zoom · drag to explore</div><span id="map-zoom-level" class="map-zoom-level">1.0×</span>' +
-        '<div class="map-tour-controls"><button type="button" id="map-tour-toggle">Pause tour</button><span id="map-tour-location">World overview</span></div>' +
+        '<div class="map-tour-controls"><button type="button" id="map-tour-toggle" aria-pressed="false">Play tour</button><span id="map-tour-location">World overview</span></div>' +
         '<aside id="network-map-detail" class="network-map-detail hidden"></aside>' +
       '</div>' +
       '<div class="network-map-foot">' +
@@ -1937,7 +1937,7 @@ async function renderNetworkMap() {
   let mapView = { scale: 1, x: 0, y: 0 };
   let dragState = null;
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  let touring = !reducedMotion.matches;
+  let touring = false;
   let tourVisible = false;
   let tourFrame = null;
   let tourStarted = null;
