@@ -134,8 +134,8 @@ test('market matrix exposes cached seven-day price sparklines', async () => {
   assert.ok(server.includes('sparkPoints'));
   assert.ok(server.includes('sparkObservations'));
   assert.ok(app.includes('function marketSparkline('));
-  assert.ok(app.includes('marketSparkline(market.history7d, market.quote, market.exchangeName)'));
-  assert.ok(app.includes('7D · '));
+  assert.ok(app.includes('marketSparkline(history, market.quote, market.exchangeName, range)'));
+  assert.ok(app.includes("'7d': '7D'"));
   assert.ok(css.includes('.market-sparkline'));
   assert.ok(css.includes('.sparkline-segment'));
 });
@@ -245,7 +245,7 @@ test('market sparklines use real intraday observations while seven-day coverage 
   assert.ok(server.includes('maxPoints = 72'));
   assert.ok(server.includes('windowStart: window.start'));
   assert.ok(server.includes('windowEnd: window.now'));
-  assert.ok(app.includes('sparkPoints.length >= 2 ? sparkPoints : dailyPoints'));
+  assert.ok(app.includes('sparkPoints.length ? sparkPoints : dailyPoints'));
   assert.ok(app.includes('(point.timestamp - windowStart) / (windowEnd - windowStart)'));
   assert.ok(app.includes('BUILDING HISTORY'));
 });

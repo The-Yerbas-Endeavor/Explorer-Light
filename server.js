@@ -2741,6 +2741,17 @@ async function handleApi(req, res, url) {
     const referenceHistory7d = marketHistory7d(referenceEntries, null, 'USDT', 'Five-exchange reference snapshots');
     return sendJson(res, 200, {
       referenceHistory7d,
+      exchangeHistoryRanges: Object.fromEntries(await Promise.all(markets.map(async market => {
+        const saved = await persistedMarketHistoryEntries(market.exchange);
+        const recent = (market.history7d?.sparkPoints || []).filter(point => point.observed === true);
+        const now = Math.floor(Date.now() / 1000);
+        const entries = [...new Map([...saved, ...recent]
+          .map(point => [point.timestamp, point])).values()];
+        return [market.exchange, {
+          '24h': referenceHistoryWindow(entries, 24, now),
+          '30d': referenceHistoryWindow(entries, 30 * 24, now)
+        }];
+      }))),
       referenceHistory24h: referenceHistoryWindow(referenceEntries, 24),
       referenceHistory30d: referenceHistoryWindow(referenceEntries, 30 * 24),
       referenceHistoryFour7d: referenceHistory7d.observedDays < 7 ? await fourExchangeHistory(markets) : null,

@@ -87,10 +87,11 @@ function marketTime(value) {
   return new Date(epochMs).toLocaleString();
 }
 
-function marketSparkline(history, fallbackQuote = '', exchangeName = '') {
+function marketSparkline(history, fallbackQuote = '', exchangeName = '', range = '7d') {
+  const rangeLabel = { '24h': '24H', '7d': '7D', '30d': '30D' }[range];
   const sparkPoints = Array.isArray(history?.sparkPoints) ? history.sparkPoints : [];
   const dailyPoints = Array.isArray(history?.points) ? history.points : [];
-  const rawPoints = sparkPoints.length >= 2 ? sparkPoints : dailyPoints;
+  const rawPoints = sparkPoints.length ? sparkPoints : dailyPoints;
   const windowStart = Number(history?.windowStart);
   const windowEnd = Number(history?.windowEnd);
   const useTimeScale = Number.isFinite(windowStart)
@@ -120,11 +121,11 @@ function marketSparkline(history, fallbackQuote = '', exchangeName = '') {
     ? (change > 0 ? 'market-up' : (change < 0 ? 'market-down' : ''))
     : '';
 
-  if (plotted.length < 2) {
+  if (!plotted.length) {
     return '<span class="market-sparkline market-sparkline-empty">' +
-      '<small>7D · ' + esc(quote) + '</small>' +
+      '<small>' + rangeLabel + ' · ' + esc(quote) + '</small>' +
       '<span class="sparkline-placeholder">BUILDING HISTORY</span>' +
-      '<em>' + esc(pricedDays + '/' + totalDays + 'D · ' + sparkObservations + ' OBS') + '</em>' +
+      '<em>' + esc((range === '7d' ? pricedDays + '/' + totalDays + 'D · ' : '') + sparkObservations + ' OBS') + '</em>' +
     '</span>';
   }
 
@@ -166,16 +167,16 @@ function marketSparkline(history, fallbackQuote = '', exchangeName = '') {
       ' data-date="' + esc(new Date(point.timestamp * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC') + '"/>')
     .join('');
 
-  const rangeTitle = '7-day ' + quote + ' range: '
+  const rangeTitle = rangeLabel + ' ' + quote + ' range: '
     + marketPrice(min) + ' to ' + marketPrice(max);
-  const coverageLabel = (
+  const coverageLabel = range !== '7d' ? sparkObservations + ' OBS' : (
     hasChange
       ? marketPercent(change)
       : (completeWindow ? '—' : pricedDays + '/' + totalDays + 'D')
   ) + ' · ' + sparkObservations + ' OBS';
 
   return '<span class="market-sparkline ' + changeClass + '" data-spark-exchange="' + esc(exchangeName) + '">' +
-    '<small>7D · ' + esc(quote) + '</small>' +
+    '<small>' + rangeLabel + ' · ' + esc(quote) + '</small>' +
     '<svg viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none" role="img" aria-label="' + esc(rangeTitle) + '">' +
       '<title>' + esc(rangeTitle) + '</title>' +
       '<line class="sparkline-guide" x1="0" y1="' + (height / 2) + '" x2="' + width + '" y2="' + (height / 2) + '"></line>' +
@@ -431,7 +432,7 @@ async function renderMarkets() {
       '<span><small>VOL YERB</small>' + number(ticker.baseVolume, 2) + '</span>' +
       '<span><small>' + quoteLabel + '</small>' + marketMoney(ticker.quoteVolume) + '</span>' +
       '<span><small>VALUATION</small>' + valuation + '</span>' +
-      marketSparkline(market.history7d, market.quote, market.exchangeName) +
+      '<span class="market-spark-slot" data-market-id="' + esc(market.exchange) + '"></span>' +
       '<a class="market-trade-link" href="' + esc(market.tradeUrl) + '" target="_blank" rel="noopener noreferrer">TRADE ↗</a>' +
     '</div>';
   }).join('');
@@ -451,7 +452,26 @@ async function renderMarkets() {
       '</section>' +
       '<div class="market-disclaimer">Market data is informational and sourced from external exchanges. Blockchain state continues to come directly from Yerbas Core.</div>' +
     '</div>';
-  app.querySelectorAll('[data-spark-exchange]').forEach(spark => {
+  const referenceHistory = app.querySelector('#reference-history');
+  const ranges = { '24h': data.referenceHistory24h, '7d': data.referenceHistory7d, '30d': data.referenceHistory30d };
+  const rangeButtons = [...app.querySelectorAll('[data-reference-range]')];
+  function setRange(range) {
+    for (const button of rangeButtons) button.setAttribute('aria-pressed', String(button.dataset.referenceRange === range));
+    referenceHistory.innerHTML = referencePriceChart(ranges[range], range === '7d' ? data.referenceHistoryFour7d : null, range);
+    bindReferenceChart(referenceHistory);
+    for (const slot of app.querySelectorAll('.market-spark-slot')) {
+      const market = data.markets.find(row => row.exchange === slot.dataset.marketId);
+      const history = range === '7d' ? market.history7d : data.exchangeHistoryRanges?.[market.exchange]?.[range];
+      slot.innerHTML = marketSparkline(history, market.quote, market.exchangeName, range);
+    }
+    bindMarketSparklines(app, range);
+  }
+  for (const button of rangeButtons) button.addEventListener('click', () => setRange(button.dataset.referenceRange));
+  setRange('7d');
+}
+
+function bindMarketSparklines(root, range) {
+  root.querySelectorAll('[data-spark-exchange]').forEach(spark => {
     const svg = spark.querySelector('svg');
     const tooltip = spark.querySelector('.sparkline-tooltip');
     const points = [...svg.querySelectorAll('[data-price]')];
@@ -459,7 +479,8 @@ async function renderMarkets() {
     spark.tabIndex = 0;
     spark.setAttribute('role', 'group');
     spark.setAttribute('aria-label', spark.dataset.sparkExchange +
-      ' seven-day price chart. Use Left and Right arrow keys to inspect points.');
+      ' ' + { '24h': '24-hour', '7d': 'seven-day', '30d': '30-day' }[range] +
+      ' price chart. Use Left and Right arrow keys to inspect points.');
     const announcement = document.createElement('span');
     announcement.className = 'reference-point-announcement';
     announcement.setAttribute('role', 'status');
@@ -537,16 +558,6 @@ async function renderMarkets() {
       show(pinned);
     });
   });
-  const referenceHistory = app.querySelector('#reference-history');
-  const ranges = { '24h': data.referenceHistory24h, '7d': data.referenceHistory7d, '30d': data.referenceHistory30d };
-  const rangeButtons = [...app.querySelectorAll('[data-reference-range]')];
-  function setRange(range) {
-    for (const button of rangeButtons) button.setAttribute('aria-pressed', String(button.dataset.referenceRange === range));
-    referenceHistory.innerHTML = referencePriceChart(ranges[range], range === '7d' ? data.referenceHistoryFour7d : null, range);
-    bindReferenceChart(referenceHistory);
-  }
-  for (const button of rangeButtons) button.addEventListener('click', () => setRange(button.dataset.referenceRange));
-  setRange('7d');
 }
 
 function bindReferenceChart(root) {
