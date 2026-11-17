@@ -373,7 +373,7 @@ function referencePriceChart(history, fourExchangeHistory) {
     return '<g class="' + line.css + '">' + segments + dots + '</g>';
   }).join('');
   return '<section class="ledger-section">' + title + legend +
-    '<div class="reference-chart-plot">' +
+    '<div class="reference-chart-plot" tabindex="0" role="group" aria-label="Seven-day YERB reference chart. Use Left and Right arrow keys to inspect points.">' +
     '<svg class="reference-price-chart" viewBox="0 0 760 180" role="img" aria-label="Seven-day YERB reference price, five-exchange main series and optional four-exchange comparison">' +
     axes + plotted + '</svg><div class="reference-tooltip" hidden aria-hidden="true"><strong></strong><small></small><span></span></div></div>' +
     '<div class="reference-inspector"><label>Inspect a price point <select id="reference-point">' +
@@ -568,6 +568,22 @@ async function renderMarkets() {
       const option = options.get(picker.value);
       announcement.textContent = option?.dataset.sources ? option.textContent + '. Sources: ' + option.dataset.sources : '';
     }
+    const orderedKeys = [...points.keys()].sort((a, b) =>
+      Number(a.split(':')[1]) - Number(b.split(':')[1]) || a.localeCompare(b));
+    plot.addEventListener('focus', () => selectPoint(picker.value || orderedKeys.at(-1)));
+    plot.addEventListener('keydown', event => {
+      let index = orderedKeys.indexOf(picker.value);
+      if (index < 0) index = orderedKeys.length - 1;
+      switch (event.key) {
+        case 'ArrowLeft': index = Math.max(0, index - 1); break;
+        case 'ArrowRight': index = Math.min(orderedKeys.length - 1, index + 1); break;
+        case 'Home': index = 0; break;
+        case 'End': index = orderedKeys.length - 1; break;
+        default: return;
+      }
+      event.preventDefault();
+      selectPoint(orderedKeys[index]);
+    });
     chart.addEventListener('pointerover', event => {
       const key = pointFrom(event);
       if (key && event.pointerType !== 'touch') showPoint(key);

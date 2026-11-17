@@ -9768,3 +9768,5 @@ html[data-layout-theme] .address-summary .telemetry-cell > strong { white-space:
 
 .market-sparkline[tabindex="0"]:focus-visible { outline: 2px solid var(--green-hot); outline-offset: 4px; }
 .market-sparkline .sparkline-observation.is-inspected { r: 3; stroke: var(--text); stroke-width: 1; }
+
+.reference-chart-plot:focus-visible { outline: 2px solid var(--green-hot); outline-offset: 4px; }
