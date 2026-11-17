@@ -383,6 +383,58 @@ function referencePriceChart(history, fourExchangeHistory, range) {
     '</select></label><output class="reference-point-announcement" aria-live="polite"></output></div></section>';
 }
 
+function marketValuationCell(market, hasLiveData) {
+  const { marketCapUsdt, supplyYerb } = market.valuation || {};
+  if (marketCapUsdt == null) {
+    return '<span><small>VALUATION</small>' + (hasLiveData ? '—' : 'EXTERNAL') + '</span>';
+  }
+  const ticker = market.ticker || {};
+  const formatRate = value => number(value, 16);
+  const id = 'valuation-' + esc(market.exchange);
+  const priceLines = market.quote === 'DOGE'
+    ? '<span>Last price: ' + esc(formatRate(ticker.last)) + ' DOGE / YERB</span>' +
+      '<span>Conversion: ' + esc(formatRate(ticker.quoteUsdt)) + ' USDT / DOGE</span>' +
+      '<span>Converted price: ' + esc(formatRate(ticker.lastUsdt)) + ' USDT / YERB</span>'
+    : '<span>Last price: ' + esc(formatRate(ticker.last)) + ' USDT / YERB</span>';
+  return '<span class="market-valuation"><small>VALUATION</small>' +
+    '<button type="button" class="market-valuation-trigger" aria-label="' +
+    esc(market.exchangeName + ' valuation: ' + marketMoney(marketCapUsdt) + ' USDT') +
+    '" aria-describedby="' + id + '">' + esc(marketMoney(marketCapUsdt)) + '</button>' +
+    '<span class="reference-tooltip market-valuation-tooltip" id="' + id + '" role="tooltip" hidden>' +
+    '<strong>' + esc(market.exchangeName) + ' valuation</strong>' +
+    '<span>Core supply: ' + esc(number(supplyYerb, 8)) + ' YERB</span>' + priceLines +
+    '</span></span>';
+}
+
+function bindMarketValuations(root) {
+  for (const cell of root.querySelectorAll('.market-valuation')) {
+    const button = cell.querySelector('button');
+    const tooltip = cell.querySelector('[role="tooltip"]');
+    let pinned = false;
+    function show() {
+      tooltip.hidden = false;
+      const anchor = button.getBoundingClientRect();
+      const bounds = cell.getBoundingClientRect();
+      const width = tooltip.offsetWidth;
+      const x = Math.min(anchor.left, document.documentElement.clientWidth - width - 8);
+      tooltip.style.left = Math.max(8, x) - bounds.left + 'px';
+      tooltip.style.top = (anchor.top >= tooltip.offsetHeight + 8 && anchor.bottom + tooltip.offsetHeight + 8 > window.innerHeight
+        ? anchor.top - tooltip.offsetHeight - 6 : anchor.bottom + 6) - bounds.top + 'px';
+    }
+    cell.addEventListener('pointerenter', event => { if (event.pointerType !== 'touch') show(); });
+    cell.addEventListener('pointerleave', () => { if (!pinned && !button.matches(':focus-visible')) tooltip.hidden = true; });
+    button.addEventListener('focus', () => { if (button.matches(':focus-visible')) show(); });
+    button.addEventListener('blur', () => { pinned = false; tooltip.hidden = true; });
+    button.addEventListener('click', () => {
+      pinned = !pinned;
+      if (pinned) show(); else tooltip.hidden = true;
+    });
+    button.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { pinned = false; tooltip.hidden = true; }
+    });
+  }
+}
+
 async function renderMarkets() {
   document.title = 'Markets · Yerbas Explorer';
   renderLoading('Reading live market feeds');
@@ -416,10 +468,6 @@ async function renderMarkets() {
       ? ''
       : ' target="_blank" rel="noopener noreferrer"';
     const quoteLabel = 'VOL ' + esc(market.quote || 'QUOTE');
-    const valuation = market.valuation?.marketCapUsdt === null || market.valuation?.marketCapUsdt === undefined
-      ? (hasLiveData ? '—' : 'EXTERNAL')
-      : marketMoney(market.valuation.marketCapUsdt);
-
     const sourceLabel = hasLiveData
       ? 'LIVE API'
       : (market.status === 'external-live-market' ? 'TRADE LINK' : 'API OFFLINE');
@@ -431,7 +479,7 @@ async function renderMarkets() {
       '<span class="' + changeClass + '"><small>24H</small>' + marketPercent(ticker.change24hPct) + '</span>' +
       '<span><small>VOL YERB</small>' + number(ticker.baseVolume, 2) + '</span>' +
       '<span><small>' + quoteLabel + '</small>' + marketMoney(ticker.quoteVolume) + '</span>' +
-      '<span><small>VALUATION</small>' + valuation + '</span>' +
+      marketValuationCell(market, hasLiveData) +
       '<span class="market-spark-slot" data-market-id="' + esc(market.exchange) + '"></span>' +
       '<a class="market-trade-link" href="' + esc(market.tradeUrl) + '" target="_blank" rel="noopener noreferrer">TRADE ↗</a>' +
     '</div>';
@@ -452,6 +500,7 @@ async function renderMarkets() {
       '</section>' +
       '<div class="market-disclaimer">Market data is informational and sourced from external exchanges. Blockchain state continues to come directly from Yerbas Core.</div>' +
     '</div>';
+  bindMarketValuations(app);
   const referenceHistory = app.querySelector('#reference-history');
   const ranges = { '24h': data.referenceHistory24h, '7d': data.referenceHistory7d, '30d': data.referenceHistory30d };
   const rangeButtons = [...app.querySelectorAll('[data-reference-range]')];

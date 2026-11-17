@@ -9777,3 +9777,12 @@ html[data-layout-theme] .address-summary .telemetry-cell > strong { white-space:
 .reference-range button:focus-visible { outline: 2px solid var(--green-hot); outline-offset: 2px; }
 
 .market-spark-slot { display: contents; }
+
+.market-valuation { position: relative; }
+.market-valuation-trigger {
+  justify-self: start; color: inherit; background: none; border: 0; padding: 0; font: inherit; cursor: help;
+  text-decoration: underline dotted; text-underline-offset: 3px;
+}
+.market-valuation-trigger:focus-visible { outline: 2px solid var(--green-hot); outline-offset: 3px; }
+.market-valuation .market-valuation-tooltip { max-width: min(280px, calc(100vw - 16px)); text-align: left; }
+.market-valuation:has(.market-valuation-tooltip:not([hidden])) { z-index: 4; }
