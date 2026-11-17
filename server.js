@@ -1250,7 +1250,8 @@ async function persistedMarketHistoryEntries(exchange) {
   return rows
     .map((row) => ({
       timestamp: marketEpochSeconds(row?.timestamp),
-      price: marketNumber(row?.price)
+      price: marketNumber(row?.price),
+      ...(Array.isArray(row?.sources) ? { sources: row.sources } : {})
     }))
     .filter((row) =>
       row.timestamp !== null
@@ -1295,7 +1296,7 @@ function recordMarketHistorySnapshot(markets, now = Math.floor(Date.now() / 1000
       ]) {
         const reference = marketReferenceSummary(observations.filter(market => exchanges.includes(market?.exchange)));
         if (exchanges.every(exchange => reference.sources.some(source => source.exchange === exchange))) {
-          observations.push({ exchange: key, quote: 'USDT', ticker: { last: reference.priceUsdt } });
+          observations.push({ exchange: key, quote: 'USDT', ticker: { last: reference.priceUsdt }, sources: reference.sources });
         }
       }
 
@@ -1319,7 +1320,8 @@ function recordMarketHistorySnapshot(markets, now = Math.floor(Date.now() / 1000
           retained.push({
             timestamp: bucket,
             price,
-            quote: market.quote || null
+            quote: market.quote || null,
+            ...(market.sources ? { sources: market.sources } : {})
           });
           changed = true;
         }
@@ -1373,6 +1375,7 @@ function marketSparkPoints(normalized, currentPrice, window, maxPoints = 72) {
     .map((entry) => ({
       timestamp: entry.timestamp,
       price: entry.price,
+      ...(entry.sources ? { sources: entry.sources } : {}),
       observed: true
     }));
 
@@ -1421,7 +1424,8 @@ function marketHistory7d(entries, currentPrice, quote, source) {
   const normalized = (Array.isArray(entries) ? entries : [])
     .map((entry) => ({
       timestamp: marketEpochSeconds(entry?.timestamp),
-      price: marketNumber(entry?.price)
+      price: marketNumber(entry?.price),
+      ...(entry?.sources ? { sources: entry.sources } : {})
     }))
     .filter((entry) =>
       entry.timestamp !== null
@@ -1610,7 +1614,8 @@ async function fourExchangeHistory(markets) {
     marketDayStart(marketEpochSeconds(Array.isArray(row) ? row[0] : row?.timestamp)),
     marketNumber(Array.isArray(row) ? row[4] : row?.close)
   ]));
-  const historyByExchange = ['nestex', 'gatevia', 'neoxex', 'filodex'].map(exchange =>
+  const exchangeNames = new Map([['nestex', 'NestEx'], ['gatevia', 'Gatevia'], ['neoxex', 'NeoxEX'], ['filodex', 'FiloDex']]);
+  const historyByExchange = [...exchangeNames.keys()].map(exchange =>
     new Map((markets.find(market => market.exchange === exchange)?.history7d?.points || [])
       .filter(point => point.observed && point.price > 0).map(point => [point.timestamp, point.price])));
   const backfill = [];
@@ -1619,8 +1624,17 @@ async function fourExchangeHistory(markets) {
     const prices = historyByExchange.map(history => history.get(day));
     const doge = dogeByDay.get(day);
     if (!(doge > 0) || !prices.every(price => price > 0)) continue;
-    prices[1] *= doge;
-    backfill.push({ timestamp: day + MARKET_HISTORY_DAY_SECONDS - 1, price: prices.reduce((sum, price) => sum + price, 0) / 4 });
+    const sources = [...exchangeNames].map(([exchange, exchangeName], index) => {
+      const nativeLast = prices[index];
+      return exchange === 'gatevia'
+        ? { exchange, exchangeName, nativeLast, nativeQuote: 'DOGE', quoteUsdt: doge, priceUsdt: nativeLast * doge }
+        : { exchange, exchangeName, nativeLast, nativeQuote: 'USDT', priceUsdt: nativeLast };
+    });
+    backfill.push({
+      timestamp: day + MARKET_HISTORY_DAY_SECONDS - 1,
+      price: sources.reduce((sum, source) => sum + source.priceUsdt, 0) / sources.length,
+      sources
+    });
   }
   return marketHistory7d([...backfill, ...saved], null, 'USDT', 'Four-exchange daily history and snapshots');
 }

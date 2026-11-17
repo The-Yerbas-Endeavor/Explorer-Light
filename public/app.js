@@ -351,9 +351,15 @@ function referencePriceChart(history, fourExchangeHistory, range) {
       esc(dateLabel.format(new Date((history.windowStart + ratio * span) * 1000))) + '</text>').join('');
   const pointKey = (line, point) => line.css + ':' + point.timestamp + ':' + point.price;
   const options = series.flatMap(line => [...line.points].reverse().map(point => {
-    const sources = 'NestEx, Gatevia (converted to USDT), NeoxEX, FiloDex' + (line.css === 'reference-five' ? ', SpotEx' : '');
+    const sources = point.sources?.length
+      ? point.sources.flatMap(source => {
+        const { price, conversion } = averageSourcePrices(source);
+        return conversion ? [source.exchangeName + ': ' + price, conversion] : [source.exchangeName + ': ' + price];
+      })
+      : ['Per-exchange prices unavailable for this point.', 'NestEx, Gatevia, NeoxEX, FiloDex' +
+        (line.css === 'reference-five' ? ', SpotEx' : '')];
     const time = new Date(point.timestamp * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
-    return '<option value="' + esc(pointKey(line, point)) + '" data-sources="' + esc(sources) +
+    return '<option value="' + esc(pointKey(line, point)) + '" data-sources="' + esc(sources.join('\n')) +
       '" data-date="' + esc(time) + '" data-price="' + esc(marketPrice(point.price) + ' USDT') + '">' +
       esc(time + ' · ' + marketPrice(point.price) + ' USDT · ' + line.name) + '</option>';
   })).join('');
@@ -377,7 +383,7 @@ function referencePriceChart(history, fourExchangeHistory, range) {
   return '<section class="ledger-section">' + title + legend +
     '<div class="reference-chart-plot" tabindex="0" role="group" aria-label="' + label + ' YERB reference chart. Use Left and Right arrow keys to inspect points.">' +
     '<svg class="reference-price-chart" viewBox="0 0 760 180" role="img" aria-label="YERB reference price in USDT">' +
-    axes + plotted + '</svg><div class="reference-tooltip" hidden aria-hidden="true"><strong></strong><small></small><span></span></div></div>' +
+    axes + plotted + '</svg><div class="reference-tooltip" hidden aria-hidden="true"><strong></strong><small></small><span class="reference-tooltip-sources"></span></div></div>' +
     '<div class="reference-inspector"><label>Inspect a price point <select id="reference-point">' +
     '<option value="">Choose a date and price</option>' + options +
     '</select></label><output class="reference-point-announcement" aria-live="polite"></output></div></section>';
@@ -406,20 +412,27 @@ function marketValuationCell(market, hasLiveData) {
     '</span></span>';
 }
 
-function marketAverageValue(reference, showUnit = false) {
+function averageSourcePrices(source) {
+  return {
+    price: number(source.priceUsdt, 16) + ' USDT / YERB',
+    conversion: source.nativeQuote === 'DOGE' && source.quoteUsdt > 0
+      ? number(source.nativeLast, 16) + ' DOGE / YERB × ' + number(source.quoteUsdt, 16) + ' USDT / DOGE'
+      : ''
+  };
+}
+
+function marketAverageValue(reference) {
   if (!(reference?.priceUsdt > 0)) return '—';
   const value = marketPrice(reference.priceUsdt);
   const rows = (reference.sources || []).map(source => {
-    const price = number(source.priceUsdt, 16) + ' USDT / YERB';
-    const conversion = source.nativeQuote === 'DOGE' && source.quoteUsdt > 0
-      ? '<small>' + esc(number(source.nativeLast, 16) + ' DOGE / YERB × ' +
-        number(source.quoteUsdt, 16) + ' USDT / DOGE') + '</small>' : '';
-    return '<span>' + esc(source.exchangeName + ': ' + price) + conversion + '</span>';
+    const { price, conversion } = averageSourcePrices(source);
+    return '<span>' + esc(source.exchangeName + ': ' + price) +
+      (conversion ? '<small>' + esc(conversion) + '</small>' : '') + '</span>';
   }).join('');
   return '<span class="market-valuation market-cap-valuation">' +
     '<button type="button" class="market-valuation-trigger" aria-label="Average YERB price: ' +
     esc(value) + ' USDT" aria-describedby="market-average-tooltip">' +
-    esc(value + (showUnit ? ' USDT' : '')) + '</button>' +
+    esc(value) + '</button>' +
     '<span class="reference-tooltip market-valuation-tooltip" id="market-average-tooltip" role="tooltip" hidden>' +
     '<strong>Prices used in the average</strong>' + rows + '</span></span>';
 }
@@ -479,11 +492,11 @@ async function renderMarkets() {
   const reference = data.reference || {};
   const referenceRail = reference.sourceCount
     ? telemetryRail([
-        { label: 'AVG YERB USDT', renderValue: () => marketAverageValue(reference, true), note: reference.method || 'live mean' },
-        { label: 'MARKET CAP', renderValue: () => marketCapValue(reference), note: 'reference price × Core supply' },
+        { label: 'AVG YERB USDT', renderValue: () => marketAverageValue(reference), note: reference.method || 'live mean' },
+        { label: 'MARKET CAP', renderValue: () => marketCapValue(reference, false), note: 'reference price × Core supply' },
         { label: 'SOURCES', value: number(reference.sourceCount), note: 'live exchanges' },
-        { label: 'LOW', value: marketPrice(reference.lowUsdt) + ' USDT', note: 'cross-exchange' },
-        { label: 'HIGH', value: marketPrice(reference.highUsdt) + ' USDT', note: 'cross-exchange' },
+        { label: 'LOW', value: marketPrice(reference.lowUsdt), note: 'cross-exchange' },
+        { label: 'HIGH', value: marketPrice(reference.highUsdt), note: 'cross-exchange' },
         { label: 'RANGE', value: marketPercent(reference.rangePct), note: 'high vs low around mean' }
       ])
     : '';

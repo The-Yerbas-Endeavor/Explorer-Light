@@ -9757,6 +9757,7 @@ html[data-layout-theme] .address-summary .telemetry-cell > strong { white-space:
 }
 .reference-tooltip > * { display: block; }
 .reference-tooltip > small, .reference-tooltip > span { color: var(--text-soft); }
+.reference-tooltip-sources { white-space: pre-line; }
 .reference-point-announcement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 
 .market-sparkline[data-spark-exchange] { position: relative; }
