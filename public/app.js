@@ -320,6 +320,31 @@ function renderLoading(label) {
     '</section>';
 }
 
+function referencePriceChart(history) {
+  const points = (history?.sparkPoints || []).filter(point => point.observed && Number.isFinite(point.price));
+  const title = railHeading('REFERENCE HISTORY', '7-day average YERB price', 'USDT · all five exchanges');
+  const note = '<p class="market-disclaimer">Only observations with quotes from all five exchanges are plotted. Coverage builds as prices are recorded.</p>';
+  if (points.length < 2) return '<section class="ledger-section">' + title +
+    '<p class="ledger-empty">Building history · ' + points.length + ' of 2 observations needed to draw the chart.</p>' + note + '</section>';
+  const prices = points.map(point => point.price);
+  const low = Math.min(...prices), high = Math.max(...prices);
+  const span = Math.max(1, history.windowEnd - history.windowStart);
+  const coords = points.map(point => ({
+    x: 10 + 740 * (point.timestamp - history.windowStart) / span,
+    y: high === low ? 62 : 10 + 104 * (high - point.price) / (high - low),
+    point
+  }));
+  const dots = coords.map(({ x, y, point }) => '<circle cx="' + x + '" cy="' + y +
+    '" r="3" fill="currentColor"><title>' + esc(new Date(point.timestamp * 1000).toLocaleString() +
+      ' · ' + marketPrice(point.price) + ' USDT') + '</title></circle>').join('');
+  return '<section class="ledger-section">' + title +
+    '<svg class="reference-price-chart" viewBox="0 0 760 124" role="img" aria-label="Seven-day YERB reference price in USDT">' +
+    '<polyline fill="none" stroke="currentColor" stroke-width="2" points="' +
+    coords.map(({ x, y }) => x + ',' + y).join(' ') + '"/>' + dots + '</svg>' +
+    '<p class="market-disclaimer">Observed range: ' + marketPrice(low) + '–' + marketPrice(high) +
+    ' USDT · ' + history.observedDays + '/7 days with observations</p>' + note + '</section>';
+}
+
 async function renderMarkets() {
   document.title = 'Markets · Yerbas Explorer';
   renderLoading('Reading live market feeds');
@@ -330,7 +355,7 @@ async function renderMarkets() {
   const reference = data.reference || {};
   const referenceRail = reference.sourceCount
     ? telemetryRail([
-        { label: 'YERB REFERENCE', value: marketPrice(reference.priceUsdt) + ' USDT', note: reference.method || 'live mean' },
+        { label: 'AVG YERB USDT', value: marketPrice(reference.priceUsdt) + ' USDT', note: reference.method || 'live mean' },
         { label: 'MARKET CAP', value: marketMoney(reference.marketCapUsdt) + ' USDT', note: 'reference price × Core supply' },
         { label: 'SOURCES', value: number(reference.sourceCount), note: 'live exchanges' },
         { label: 'LOW', value: marketPrice(reference.lowUsdt) + ' USDT', note: 'cross-exchange' },
@@ -378,6 +403,7 @@ async function renderMarkets() {
     '<div class="market-page">' +
       ledgerHeader('MARKET OBSERVATORY', 'Yerbas markets', number((data.markets || []).length) + ' listed market' + ((data.markets || []).length === 1 ? '' : 's'), '<a href="/">LIVE CHAIN</a>') +
       referenceRail +
+      referencePriceChart(data.referenceHistory7d) +
       '<section class="ledger-section">' +
         railHeading('MARKET MATRIX', 'Live exchange values', 'exchange data · not consensus data') +
         '<div class="market-matrix">' + (rows || '<div class="ledger-empty">No market feeds are currently available.</div>') + '</div>' +
@@ -590,7 +616,7 @@ async function renderOriginalHome() {
         '<p>A listing of all verified Yerbas transactions</p>' +
       '</section>' +
       '<section class="original-market-strip">' +
-        '<span><small>YERB reference (USDT)</small><strong>' + marketPrice(reference.priceUsdt) + '</strong></span>' +
+        '<span><small>AVG YERB USDT</small><strong>' + marketPrice(reference.priceUsdt) + '</strong></span>' +
         '<span><small>Market Cap</small><strong>' + marketMoney(reference.marketCapUsdt) + ' USDT</strong></span>' +
         '<span><small>Connections</small><strong>' + number(summary.connections) + '</strong></span>' +
         '<span><small>Block Height</small><strong>' + number(summary.blockcount) + '</strong></span>' +
@@ -637,9 +663,8 @@ async function renderHome() {
     { label: 'DIFFICULTY', value: number(status.difficulty, 6), note: 'network target' },
     { label: 'PEERS', value: number(status.network?.connections), note: 'connected' },
     { label: 'MEMPOOL', value: number(status.mempool?.transactions), note: bytes(status.mempool?.bytes) },
-    { label: 'YERB REFERENCE', value: marketPrice(market?.priceUsdt), note: market?.sourceCount ? number(market.sourceCount) + (market.sourceCount === 1 ? ' exchange · USDT' : ' exchanges · USDT') : 'market unavailable' },
-    { label: 'MARKET CAP', value: market ? marketMoney(market.marketCapUsdt) : '—', note: 'USDT estimate' },
-    { label: 'SOURCE', value: 'RPC', note: 'Yerbas Core' }
+    { label: 'AVG YERB USDT', value: marketPrice(market?.priceUsdt), note: market?.sourceCount ? number(market.sourceCount) + (market.sourceCount === 1 ? ' exchange · USDT' : ' exchanges · USDT') : 'market unavailable' },
+    { label: 'MARKET CAP', value: market ? marketMoney(market.marketCapUsdt) : '—', note: 'USDT estimate' }
   ]);
 
   const tape = blocks.map((block, index) => {

@@ -1287,7 +1287,14 @@ function recordMarketHistorySnapshot(markets, now = Math.floor(Date.now() / 1000
       );
       let changed = false;
 
-      for (const market of Array.isArray(markets) ? markets : []) {
+      const reference = marketReferenceSummary(markets);
+      const referenceExchanges = ['nestex', 'gatevia', 'neoxex', 'filodex', 'spotex'];
+      const hasFiveQuotes = reference.sourceCount === referenceExchanges.length
+        && referenceExchanges.every(exchange => reference.sources.some(source => source.exchange === exchange));
+      const observations = [...(Array.isArray(markets) ? markets : [])];
+      if (hasFiveQuotes) observations.push({ exchange: 'yerb-reference-five', quote: 'USDT', ticker: { last: reference.priceUsdt } });
+
+      for (const market of observations) {
         if (!market || market.available === false) continue;
 
         const exchange = String(market.exchange || '').trim().toLowerCase();
@@ -2682,10 +2689,14 @@ async function handleApi(req, res, url) {
       spotexMarketHistory(spotex.ticker.last)
     ]);
     const markets = [nestex, gatevia, { ...spotex, history7d: spotHistory }, { ...neoxex, history7d }, { ...filodex, history7d: filoHistory }];
-    void recordMarketHistorySnapshot(markets);
+    await recordMarketHistorySnapshot(markets);
+    const reference = marketReferenceSummary(markets);
+    const referenceEntries = await persistedMarketHistoryEntries('yerb-reference-five');
+    const referenceHistory7d = marketHistory7d(referenceEntries, null, 'USDT', 'Five-exchange reference snapshots');
     return sendJson(res, 200, {
+      referenceHistory7d,
       generatedAt: new Date().toISOString(),
-      reference: marketReferenceSummary(markets),
+      reference,
       markets
     });
   }

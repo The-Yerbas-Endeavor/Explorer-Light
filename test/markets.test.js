@@ -73,7 +73,7 @@ test('Gatevia YERB DOGE uses the public API with a safe degraded mode', async ()
   assert.ok(server.includes("available ? 'live-api' : 'api-unavailable'"));
   assert.ok(server.includes("reportedSpreadPct"));
   assert.ok(server.includes("public/markets/' + tickerId + '/depth?limit=5"));
-  assert.ok(server.includes("reference: marketReferenceSummary(markets)"));
+  assert.ok(server.includes("const reference = marketReferenceSummary(markets)"));
   assert.ok(server.includes("'/api/market/gatevia/YERB/DOGE'"));
   assert.ok(app.includes("exchangeId === 'gatevia'"));
   assert.ok(app.includes("'API OFFLINE'"));
@@ -93,7 +93,7 @@ test('markets page exposes a cross-exchange reference and resilient Gatevia trad
   assert.ok(server.includes("conversion = 'YERB/DOGE × DOGE/USDT'"));
   assert.ok(server.includes('marketCapUsdt'));
   assert.ok(server.includes('supplyYerb * priceUsdt'));
-  assert.ok(app.includes("'YERB REFERENCE'"));
+  assert.ok(app.includes("'AVG YERB USDT'"));
   assert.ok(app.includes("'MARKET CAP'"));
   assert.ok(app.includes("'reference price × Core supply'"));
   assert.ok(app.includes('TIME / ID'));
