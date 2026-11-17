@@ -312,7 +312,7 @@ test('SpotEx YERB is listed without inventing unverified ticker data', async () 
   assert.ok(server.includes("source: 'https://spotex.trade/docs/api'"));
   assert.ok(server.includes("available: false"));
   assert.ok(server.includes("status: 'external-live-market'"));
-  assert.ok(server.includes('const markets = [nestex, gatevia, spotexMarketListing()'));
+  assert.ok(server.includes('const markets = [nestex, gatevia, { ...spotex, history7d: spotHistory }'));
   assert.ok(app.includes("'TRADE LINK'"));
 });
 

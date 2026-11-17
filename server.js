@@ -1690,6 +1690,66 @@ function spotexMarketListing() {
   };
 }
 
+const spotexApi = 'https://spotex.trade/api/public/v1/';
+
+async function spotexFetch(route) {
+  const response = await fetch(spotexApi + route, {
+    headers: { accept: 'application/json' },
+    signal: AbortSignal.timeout(config.markets.timeoutMs)
+  });
+  return response.ok ? response.json() : null;
+}
+
+async function spotexMarketSummary() {
+  const listing = spotexMarketListing();
+  if (!config.markets.enabled) return listing;
+  return cached('market:spotex:YERB-USDT', config.markets.cacheMs, async () => {
+    try {
+      const row = await spotexFetch('ticker/24hr?symbol=YERB-USDT');
+      const numeric = value => (typeof value === 'number' || (typeof value === 'string' && value.trim()))
+        ? marketNumber(value) : null;
+      const positive = value => numeric(value) > 0 ? numeric(value) : null;
+      const last = positive(row?.lastPrice);
+      if (row?.symbol !== listing.tickerId || last === null) return listing;
+      return {
+        ...listing,
+        available: true,
+        status: 'live-api',
+        asOf: positive(row.updatedAt) ?? Date.now(),
+        ticker: {
+          ...listing.ticker,
+          last,
+          change24hPct: numeric(row.changePercent24h),
+          high: positive(row.high24h),
+          low: positive(row.low24h),
+          baseVolume: numeric(row.baseVolume24h),
+          quoteVolume: numeric(row.quoteVolume24h)
+        }
+      };
+    } catch { return listing; }
+  });
+}
+
+async function spotexMarketHistory(last) {
+  if (!config.markets.enabled) return null;
+  const candles = await cached('market:spotex:candles:YERB-USDT', MARKET_HISTORY_CACHE_MS, async () => {
+    try {
+      const rows = await spotexFetch('klines?symbol=YERB-USDT&interval=1h&limit=200');
+      const window = marketHistoryWindow();
+      return (Array.isArray(rows) ? rows.slice(-200) : [])
+        .filter(row => Array.isArray(row) && Number(row[5]) > 0)
+        .map(row => ({ timestamp: marketEpochSeconds(row[0]), price: marketNumber(row[4]) }))
+        .filter(row => row.timestamp >= window.fetchFrom && row.timestamp <= window.now && row.price > 0)
+        .sort((a, b) => a.timestamp - b.timestamp);
+    } catch { return []; }
+  });
+  let saved = [];
+  try { saved = await persistedMarketHistoryEntries('spotex'); } catch { /* Candles remain usable. */ }
+  const earlier = candles.length ? saved.filter(row => row.timestamp < candles[0].timestamp) : saved;
+  return marketHistory7d([...earlier, ...candles], last, 'USDT',
+    candles.length ? (earlier.length ? 'SpotEx hourly candles and explorer snapshots' : 'SpotEx hourly candle closes') : 'Explorer snapshots');
+}
+
 async function neoxexMarketSummary() {
   const listing = {
     ...spotexMarketListing(),
@@ -2032,7 +2092,8 @@ async function snapshotMarketHistoryFromFeeds() {
     nestexMarketSummary(),
     gateviaMarketSummary(),
     neoxexMarketSummary(),
-    filodexMarketSummary()
+    filodexMarketSummary(),
+    spotexMarketSummary()
   ]);
 
   const markets = results
@@ -2587,16 +2648,18 @@ async function handleApi(req, res, url) {
   }
 
   if (url.pathname === '/api/markets') {
-    const [nestex, gatevia, neoxex, filodex] = await Promise.all([
+    const [nestex, gatevia, neoxex, filodex, spotex] = await Promise.all([
       nestexMarketSummary(),
       gateviaMarketSummary(),
       neoxexMarketSummary(),
-      filodexMarketSummary()
+      filodexMarketSummary(),
+      spotexMarketSummary()
     ]);
-    const [history7d, filoHistory] = await Promise.all([
-      neoxexMarketHistory(neoxex.ticker.last), filodexMarketHistory(filodex.ticker.last)
+    const [history7d, filoHistory, spotHistory] = await Promise.all([
+      neoxexMarketHistory(neoxex.ticker.last), filodexMarketHistory(filodex.ticker.last),
+      spotexMarketHistory(spotex.ticker.last)
     ]);
-    const markets = [nestex, gatevia, spotexMarketListing(), { ...neoxex, history7d }, { ...filodex, history7d: filoHistory }];
+    const markets = [nestex, gatevia, { ...spotex, history7d: spotHistory }, { ...neoxex, history7d }, { ...filodex, history7d: filoHistory }];
     void recordMarketHistorySnapshot(markets);
     return sendJson(res, 200, {
       generatedAt: new Date().toISOString(),
