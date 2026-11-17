@@ -1316,9 +1316,13 @@ function recordMarketHistorySnapshot(markets, now = Math.floor(Date.now() / 1000
         );
         const last = retained[retained.length - 1];
 
-        if (!last || marketEpochSeconds(last.timestamp) !== bucket) {
+        const lastTimestamp = marketEpochSeconds(last?.timestamp);
+        const sameBucket = lastTimestamp !== null && Math.floor(lastTimestamp / bucketSeconds) * bucketSeconds === bucket;
+        // Capture the first detailed observation after upgrading a legacy snapshot.
+        const addDetailedPoint = sameBucket && market.sources && !last.sources && now > lastTimestamp;
+        if (!sameBucket || addDetailedPoint) {
           retained.push({
-            timestamp: bucket,
+            timestamp: addDetailedPoint ? now : bucket,
             price,
             quote: market.quote || null,
             ...(market.sources ? { sources: market.sources } : {})
