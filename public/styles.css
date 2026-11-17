@@ -9731,3 +9731,16 @@ html[data-layout-theme] .address-summary .telemetry-cell > strong { white-space:
 .network-map-workspace .network-pin.cluster { border-width: 2px; background: #081b24; }
 .network-map-workspace .network-pin.cluster span { font-size: 11px; font-weight: 700; }
 .network-map-workspace .network-pin:focus-visible { outline: 2px solid #fff; outline-offset: 2px; z-index: 5; }
+
+.reference-price-chart text { fill: var(--text-soft); font: 13px var(--mono); }
+.reference-grid { stroke: var(--line-strong); stroke-width: 1; }
+.reference-inspector { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 20px; margin-block: 12px; }
+.reference-inspector label { display: grid; gap: 6px; min-width: 0; max-width: 100%; }
+.reference-inspector select { width: 100%; background: var(--panel-solid); color: var(--text); border: 1px solid var(--line-strong); padding: 8px; font: inherit; }
+.reference-inspector output { color: var(--text-soft); }
+.tx-flow-card { grid-template-columns: minmax(0, 1fr) auto; }
+.tx-flow-card > strong { text-align: left; font-size: 16px; }
+.tx-flow-card > small { text-align: right; }
+.tx-follow { justify-self: end; }
+.tx-follow a { display: inline-block; padding: 4px 8px; border: 1px solid var(--line-strong); border-radius: 4px; }
+.tx-flow-card:target, .tx-flow-card:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }

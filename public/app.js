@@ -337,10 +337,25 @@ function referencePriceChart(history, fourExchangeHistory) {
     '<p class="ledger-empty">Building history</p></section>';
   const low = Math.min(...prices), high = Math.max(...prices);
   const span = Math.max(1, history.windowEnd - history.windowStart);
+  const dateLabel = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const axes = [0, .5, 1].map(ratio => {
+    const y = 16 + ratio * 130;
+    return '<line class="reference-grid" x1="104" x2="740" y1="' + y + '" y2="' + y + '"/>' +
+      (high === low && ratio !== .5 ? '' : '<text x="97" y="' + (y + 4) + '" text-anchor="end">' +
+        esc(marketPrice(high - ratio * (high - low))) + '</text>');
+  }).join('') + [0, .5, 1].map(ratio =>
+    '<text x="' + (104 + 636 * ratio) + '" y="169" text-anchor="' + (ratio === 0 ? 'start' : ratio === 1 ? 'end' : 'middle') + '">' +
+      esc(dateLabel.format(new Date((history.windowStart + ratio * span) * 1000))) + '</text>').join('');
+  const options = series.flatMap(line => [...line.points].reverse().map(point => {
+    const sources = 'NestEx, Gatevia (converted to USDT), NeoxEX, FiloDex' + (line.css === 'reference-five' ? ', SpotEx' : '');
+    const time = new Date(point.timestamp * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+    return '<option data-sources="' + esc(sources) + '">' +
+      esc(time + ' · ' + marketPrice(point.price) + ' USDT · ' + line.name) + '</option>';
+  })).join('');
   const plotted = [...series].reverse().map(line => {
     const coords = line.points.map(point => ({
-      x: 10 + 740 * (point.timestamp - history.windowStart) / span,
-      y: high === low ? 62 : 10 + 104 * (high - point.price) / (high - low),
+      x: 104 + 636 * (point.timestamp - history.windowStart) / span,
+      y: high === low ? 81 : 16 + 130 * (high - point.price) / (high - low),
       point
     }));
     const segments = coords.map(({ x, y, point }, i) => {
@@ -355,8 +370,10 @@ function referencePriceChart(history, fourExchangeHistory) {
     return '<g class="' + line.css + '">' + segments + dots + '</g>';
   }).join('');
   return '<section class="ledger-section">' + title + legend +
-    '<svg class="reference-price-chart" viewBox="0 0 760 124" role="img" aria-label="Seven-day YERB reference price, five-exchange main series and optional four-exchange comparison">' +
-    plotted + '</svg><p class="market-disclaimer">Observed range: ' + marketPrice(low) + '–' + marketPrice(high) +
+    '<svg class="reference-price-chart" viewBox="0 0 760 180" role="img" aria-label="Seven-day YERB reference price, five-exchange main series and optional four-exchange comparison">' +
+    axes + plotted + '</svg><div class="reference-inspector"><label>Inspect a price point <select id="reference-point">' +
+    '<option value="">Choose a date and price</option>' + options +
+    '</select></label><output id="reference-point-sources" aria-live="polite"></output></div><p class="market-disclaimer">Observed range: ' + marketPrice(low) + '–' + marketPrice(high) +
     ' USDT.</p>' + (fourExchangeHistory ? '<p class="market-disclaimer">The four-exchange comparison uses same-day prices for the backfill and historical DOGE/USDT to convert Gatevia quotes. It disappears when the main series has observations on all seven days.</p>' : '') + '</section>';
 }
 
@@ -425,6 +442,11 @@ async function renderMarkets() {
       '</section>' +
       '<div class="market-disclaimer">Market data is informational and sourced from external exchanges. Blockchain state continues to come directly from Yerbas Core.</div>' +
     '</div>';
+  app.querySelector('#reference-point')?.addEventListener('change', event => {
+    const sources = event.target.selectedOptions[0]?.dataset.sources;
+    app.querySelector('#reference-point-sources').textContent = sources ? 'Sources: ' + sources : '';
+  });
+
 }
 
 async function renderMarketDetail(exchange = 'nestex') {
@@ -2310,7 +2332,7 @@ async function renderTransaction(txid) {
       const amount = incoming ? (row.available ? number(row.amountYerb, 8) + ' YERB' : 'Amount unavailable') : number(row.value, 8) + ' YERB';
       const link = incoming ? '<a href="/tx/' + encodeURIComponent(row.txid) + '#output-' + row.vout + '">← Source · output ' + esc(row.vout) + '</a>' :
         (row.spentTxId ? '<a href="/tx/' + encodeURIComponent(row.spentTxId) + '#input-' + row.spentIndex + '">Follow spend →</a>' : '<span>Spend status unavailable</span>');
-      return '<article class="tx-flow-card" id="' + (incoming ? 'input-' + (start + index) : 'output-' + row.n) + '"><small>' + (incoming ? 'INPUT ' + (start + index) : 'OUTPUT ' + row.n) + '</small><strong>' + esc(amount) + '</strong>' +
+      return '<article class="tx-flow-card" id="' + (incoming ? 'input-' + (start + index) : 'output-' + row.n) + '" tabindex="-1"><strong>' + esc(amount) + '</strong><small>' + (incoming ? 'INPUT ' + (start + index) : 'OUTPUT ' + row.n) + '</small>' +
         (asset ? '<p><a href="/asset/' + encodeURIComponent(asset.name) + '">' + esc(asset.name) + '</a> · ' + number(asset.amount, 8) + '</p>' : '') +
         '<div class="tx-flow-address">' + (addresses.length ? addresses.map(address => '<a href="/address/' + encodeURIComponent(address) + '">' + esc(address) + '</a>').join('<br>') : '<span>Script / address unavailable</span>') + '</div><div class="tx-follow">' + link + '</div></article>';
     }).join('');
@@ -2349,7 +2371,9 @@ async function renderTransaction(txid) {
     if (index >= 0 && index < rows.length) {
       pages[side] = Math.floor(index / pageSize);
       document.querySelector('#tx-' + side).innerHTML = flowRows(side);
-      document.getElementById(target[0].slice(1))?.scrollIntoView({ block: 'center' });
+      const linkedRow = document.getElementById(target[0].slice(1));
+      linkedRow?.focus({ preventScroll: true });
+      linkedRow?.scrollIntoView({ block: 'center' });
     }
   }
   document.querySelector('#raw-json').textContent = JSON.stringify(tx, null, 2);
