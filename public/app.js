@@ -517,15 +517,15 @@ async function renderOriginalHome() {
   );
   const blockOffset = (requestedPage - 1) * pageSize;
 
-  const [summary, transactions, markets] = await Promise.all([
+  const [summary, transactions, referenceData] = await Promise.all([
     api('/ext/getsummary'),
     api('/api/transactions?limit=500&blocks=' + pageSize + '&offsetBlocks=' + blockOffset),
-    api('/api/markets').catch(() => null)
+    api('/api/market-reference').catch(() => null)
   ]);
 
   setRpcState('online', 'Core online');
 
-  const reference = markets?.reference || {};
+  const reference = referenceData || {};
   const totalBlocks = Math.max(1, Number(transactions?.tip ?? summary.blockcount ?? 0) + 1);
   const totalPages = Math.max(1, Math.ceil(totalBlocks / pageSize));
   const page = Math.min(requestedPage, totalPages);
@@ -590,7 +590,7 @@ async function renderOriginalHome() {
         '<p>A listing of all verified Yerbas transactions</p>' +
       '</section>' +
       '<section class="original-market-strip">' +
-        '<span><small>YERB/USDT</small><strong>' + marketPrice(reference.priceUsdt) + '</strong></span>' +
+        '<span><small>YERB reference (USDT)</small><strong>' + marketPrice(reference.priceUsdt) + '</strong></span>' +
         '<span><small>Market Cap</small><strong>' + marketMoney(reference.marketCapUsdt) + ' USDT</strong></span>' +
         '<span><small>Connections</small><strong>' + number(summary.connections) + '</strong></span>' +
         '<span><small>Block Height</small><strong>' + number(summary.blockcount) + '</strong></span>' +
@@ -619,7 +619,7 @@ async function renderHome() {
 
   const pageSize = 12;
   const requestedPage = Math.max(1, Number.parseInt(new URLSearchParams(location.search).get('page') || '1', 10) || 1);
-  const marketPromise = api('/api/v1/market-price').catch(() => null);
+  const marketPromise = api('/api/market-reference').catch(() => null);
   const status = await api('/api/status');
   const totalBlocks = Math.max(1, Number(status.blocks || 0) + 1);
   const totalPages = Math.max(1, Math.ceil(totalBlocks / pageSize));
@@ -637,7 +637,7 @@ async function renderHome() {
     { label: 'DIFFICULTY', value: number(status.difficulty, 6), note: 'network target' },
     { label: 'PEERS', value: number(status.network?.connections), note: 'connected' },
     { label: 'MEMPOOL', value: number(status.mempool?.transactions), note: bytes(status.mempool?.bytes) },
-    { label: 'YERB/USDT', value: market ? marketPrice(market.priceUsdt) : '—', note: market ? 'NestEx · ' + marketPercent(market.change24hPct) : 'market unavailable' },
+    { label: 'YERB REFERENCE', value: marketPrice(market?.priceUsdt), note: market?.sourceCount ? number(market.sourceCount) + (market.sourceCount === 1 ? ' exchange · USDT' : ' exchanges · USDT') : 'market unavailable' },
     { label: 'MARKET CAP', value: market ? marketMoney(market.marketCapUsdt) : '—', note: 'USDT estimate' },
     { label: 'SOURCE', value: 'RPC', note: 'Yerbas Core' }
   ]);

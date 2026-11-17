@@ -1572,14 +1572,14 @@ async function gateviaMarketHistoryEntries7d() {
   );
 }
 
-async function gateviaMarketSummary() {
+async function gateviaMarketSummary(includeDetails = true) {
   const tickerId = 'YERB_DOGE';
   const [tickerResult, dogeUsdtResult, supply, orderbookResult, historyEntries] = await Promise.all([
     gateviaMarketFetchJson('public/markets/' + tickerId + '/tickers', 'ticker:' + tickerId).catch(() => null),
     gateviaMarketFetchJson('public/markets/DOGE_USDT/tickers', 'ticker:DOGE_USDT').catch(() => null),
-    supplyData(),
-    gateviaMarketFetchJson('public/markets/' + tickerId + '/depth?limit=5', 'depth:' + tickerId + ':5').catch(() => null),
-    gateviaMarketHistoryEntries7d().catch(() => [])
+    supplyData().catch(() => null),
+    includeDetails ? gateviaMarketFetchJson('public/markets/' + tickerId + '/depth?limit=5', 'depth:' + tickerId + ':5').catch(() => null) : null,
+    includeDetails ? gateviaMarketHistoryEntries7d().catch(() => []) : []
   ]);
 
   const ticker = tickerResult?.ticker && typeof tickerResult.ticker === 'object'
@@ -1961,13 +1961,13 @@ function marketReferenceSummary(markets) {
   };
 }
 
-async function nestexMarketSummary() {
+async function nestexMarketSummary(includeDetails = true) {
   const tickerId = 'YERB_USDT';
   const [ticker, supply, liquidityResult, historyEntries] = await Promise.all([
     marketFetchJson('cg/tickers/' + tickerId, 'ticker:' + tickerId),
-    supplyData(),
-    marketFetchJson('v1/liquidity/YERB', 'liquidity:YERB').catch(() => null),
-    nestexMarketHistoryEntries7d().catch(() => [])
+    supplyData().catch(() => null),
+    includeDetails ? marketFetchJson('v1/liquidity/YERB', 'liquidity:YERB').catch(() => null) : null,
+    includeDetails ? nestexMarketHistoryEntries7d().catch(() => []) : []
   ]);
 
   const last = marketNumber(ticker?.last_price);
@@ -2083,6 +2083,30 @@ async function gateviaMarketDetail() {
       items: trades
     } : null
   };
+}
+
+async function currentMarketSummaries(includeDetails) {
+  const results = await Promise.allSettled([
+    nestexMarketSummary(includeDetails),
+    gateviaMarketSummary(includeDetails),
+    neoxexMarketSummary(),
+    filodexMarketSummary(),
+    spotexMarketSummary()
+  ]);
+  return results.map((result, index) => {
+    if (result.status === 'fulfilled') return result.value;
+    if (index !== 0) throw result.reason;
+    return {
+      ...spotexMarketListing(),
+      exchange: 'nestex',
+      exchangeName: 'NestEx',
+      tickerId: 'YERB_USDT',
+      tradeUrl: 'https://trade.nestex.one/spot/YERB_USDT',
+      source: 'https://api.nestex.one',
+      apiDocsUrl: null,
+      status: 'unavailable'
+    };
+  });
 }
 
 async function snapshotMarketHistoryFromFeeds() {
@@ -2647,14 +2671,12 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, data);
   }
 
+  if (url.pathname === '/api/market-reference') {
+    return sendJson(res, 200, marketReferenceSummary(await currentMarketSummaries(false)));
+  }
+
   if (url.pathname === '/api/markets') {
-    const [nestex, gatevia, neoxex, filodex, spotex] = await Promise.all([
-      nestexMarketSummary(),
-      gateviaMarketSummary(),
-      neoxexMarketSummary(),
-      filodexMarketSummary(),
-      spotexMarketSummary()
-    ]);
+    const [nestex, gatevia, neoxex, filodex, spotex] = await currentMarketSummaries(true);
     const [history7d, filoHistory, spotHistory] = await Promise.all([
       neoxexMarketHistory(neoxex.ticker.last), filodexMarketHistory(filodex.ticker.last),
       spotexMarketHistory(spotex.ticker.last)
