@@ -1404,6 +1404,18 @@ function marketSparkPoints(normalized, currentPrice, window, maxPoints = 72) {
   return sampled;
 }
 
+function referenceHistoryWindow(entries, hours, now = Math.floor(Date.now() / 1000)) {
+  const start = now - hours * 3600;
+  const observed = entries.filter(point => point.timestamp >= start && point.timestamp <= now)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  return {
+    windowStart: start,
+    windowEnd: now,
+    observationCount: observed.length,
+    sparkPoints: marketSparkPoints(observed, null, { start, now }, 144)
+  };
+}
+
 function marketHistory7d(entries, currentPrice, quote, source) {
   const window = marketHistoryWindow();
   const normalized = (Array.isArray(entries) ? entries : [])
@@ -2729,6 +2741,8 @@ async function handleApi(req, res, url) {
     const referenceHistory7d = marketHistory7d(referenceEntries, null, 'USDT', 'Five-exchange reference snapshots');
     return sendJson(res, 200, {
       referenceHistory7d,
+      referenceHistory24h: referenceHistoryWindow(referenceEntries, 24),
+      referenceHistory30d: referenceHistoryWindow(referenceEntries, 30 * 24),
       referenceHistoryFour7d: referenceHistory7d.observedDays < 7 ? await fourExchangeHistory(markets) : null,
       generatedAt: new Date().toISOString(),
       reference,

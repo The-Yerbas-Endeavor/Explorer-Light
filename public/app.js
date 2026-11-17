@@ -321,7 +321,8 @@ function renderLoading(label) {
     '</section>';
 }
 
-function referencePriceChart(history, fourExchangeHistory) {
+function referencePriceChart(history, fourExchangeHistory, range) {
+  const label = { "24h": "24-hour", "7d": "7-day", "30d": "30-day" }[range];
   const series = [
     { history, name: 'Five exchanges (main)', css: 'reference-five' },
     { history: fourExchangeHistory, name: 'Four exchanges · excludes SpotEx', css: 'reference-four' }
@@ -329,16 +330,16 @@ function referencePriceChart(history, fourExchangeHistory) {
     ...line,
     points: (line.history.sparkPoints || []).filter(point => point.observed && Number.isFinite(point.price))
   }));
-  const title = railHeading('REFERENCE HISTORY', '7-day average YERB price', 'USDT');
+  const title = railHeading('REFERENCE HISTORY', label + ' average YERB price', 'USDT');
   const legend = '<p class="reference-chart-legend">' +
     series.map(line => '<span class="' + line.css + '">' + esc(line.name) +
-      ' · ' + line.history.observedDays + '/7 days</span>').join('') + '</p>';
+      ' · ' + (range === '7d' ? line.history.observedDays + '/7 days' : number(line.history.observationCount) + ' observations') + '</span>').join('') + '</p>';
   const prices = series.flatMap(line => line.points.map(point => point.price));
   if (!prices.length) return '<section class="ledger-section">' + title + legend +
     '<p class="ledger-empty">Building history</p></section>';
   const low = Math.min(...prices), high = Math.max(...prices);
   const span = Math.max(1, history.windowEnd - history.windowStart);
-  const dateLabel = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const dateLabel = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC', ...(range === '24h' ? { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' } : {}) });
   const axes = [0, .5, 1].map(ratio => {
     const y = 16 + ratio * 130;
     return '<line class="reference-grid" x1="104" x2="740" y1="' + y + '" y2="' + y + '"/>' +
@@ -373,8 +374,8 @@ function referencePriceChart(history, fourExchangeHistory) {
     return '<g class="' + line.css + '">' + segments + dots + '</g>';
   }).join('');
   return '<section class="ledger-section">' + title + legend +
-    '<div class="reference-chart-plot" tabindex="0" role="group" aria-label="Seven-day YERB reference chart. Use Left and Right arrow keys to inspect points.">' +
-    '<svg class="reference-price-chart" viewBox="0 0 760 180" role="img" aria-label="Seven-day YERB reference price, five-exchange main series and optional four-exchange comparison">' +
+    '<div class="reference-chart-plot" tabindex="0" role="group" aria-label="' + label + ' YERB reference chart. Use Left and Right arrow keys to inspect points.">' +
+    '<svg class="reference-price-chart" viewBox="0 0 760 180" role="img" aria-label="YERB reference price in USDT">' +
     axes + plotted + '</svg><div class="reference-tooltip" hidden aria-hidden="true"><strong></strong><small></small><span></span></div></div>' +
     '<div class="reference-inspector"><label>Inspect a price point <select id="reference-point">' +
     '<option value="">Choose a date and price</option>' + options +
@@ -439,7 +440,11 @@ async function renderMarkets() {
     '<div class="market-page">' +
       ledgerHeader('MARKET OBSERVATORY', 'Yerbas markets', number((data.markets || []).length) + ' listed market' + ((data.markets || []).length === 1 ? '' : 's'), '<a href="/">LIVE CHAIN</a>') +
       referenceRail +
-      referencePriceChart(data.referenceHistory7d, data.referenceHistoryFour7d) +
+      '<div class="reference-range" role="group" aria-label="Reference chart time range">' +
+        '<button type="button" data-reference-range="24h" aria-pressed="false">24 hours</button>' +
+        '<button type="button" data-reference-range="7d" aria-pressed="true">7 days</button>' +
+        '<button type="button" data-reference-range="30d" aria-pressed="false">30 days</button></div>' +
+      '<div id="reference-history"></div>' +
       '<section class="ledger-section">' +
         railHeading('MARKET MATRIX', 'Live exchange values', 'exchange data · not consensus data') +
         '<div class="market-matrix">' + (rows || '<div class="ledger-empty">No market feeds are currently available.</div>') + '</div>' +
@@ -532,12 +537,25 @@ async function renderMarkets() {
       show(pinned);
     });
   });
-  const picker = app.querySelector('#reference-point');
-  const chart = app.querySelector('.reference-price-chart');
+  const referenceHistory = app.querySelector('#reference-history');
+  const ranges = { '24h': data.referenceHistory24h, '7d': data.referenceHistory7d, '30d': data.referenceHistory30d };
+  const rangeButtons = [...app.querySelectorAll('[data-reference-range]')];
+  function setRange(range) {
+    for (const button of rangeButtons) button.setAttribute('aria-pressed', String(button.dataset.referenceRange === range));
+    referenceHistory.innerHTML = referencePriceChart(ranges[range], range === '7d' ? data.referenceHistoryFour7d : null, range);
+    bindReferenceChart(referenceHistory);
+  }
+  for (const button of rangeButtons) button.addEventListener('click', () => setRange(button.dataset.referenceRange));
+  setRange('7d');
+}
+
+function bindReferenceChart(root) {
+  const picker = root.querySelector('#reference-point');
+  const chart = root.querySelector('.reference-price-chart');
   if (picker && chart) {
     const plot = chart.parentElement;
     const tooltip = plot.querySelector('.reference-tooltip');
-    const announcement = app.querySelector('.reference-point-announcement');
+    const announcement = root.querySelector('.reference-point-announcement');
     const points = new Map([...chart.querySelectorAll('[data-reference-point]')].map(point => [point.dataset.referencePoint, point]));
     const options = new Map([...picker.options].map(option => [option.value, option]));
     let activePoint;

@@ -9770,3 +9770,8 @@ html[data-layout-theme] .address-summary .telemetry-cell > strong { white-space:
 .market-sparkline .sparkline-observation.is-inspected { r: 3; stroke: var(--text); stroke-width: 1; }
 
 .reference-chart-plot:focus-visible { outline: 2px solid var(--green-hot); outline-offset: 4px; }
+
+.reference-range { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+.reference-range button { background: var(--panel-solid); color: var(--text); border: 1px solid var(--line-strong); border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+.reference-range button[aria-pressed="true"] { border-color: var(--green-hot); color: var(--green-hot); }
+.reference-range button:focus-visible { outline: 2px solid var(--green-hot); outline-offset: 2px; }
