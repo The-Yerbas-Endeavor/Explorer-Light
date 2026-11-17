@@ -1816,9 +1816,29 @@ async function filodexMarketSummary() {
 
 async function filodexMarketHistory(last) {
   if (!config.markets.enabled) return null;
-  try {
-    return marketHistory7d(await persistedMarketHistoryEntries('filodex'), last, 'USDT', 'Explorer snapshots');
-  } catch { return null; }
+  const trades = await cached('market:filodex:trades:YERB_USDT', MARKET_HISTORY_CACHE_MS, async () => {
+    try {
+      const response = await fetch('https://api.filodex.xyz/cmc/trades?market_pair=YERB_USDT', {
+        headers: { accept: 'application/json' },
+        signal: AbortSignal.timeout(config.markets.timeoutMs)
+      });
+      if (!response.ok) return [];
+      const data = await response.json();
+      if (!Array.isArray(data)) return [];
+      const window = marketHistoryWindow();
+      return data.slice(0, 100)
+        .map(row => ({ timestamp: marketEpochSeconds(row?.timestamp), price: marketNumber(row?.price) }))
+        .filter(row => row.timestamp >= window.fetchFrom && row.timestamp <= window.now && row.price > 0)
+        .sort((a, b) => a.timestamp - b.timestamp);
+    } catch { return []; }
+  });
+
+  let saved = [];
+  try { saved = await persistedMarketHistoryEntries('filodex'); } catch { /* Exchange trades can still be displayed. */ }
+  if (!trades.length) return marketHistory7d(saved, last, 'USDT', 'Explorer snapshots');
+  const earlier = saved.filter(row => row.timestamp < trades[0].timestamp);
+  return marketHistory7d([...earlier, ...trades], last, 'USDT',
+    earlier.length ? 'FiloDex trades and explorer snapshots' : 'FiloDex recent trades');
 }
 
 function marketReferenceSummary(markets) {
