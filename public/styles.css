@@ -9765,3 +9765,6 @@ html[data-layout-theme] .address-summary .telemetry-cell > strong { white-space:
 .market-sparkline:has(.sparkline-tooltip:not([hidden])) { z-index: 3; }
 
 .market-sparkline .sparkline-tooltip small { white-space: normal; }
+
+.market-sparkline[tabindex="0"]:focus-visible { outline: 2px solid var(--green-hot); outline-offset: 4px; }
+.market-sparkline .sparkline-observation.is-inspected { r: 3; stroke: var(--text); stroke-width: 1; }

@@ -450,8 +450,22 @@ async function renderMarkets() {
     const svg = spark.querySelector('svg');
     const tooltip = spark.querySelector('.sparkline-tooltip');
     const points = [...svg.querySelectorAll('[data-price]')];
+    if (!points.length) return;
+    spark.tabIndex = 0;
+    spark.setAttribute('role', 'group');
+    spark.setAttribute('aria-label', spark.dataset.sparkExchange +
+      ' seven-day price chart. Use Left and Right arrow keys to inspect points.');
+    const announcement = document.createElement('span');
+    announcement.className = 'reference-point-announcement';
+    announcement.setAttribute('role', 'status');
+    spark.append(announcement);
+    let keyboardIndex = points.length - 1;
+    let inspected = null;
     let pinned = null;
     function show(point) {
+      inspected?.classList.remove('is-inspected');
+      inspected = point;
+      if (point) point.classList.add('is-inspected');
       tooltip.hidden = !point;
       if (!point) return;
       tooltip.querySelector('strong').textContent = point.dataset.price;
@@ -481,6 +495,33 @@ async function renderMarkets() {
       }
       return best;
     }
+    function inspectByKeyboard() {
+      const point = points[keyboardIndex];
+      show(point);
+      announcement.textContent = spark.dataset.sparkExchange + ': ' + point.dataset.price + ', ' +
+        point.dataset.date + '. Point ' + (keyboardIndex + 1) + ' of ' + points.length + '.';
+    }
+    spark.addEventListener('focus', inspectByKeyboard);
+    spark.addEventListener('blur', () => {
+      announcement.textContent = '';
+      show(pinned);
+    });
+    spark.addEventListener('keydown', event => {
+      switch (event.key) {
+        case 'ArrowLeft': keyboardIndex = Math.max(0, keyboardIndex - 1); break;
+        case 'ArrowRight': keyboardIndex = Math.min(points.length - 1, keyboardIndex + 1); break;
+        case 'Home': keyboardIndex = 0; break;
+        case 'End': keyboardIndex = points.length - 1; break;
+        case 'Escape':
+          pinned = null;
+          show(null);
+          announcement.textContent = '';
+          return;
+        default: return;
+      }
+      event.preventDefault();
+      inspectByKeyboard();
+    });
     svg.addEventListener('pointermove', event => {
       if (event.pointerType !== 'touch') show(nearest(event) || pinned);
     });
