@@ -350,7 +350,8 @@ function referencePriceChart(history, fourExchangeHistory) {
   const options = series.flatMap(line => [...line.points].reverse().map(point => {
     const sources = 'NestEx, Gatevia (converted to USDT), NeoxEX, FiloDex' + (line.css === 'reference-five' ? ', SpotEx' : '');
     const time = new Date(point.timestamp * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
-    return '<option value="' + esc(pointKey(line, point)) + '" data-sources="' + esc(sources) + '">' +
+    return '<option value="' + esc(pointKey(line, point)) + '" data-sources="' + esc(sources) +
+      '" data-date="' + esc(time) + '" data-price="' + esc(marketPrice(point.price) + ' USDT') + '">' +
       esc(time + ' · ' + marketPrice(point.price) + ' USDT · ' + line.name) + '</option>';
   })).join('');
   const plotted = [...series].reverse().map(line => {
@@ -371,12 +372,12 @@ function referencePriceChart(history, fourExchangeHistory) {
     return '<g class="' + line.css + '">' + segments + dots + '</g>';
   }).join('');
   return '<section class="ledger-section">' + title + legend +
+    '<div class="reference-chart-plot">' +
     '<svg class="reference-price-chart" viewBox="0 0 760 180" role="img" aria-label="Seven-day YERB reference price, five-exchange main series and optional four-exchange comparison">' +
-    axes + plotted + '</svg><div class="reference-point-details"><strong id="reference-point-label">Hover over or tap a point to inspect it.</strong>' +
-    '<output id="reference-point-sources" aria-live="polite"></output></div><div class="reference-inspector"><label>Inspect a price point <select id="reference-point">' +
+    axes + plotted + '</svg><div class="reference-tooltip" hidden aria-hidden="true"><strong></strong><small></small><span></span></div></div>' +
+    '<div class="reference-inspector"><label>Inspect a price point <select id="reference-point">' +
     '<option value="">Choose a date and price</option>' + options +
-    '</select></label></div><p class="market-disclaimer">Observed range: ' + marketPrice(low) + '–' + marketPrice(high) +
-    ' USDT.</p>' + (fourExchangeHistory ? '<p class="market-disclaimer">The four-exchange comparison uses same-day prices for the backfill and historical DOGE/USDT to convert Gatevia quotes. It disappears when the main series has observations on all seven days.</p>' : '') + '</section>';
+    '</select></label><output class="reference-point-announcement" aria-live="polite"></output></div></section>';
 }
 
 async function renderMarkets() {
@@ -447,27 +448,55 @@ async function renderMarkets() {
   const picker = app.querySelector('#reference-point');
   const chart = app.querySelector('.reference-price-chart');
   if (picker && chart) {
-    const showPoint = key => {
-      const option = [...picker.options].find(item => item.value === key);
-      const sources = option?.dataset.sources;
-      app.querySelector('#reference-point-label').textContent = sources
-        ? option.textContent : 'Hover over or tap a point to inspect it.';
-      app.querySelector('#reference-point-sources').textContent = sources ? 'Sources: ' + sources : '';
-      chart.querySelectorAll('[data-reference-point]').forEach(point =>
-        point.classList.toggle('is-inspected', point.dataset.referencePoint === key));
-    };
-    const inspectPointer = event => {
-      const key = event.target.closest('[data-reference-point]')?.dataset.referencePoint;
-      if (key) {
-        picker.value = key;
-        showPoint(key);
-      }
-    };
+    const plot = chart.parentElement;
+    const tooltip = plot.querySelector('.reference-tooltip');
+    const announcement = app.querySelector('.reference-point-announcement');
+    const points = new Map([...chart.querySelectorAll('[data-reference-point]')].map(point => [point.dataset.referencePoint, point]));
+    const options = new Map([...picker.options].map(option => [option.value, option]));
+    let activePoint;
+    function showPoint(key) {
+      const point = points.get(key);
+      const option = options.get(key);
+      activePoint?.classList.remove('is-inspected');
+      activePoint = point;
+      tooltip.hidden = !point || !option;
+      if (tooltip.hidden) return;
+      point.classList.add('is-inspected');
+      tooltip.querySelector('strong').textContent = option.dataset.price;
+      tooltip.querySelector('small').textContent = option.dataset.date;
+      tooltip.querySelector('span').textContent = option.dataset.sources;
+      const bounds = plot.getBoundingClientRect();
+      const dot = point.querySelector('.reference-point-dot').getBoundingClientRect();
+      const x = dot.left + dot.width / 2 - bounds.left;
+      const y = dot.top + dot.height / 2 - bounds.top;
+      const { offsetWidth: width, offsetHeight: height } = tooltip;
+      const left = x + 12 + width <= bounds.width ? x + 12 : x - width - 12;
+      tooltip.style.left = Math.max(0, Math.min(left, bounds.width - width)) + 'px';
+      tooltip.style.top = Math.max(0, Math.min(y - height / 2, bounds.height - height)) + 'px';
+    }
+    const pointFrom = event => event.target.closest('[data-reference-point]')?.dataset.referencePoint;
+    function selectPoint(key) {
+      picker.value = key;
+      showPoint(key);
+      const option = options.get(picker.value);
+      announcement.textContent = option?.dataset.sources ? option.textContent + '. Sources: ' + option.dataset.sources : '';
+    }
     chart.addEventListener('pointerover', event => {
-      if (event.pointerType !== 'touch') inspectPointer(event);
+      const key = pointFrom(event);
+      if (key && event.pointerType !== 'touch') showPoint(key);
     });
-    chart.addEventListener('click', inspectPointer);
-    picker.addEventListener('change', () => showPoint(picker.value));
+    chart.addEventListener('pointerout', event => {
+      if (pointFrom(event) && !event.relatedTarget?.closest?.('[data-reference-point]')) showPoint(picker.value);
+    });
+    chart.addEventListener('pointerleave', () => showPoint(picker.value));
+    chart.addEventListener('click', event => {
+      const key = pointFrom(event);
+      if (key) selectPoint(picker.value === key ? '' : key);
+    });
+    picker.addEventListener('change', () => selectPoint(picker.value));
+    plot.parentElement.addEventListener('keydown', event => {
+      if (event.key === 'Escape') selectPoint('');
+    });
   }
 
 }

@@ -9748,5 +9748,13 @@ html[data-layout-theme] .address-summary .telemetry-cell > strong { white-space:
 .reference-point-hit { cursor: pointer; }
 .reference-point-dot { pointer-events: none; }
 .is-inspected > .reference-point-dot { r: 5; stroke: var(--text); stroke-width: 1.5; }
-.reference-point-details { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); background: var(--panel-solid); }
-.reference-point-details output { color: var(--text-soft); }
+.reference-chart-plot { position: relative; }
+.reference-tooltip {
+  position: absolute; max-width: min(250px, 85%); width: max-content; z-index: 2; pointer-events: none;
+  padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 5px;
+  background: var(--panel-solid); color: var(--text); font-size: 12px; line-height: 1.35;
+  box-shadow: 0 4px 16px #0006;
+}
+.reference-tooltip > * { display: block; }
+.reference-tooltip > small, .reference-tooltip > span { color: var(--text-soft); }
+.reference-point-announcement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
