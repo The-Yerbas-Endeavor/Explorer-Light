@@ -1740,6 +1740,42 @@ async function neoxexMarketSummary() {
   });
 }
 
+async function neoxexMarketHistory(last) {
+  if (!config.markets.enabled) return null;
+  const candles = await cached('market:neoxex:candles:YERB_USDT', MARKET_HISTORY_CACHE_MS, async () => {
+    try {
+      const response = await fetch('https://neoxa.exchange/api/exchange/candles/YERB_USDT?interval=1h&limit=168', {
+        headers: { accept: 'application/json' },
+        signal: AbortSignal.timeout(config.markets.timeoutMs)
+      });
+      if (!response.ok) return [];
+      const data = await response.json();
+      if (data?.success !== true || data.pair !== 'YERB_USDT' || data.interval !== '1h' || !Array.isArray(data.candles)) return [];
+      return data.candles.slice(-168)
+        .filter(row => Number(row?.volume) > 0 && marketEpochSeconds(row?.time) > 0 && marketNumber(row?.close) > 0)
+        .map(row => ({ timestamp: row.time, price: row.close }));
+    } catch { return []; }
+  });
+  if (candles.length >= 2) return marketHistory7d(candles, last, 'USDT', 'NeoxEX hourly candle closes');
+  let saved = [];
+  try { saved = await persistedMarketHistoryEntries('neoxex'); } catch { /* The ticker still works without local history. */ }
+  return marketHistory7d(candles.length && !saved.length ? candles : saved, last, 'USDT',
+    candles.length && !saved.length ? 'NeoxEX hourly candle closes' : 'Explorer snapshots');
+}
+
+function filodexMarketListing() {
+  const tradeUrl = 'https://filodex.xyz/trade/YERB_USDT';
+  return {
+    ...spotexMarketListing(),
+    exchange: 'filodex',
+    exchangeName: 'FiloDex',
+    tickerId: 'YERB_USDT',
+    tradeUrl,
+    source: tradeUrl,
+    apiDocsUrl: null
+  };
+}
+
 function marketReferenceSummary(markets) {
   const sources = [];
 
@@ -1929,7 +1965,8 @@ async function snapshotMarketHistoryFromFeeds() {
 
   const results = await Promise.allSettled([
     nestexMarketSummary(),
-    gateviaMarketSummary()
+    gateviaMarketSummary(),
+    neoxexMarketSummary()
   ]);
 
   const markets = results
@@ -2489,7 +2526,8 @@ async function handleApi(req, res, url) {
       gateviaMarketSummary(),
       neoxexMarketSummary()
     ]);
-    const markets = [nestex, gatevia, spotexMarketListing(), neoxex];
+    const history7d = await neoxexMarketHistory(neoxex.ticker.last);
+    const markets = [nestex, gatevia, spotexMarketListing(), { ...neoxex, history7d }, filodexMarketListing()];
     void recordMarketHistorySnapshot(markets);
     return sendJson(res, 200, {
       generatedAt: new Date().toISOString(),
