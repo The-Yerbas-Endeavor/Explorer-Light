@@ -3,6 +3,7 @@ import { AddressReceived } from './src/address-received.js';
 import { createTimedCache } from './src/timed-cache.js';
 import QRCode from 'qrcode';
 import { enrichTransaction, recentMovementBlocks, smartnodeRewards, toDuffs } from './src/chain-tools.js';
+import { referenceBackfill } from './src/reference-backfill.js';
 import { NetworkHistory } from './src/network-history.js';
 import http from 'node:http';
 import { isIP } from 'node:net';
@@ -1243,9 +1244,9 @@ async function loadMarketHistoryState() {
 
 async function persistedMarketHistoryEntries(exchange) {
   const state = await loadMarketHistoryState();
-  const rows = Array.isArray(state.markets?.[exchange])
-    ? state.markets[exchange]
-    : [];
+  const rows = exchange === 'yerb-reference-five' || exchange === 'yerb-reference-four'
+    ? referenceBackfill(state.markets, exchange)
+    : (Array.isArray(state.markets?.[exchange]) ? state.markets[exchange] : []);
 
   return rows
     .map((row) => ({

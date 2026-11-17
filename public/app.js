@@ -416,7 +416,7 @@ function averageSourcePrices(source) {
   return {
     price: number(source.priceUsdt, 16) + ' USDT / YERB',
     conversion: source.nativeQuote === 'DOGE' && source.quoteUsdt > 0
-      ? number(source.nativeLast, 16) + ' DOGE / YERB × ' + number(source.quoteUsdt, 16) + ' USDT / DOGE'
+      ? number(source.nativeLast, 16) + ' DOGE / YERB × ' + number(source.quoteUsdt, 16) + ' USDT / DOGE' + (source.reconstructed ? ' (rate reconstructed)' : '')
       : ''
   };
 }
