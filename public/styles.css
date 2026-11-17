@@ -9791,3 +9791,5 @@ html[data-layout-theme] .address-summary .telemetry-cell > strong { white-space:
 html[data-layout-theme] .telemetry-cell > strong:has(.market-cap-valuation) { overflow: visible; white-space: normal; }
 .market-cap-valuation { display: inline-block; max-width: 100%; }
 .market-cap-valuation .market-valuation-tooltip { white-space: normal; font-weight: 400; }
+
+#market-average-tooltip small { display: block; font-size: inherit; letter-spacing: normal; }

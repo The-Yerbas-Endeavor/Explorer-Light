@@ -1979,6 +1979,7 @@ function marketReferenceSummary(markets) {
       priceUsdt,
       nativeLast: marketNumber(market.ticker?.last),
       nativeQuote: market.quote,
+      ...(market.exchange === 'gatevia' ? { quoteUsdt: market.ticker.quoteUsdt } : {}),
       conversion
     });
   }

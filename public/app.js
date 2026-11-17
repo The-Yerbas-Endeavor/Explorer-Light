@@ -406,6 +406,24 @@ function marketValuationCell(market, hasLiveData) {
     '</span></span>';
 }
 
+function marketAverageValue(reference, showUnit = false) {
+  if (!(reference?.priceUsdt > 0)) return '—';
+  const value = marketPrice(reference.priceUsdt);
+  const rows = (reference.sources || []).map(source => {
+    const price = number(source.priceUsdt, 16) + ' USDT / YERB';
+    const conversion = source.nativeQuote === 'DOGE' && source.quoteUsdt > 0
+      ? '<small>' + esc(number(source.nativeLast, 16) + ' DOGE / YERB × ' +
+        number(source.quoteUsdt, 16) + ' USDT / DOGE') + '</small>' : '';
+    return '<span>' + esc(source.exchangeName + ': ' + price) + conversion + '</span>';
+  }).join('');
+  return '<span class="market-valuation market-cap-valuation">' +
+    '<button type="button" class="market-valuation-trigger" aria-label="Average YERB price: ' +
+    esc(value) + ' USDT" aria-describedby="market-average-tooltip">' +
+    esc(value + (showUnit ? ' USDT' : '')) + '</button>' +
+    '<span class="reference-tooltip market-valuation-tooltip" id="market-average-tooltip" role="tooltip" hidden>' +
+    '<strong>Prices used in the average</strong>' + rows + '</span></span>';
+}
+
 function marketCapValue(reference, showUnit = true) {
   const { marketCapUsdt, priceUsdt, supplyYerb, sources } = reference || {};
   if (marketCapUsdt == null) return '—';
@@ -461,7 +479,7 @@ async function renderMarkets() {
   const reference = data.reference || {};
   const referenceRail = reference.sourceCount
     ? telemetryRail([
-        { label: 'AVG YERB USDT', value: marketPrice(reference.priceUsdt) + ' USDT', note: reference.method || 'live mean' },
+        { label: 'AVG YERB USDT', renderValue: () => marketAverageValue(reference, true), note: reference.method || 'live mean' },
         { label: 'MARKET CAP', renderValue: () => marketCapValue(reference), note: 'reference price × Core supply' },
         { label: 'SOURCES', value: number(reference.sourceCount), note: 'live exchanges' },
         { label: 'LOW', value: marketPrice(reference.lowUsdt) + ' USDT', note: 'cross-exchange' },
@@ -902,7 +920,7 @@ async function renderOriginalHome() {
         '<p>A listing of all verified Yerbas transactions</p>' +
       '</section>' +
       '<section class="original-market-strip">' +
-        '<span><small>AVG YERB USDT</small><strong>' + marketPrice(reference.priceUsdt) + '</strong></span>' +
+        '<span><small>AVG YERB USDT</small><strong>' + marketAverageValue(reference) + '</strong></span>' +
         '<span><small>Market Cap</small><strong>' + marketCapValue(reference) + '</strong></span>' +
         '<span><small>Connections</small><strong>' + number(summary.connections) + '</strong></span>' +
         '<span><small>Block Height</small><strong>' + number(summary.blockcount) + '</strong></span>' +
@@ -950,7 +968,7 @@ async function renderHome() {
     { label: 'DIFFICULTY', value: number(status.difficulty, 6), note: 'network target' },
     { label: 'PEERS', value: number(status.network?.connections), note: 'connected' },
     { label: 'MEMPOOL', value: number(status.mempool?.transactions), note: bytes(status.mempool?.bytes) },
-    { label: 'AVG YERB USDT', value: marketPrice(market?.priceUsdt), note: market?.sourceCount ? number(market.sourceCount) + (market.sourceCount === 1 ? ' exchange · USDT' : ' exchanges · USDT') : 'market unavailable' },
+    { label: 'AVG YERB USDT', renderValue: () => marketAverageValue(market), note: market?.sourceCount ? number(market.sourceCount) + (market.sourceCount === 1 ? ' exchange · USDT' : ' exchanges · USDT') : 'market unavailable' },
     { label: 'MARKET CAP', renderValue: () => marketCapValue(market, false), note: 'USDT estimate' }
   ]);
 
