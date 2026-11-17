@@ -279,7 +279,7 @@ function telemetryRail(items) {
   return '<section class="telemetry-rail">' + items.map((item) =>
     '<div class="telemetry-cell">' +
       '<span>' + esc(item.label) + '</span>' +
-      '<strong>' + esc(item.value) + '</strong>' +
+      '<strong>' + (item.renderValue ? item.renderValue() : esc(item.value)) + '</strong>' +
       (item.note ? '<small>' + esc(item.note) + '</small>' : '') +
     '</div>'
   ).join('') + '</section>';
@@ -406,6 +406,22 @@ function marketValuationCell(market, hasLiveData) {
     '</span></span>';
 }
 
+function marketCapValue(reference, showUnit = true) {
+  const { marketCapUsdt, priceUsdt, supplyYerb, sources } = reference || {};
+  if (marketCapUsdt == null) return '—';
+  const value = marketMoney(marketCapUsdt) + (showUnit ? ' USDT' : '');
+  const exchanges = (sources || []).map(source => source.exchangeName +
+    (source.nativeQuote === 'DOGE' ? ' (converted to USDT)' : '')).join(', ');
+  return '<span class="market-valuation market-cap-valuation">' +
+    '<button type="button" class="market-valuation-trigger" aria-label="Market cap: ' +
+    esc(marketMoney(marketCapUsdt)) + ' USDT" aria-describedby="market-cap-tooltip">' + esc(value) + '</button>' +
+    '<span class="reference-tooltip market-valuation-tooltip" id="market-cap-tooltip" role="tooltip" hidden>' +
+    '<strong>Market cap estimate</strong>' +
+    '<span>Core supply: ' + esc(number(supplyYerb, 8)) + ' YERB</span>' +
+    '<span>Average price: ' + esc(number(priceUsdt, 16)) + ' USDT / YERB</span>' +
+    '<span>Exchanges: ' + esc(exchanges) + '</span></span></span>';
+}
+
 function bindMarketValuations(root) {
   for (const cell of root.querySelectorAll('.market-valuation')) {
     const button = cell.querySelector('button');
@@ -446,7 +462,7 @@ async function renderMarkets() {
   const referenceRail = reference.sourceCount
     ? telemetryRail([
         { label: 'AVG YERB USDT', value: marketPrice(reference.priceUsdt) + ' USDT', note: reference.method || 'live mean' },
-        { label: 'MARKET CAP', value: marketMoney(reference.marketCapUsdt) + ' USDT', note: 'reference price × Core supply' },
+        { label: 'MARKET CAP', renderValue: () => marketCapValue(reference), note: 'reference price × Core supply' },
         { label: 'SOURCES', value: number(reference.sourceCount), note: 'live exchanges' },
         { label: 'LOW', value: marketPrice(reference.lowUsdt) + ' USDT', note: 'cross-exchange' },
         { label: 'HIGH', value: marketPrice(reference.highUsdt) + ' USDT', note: 'cross-exchange' },
@@ -887,7 +903,7 @@ async function renderOriginalHome() {
       '</section>' +
       '<section class="original-market-strip">' +
         '<span><small>AVG YERB USDT</small><strong>' + marketPrice(reference.priceUsdt) + '</strong></span>' +
-        '<span><small>Market Cap</small><strong>' + marketMoney(reference.marketCapUsdt) + ' USDT</strong></span>' +
+        '<span><small>Market Cap</small><strong>' + marketCapValue(reference) + '</strong></span>' +
         '<span><small>Connections</small><strong>' + number(summary.connections) + '</strong></span>' +
         '<span><small>Block Height</small><strong>' + number(summary.blockcount) + '</strong></span>' +
       '</section>' +
@@ -902,6 +918,7 @@ async function renderOriginalHome() {
         pagination +
       '</section>' +
     '</div>';
+  bindMarketValuations(app);
 }
 
 
@@ -934,7 +951,7 @@ async function renderHome() {
     { label: 'PEERS', value: number(status.network?.connections), note: 'connected' },
     { label: 'MEMPOOL', value: number(status.mempool?.transactions), note: bytes(status.mempool?.bytes) },
     { label: 'AVG YERB USDT', value: marketPrice(market?.priceUsdt), note: market?.sourceCount ? number(market.sourceCount) + (market.sourceCount === 1 ? ' exchange · USDT' : ' exchanges · USDT') : 'market unavailable' },
-    { label: 'MARKET CAP', value: market ? marketMoney(market.marketCapUsdt) : '—', note: 'USDT estimate' }
+    { label: 'MARKET CAP', renderValue: () => marketCapValue(market, false), note: 'USDT estimate' }
   ]);
 
   const tape = blocks.map((block, index) => {
@@ -1009,6 +1026,7 @@ async function renderHome() {
       '<div class="chain-tape">' + tape + '</div>' +
       pagination +
     '</section>';
+  bindMarketValuations(app);
 }
 
 

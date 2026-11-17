@@ -9786,3 +9786,8 @@ html[data-layout-theme] .address-summary .telemetry-cell > strong { white-space:
 .market-valuation-trigger:focus-visible { outline: 2px solid var(--green-hot); outline-offset: 3px; }
 .market-valuation .market-valuation-tooltip { max-width: min(280px, calc(100vw - 16px)); text-align: left; }
 .market-valuation:has(.market-valuation-tooltip:not([hidden])) { z-index: 4; }
+
+.telemetry-cell:has(.market-cap-valuation) { overflow: visible; }
+html[data-layout-theme] .telemetry-cell > strong:has(.market-cap-valuation) { overflow: visible; white-space: normal; }
+.market-cap-valuation { display: inline-block; max-width: 100%; }
+.market-cap-valuation .market-valuation-tooltip { white-space: normal; font-weight: 400; }
