@@ -565,7 +565,7 @@ async function renderMarkets() {
       const market = data.markets.find(row => row.exchange === slot.dataset.marketId);
       const history = market.exchange === 'gatevia' ? data.gateviaUsdtHistory?.[range]
         : range === '7d' ? market.history7d : data.exchangeHistoryRanges?.[market.exchange]?.[range];
-      slot.innerHTML = marketSparkline(history, market.exchange === 'gatevia' ? 'USDT' : market.quote, market.exchangeName, range);
+      slot.innerHTML = marketSparkline(history, market.quote, market.exchangeName, range);
     }
     bindMarketSparklines(app, range);
   }
