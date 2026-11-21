@@ -324,17 +324,22 @@ function renderLoading(label) {
 
 function referencePriceChart(history, fourExchangeHistory, range) {
   const label = { "24h": "24-hour", "7d": "7-day", "30d": "30-day" }[range];
-  const series = [
-    { history, name: 'Five exchanges (main)', css: 'reference-five' },
-    { history: fourExchangeHistory, name: 'Four exchanges · excludes SpotEx', css: 'reference-four' }
-  ].filter(line => line.history).map(line => ({
-    ...line,
-    points: (line.history.sparkPoints || []).filter(point => point.observed && Number.isFinite(point.price))
-  }));
+  const observed = data => (data?.sparkPoints || [])
+    .filter(point => point.observed && Number.isFinite(point.price));
+  const mainPoints = observed(history).map(point => ({ ...point, exchangeCount: 5 }));
+  const firstMain = mainPoints.length ? Math.min(...mainPoints.map(point => point.timestamp)) : Infinity;
+  const earlierPoints = observed(fourExchangeHistory)
+    .filter(point => point.timestamp < firstMain)
+    .map(point => ({ ...point, exchangeCount: 4 }));
+  const series = [{
+    name: 'AVG YERB USDT',
+    css: 'reference-five',
+    points: [...earlierPoints, ...mainPoints].sort((a, b) => a.timestamp - b.timestamp)
+  }];
   const title = railHeading('REFERENCE HISTORY', label + ' average YERB price', 'USDT');
-  const legend = '<p class="reference-chart-legend">' +
-    series.map(line => '<span class="' + line.css + '">' + esc(line.name) +
-      ' · ' + (range === '7d' ? line.history.observedDays + '/7 days' : number(line.history.observationCount) + ' observations') + '</span>').join('') + '</p>';
+  const legend = earlierPoints.length
+    ? '<p class="reference-chart-legend">Five exchanges · earlier points use four exchanges; Gatevia converted to USDT</p>'
+    : '';
   const prices = series.flatMap(line => line.points.map(point => point.price));
   if (!prices.length) return '<section class="ledger-section">' + title + legend +
     '<p class="ledger-empty">Building history</p></section>';
@@ -357,11 +362,11 @@ function referencePriceChart(history, fourExchangeHistory, range) {
         return conversion ? [source.exchangeName + ': ' + price, conversion] : [source.exchangeName + ': ' + price];
       })
       : ['Per-exchange prices unavailable for this point.', 'NestEx, Gatevia, NeoxEX, FiloDex' +
-        (line.css === 'reference-five' ? ', SpotEx' : '')];
+        (point.exchangeCount === 5 ? ', SpotEx' : '')];
     const time = new Date(point.timestamp * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
     return '<option value="' + esc(pointKey(line, point)) + '" data-sources="' + esc(sources.join('\n')) +
       '" data-date="' + esc(time) + '" data-price="' + esc(marketPrice(point.price) + ' USDT') + '">' +
-      esc(time + ' · ' + marketPrice(point.price) + ' USDT · ' + line.name) + '</option>';
+      esc(time + ' · ' + marketPrice(point.price) + ' USDT · ' + point.exchangeCount + ' exchanges') + '</option>';
   })).join('');
   const plotted = [...series].reverse().map(line => {
     const coords = line.points.map(point => ({
