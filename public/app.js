@@ -103,7 +103,8 @@ function marketSparkline(history, fallbackQuote = '', exchangeName = '', range =
       index,
       timestamp: Number(point?.timestamp),
       price: Number(point?.price),
-      observed: point?.observed === true
+      observed: point?.observed === true,
+      conversion: point?.sources?.[0] ? averageSourcePrices(point.sources[0]).conversion : ''
     }))
     .filter((point) => Number.isFinite(point.price) && point.price > 0);
 
@@ -163,7 +164,7 @@ function marketSparkline(history, fallbackQuote = '', exchangeName = '', range =
   const observations = coords
     .filter(point => point.observed && Number.isFinite(point.timestamp) && Math.abs(point.timestamp) <= 8640000000000)
     .map(point => '<circle class="sparkline-observation" cx="' + point.x + '" cy="' + point.y + '" r="1.7"' +
-      ' data-price="' + esc(marketPrice(point.price) + ' ' + quote) + '"' +
+      ' data-conversion="' + esc(point.conversion || '') + '" data-price="' + esc(marketPrice(point.price) + ' ' + quote) + '"' +
       ' data-date="' + esc(new Date(point.timestamp * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC') + '"/>')
     .join('');
 
@@ -562,8 +563,9 @@ async function renderMarkets() {
     bindReferenceChart(referenceHistory);
     for (const slot of app.querySelectorAll('.market-spark-slot')) {
       const market = data.markets.find(row => row.exchange === slot.dataset.marketId);
-      const history = range === '7d' ? market.history7d : data.exchangeHistoryRanges?.[market.exchange]?.[range];
-      slot.innerHTML = marketSparkline(history, market.quote, market.exchangeName, range);
+      const history = market.exchange === 'gatevia' ? data.gateviaUsdtHistory?.[range]
+        : range === '7d' ? market.history7d : data.exchangeHistoryRanges?.[market.exchange]?.[range];
+      slot.innerHTML = marketSparkline(history, market.exchange === 'gatevia' ? 'USDT' : market.quote, market.exchangeName, range);
     }
     bindMarketSparklines(app, range);
   }
@@ -597,7 +599,8 @@ function bindMarketSparklines(root, range) {
       if (!point) return;
       tooltip.querySelector('strong').textContent = point.dataset.price;
       tooltip.querySelector('small').textContent = point.dataset.date;
-      tooltip.querySelector('span').textContent = spark.dataset.sparkExchange;
+      tooltip.querySelector('span').textContent = spark.dataset.sparkExchange +
+        (point.dataset.conversion ? ' · ' + point.dataset.conversion : '');
       const dot = point.getBoundingClientRect();
       const box = spark.getBoundingClientRect();
       const x = dot.left + dot.width / 2;

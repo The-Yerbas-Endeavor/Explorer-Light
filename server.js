@@ -1605,6 +1605,44 @@ async function gateviaMarketHistoryEntries7d() {
   );
 }
 
+async function gateviaUsdtHistory() {
+  const saved = await persistedMarketHistoryEntries('gatevia');
+  const references = [
+    ...await persistedMarketHistoryEntries('yerb-reference-four'),
+    ...await persistedMarketHistoryEntries('yerb-reference-five')
+  ];
+  let trades = [];
+  try {
+    const payload = await cached('market:gatevia:doge-usdt:conversion-trades', MARKET_HISTORY_CACHE_MS,
+      () => gateviaMarketFetchJson('public/markets/DOGE_USDT/trades?limit=1000&order_by=desc', 'conversion-trades:DOGE_USDT'));
+    const rows = Array.isArray(payload) ? payload : (payload?.data || []);
+    trades = rows.map(row => ({ timestamp: marketEpochSeconds(row.ts ?? row.timestamp), price: marketNumber(row.price) }))
+      .filter(row => row.timestamp > 0 && row.price > 0).sort((a, b) => a.timestamp - b.timestamp);
+  } catch { /* Saved conversion observations remain available. */ }
+  const entries = new Map();
+  let tradeIndex = -1;
+  for (const point of saved.sort((a, b) => a.timestamp - b.timestamp)) {
+    while (tradeIndex + 1 < trades.length && trades[tradeIndex + 1].timestamp <= point.timestamp) tradeIndex++;
+    const rate = trades[tradeIndex]?.price;
+    if (rate > 0) entries.set(point.timestamp, {
+      timestamp: point.timestamp, price: point.price * rate,
+      sources: [{ nativeLast: point.price, nativeQuote: 'DOGE', quoteUsdt: rate }]
+    });
+  }
+  for (const point of references) {
+    const source = point.sources?.find(source => source.exchange === 'gatevia');
+    if (source?.priceUsdt > 0 && source.quoteUsdt > 0) entries.set(point.timestamp, {
+      timestamp: point.timestamp, price: source.priceUsdt, sources: [source]
+    });
+  }
+  const points = [...entries.values()].sort((a, b) => a.timestamp - b.timestamp);
+  return {
+    '24h': { ...referenceHistoryWindow(points, 24), quote: 'USDT' },
+    '7d': marketHistory7d(points, null, 'USDT', 'Historical Gatevia conversions'),
+    '30d': { ...referenceHistoryWindow(points, 30 * 24), quote: 'USDT' }
+  };
+}
+
 async function fourExchangeHistory(markets) {
   const saved = await persistedMarketHistoryEntries('yerb-reference-four');
   const window = marketHistoryWindow();
@@ -2774,6 +2812,7 @@ async function handleApi(req, res, url) {
     const referenceHistory7d = marketHistory7d(referenceEntries, null, 'USDT', 'Five-exchange reference snapshots');
     return sendJson(res, 200, {
       referenceHistory7d,
+      gateviaUsdtHistory: await gateviaUsdtHistory(),
       exchangeHistoryRanges: Object.fromEntries(await Promise.all(markets.map(async market => {
         const saved = await persistedMarketHistoryEntries(market.exchange);
         const recent = (market.history7d?.sparkPoints || []).filter(point => point.observed === true);
