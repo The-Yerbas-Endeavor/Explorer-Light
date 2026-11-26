@@ -9794,3 +9794,23 @@ html[data-layout-theme] .telemetry-cell > strong:has(.market-cap-valuation) { ov
 .market-cap-valuation .market-valuation-tooltip { white-space: normal; font-weight: 400; }
 
 #market-average-tooltip small { display: block; font-size: inherit; letter-spacing: normal; }
+
+html[data-layout-theme="new"] {
+  --ink: #1a2d26;
+  --ink-soft: #223a30;
+  --panel: rgba(39, 65, 53, .88);
+  --panel-solid: #294235;
+  --panel-raised: #345440;
+  --line: rgba(184, 225, 196, .25);
+  --line-strong: rgba(184, 225, 196, .45);
+  --text: #f4faf5;
+  --text-soft: #d4e5d9;
+  --muted: #afc8b8;
+  --green-dim: #8abb99;
+}
+html[data-layout-theme="new"] body {
+  background: linear-gradient(180deg, #233c30 0%, #1a2d26 60%, #192c25 100%);
+}
+html[data-layout-theme="new"] .site-header {
+  background: rgba(36, 61, 48, .96);
+}

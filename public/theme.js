@@ -26,7 +26,7 @@
 
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) {
-      meta.setAttribute('content', theme === 'original' ? '#303030' : '#030907');
+      meta.setAttribute('content', theme === 'original' ? '#303030' : '#1a2d26');
     }
 
     if (options.persist !== false) {
