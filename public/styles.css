@@ -10071,3 +10071,11 @@ html[data-layout-theme="new"] #app > * { min-width: 0; max-width: 100%; }
   html[data-layout-theme="new"] .observatory-strip { grid-template-columns: minmax(0, 1fr); }
   html[data-layout-theme="new"] .observatory-label { min-width: 0; }
 }
+@media (max-width: 640px) {
+  html[data-layout-theme="new"] .market-matrix-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  html[data-layout-theme="new"] .market-matrix-row > * { min-width: 0; grid-column: auto; }
+  html[data-layout-theme="new"] .market-matrix-row .market-spark-slot { grid-column: 1 / -1; }
+}
