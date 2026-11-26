@@ -1954,7 +1954,7 @@ async function renderSmartnodes() {
     '</div>';
 
   app.innerHTML =
-    ledgerHeader('SMARTNODE NETWORK', 'Deterministic node stream', number(enabled) + ' enabled', '<a href="/node-map?view=smartnodes">NETWORK MAP ↗</a><a href="/rewards">PAYOUT HISTORY</a><a href="/">LIVE CHAIN</a>') +
+    ledgerHeader('SMARTNODE NETWORK', 'Smartnodes', number(enabled) + ' enabled', '<a href="/node-map?view=smartnodes">NETWORK MAP ↗</a><a href="/rewards">PAYOUT HISTORY</a><a href="/">LIVE CHAIN</a>') +
     telemetryRail([
       { label: 'ENABLED', value: number(enabled), note: total ? ((enabled / total) * 100).toFixed(1) + '%' : '—' },
       { label: 'REGISTERED', value: number(total), note: 'deterministic' },
