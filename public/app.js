@@ -29,6 +29,7 @@ async function api(path) {
 }
 
 function setRpcState(state, label) {
+  if (!rpcState) return;
   rpcState.className = 'rpc-state ' + state;
   rpcState.innerHTML =
     '<span class="rpc-dot" aria-hidden="true"></span>' +
