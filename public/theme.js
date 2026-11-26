@@ -72,6 +72,35 @@
   });
 
   function bindControls() {
+    const menuButton = document.querySelector('.navigation-toggle');
+    const navigation = document.querySelector('#primary-navigation');
+    const closeNavigation = () => {
+      menuButton?.setAttribute('aria-expanded', 'false');
+      navigation?.classList.remove('is-open');
+    };
+    menuButton?.addEventListener('click', () => {
+      const open = menuButton.getAttribute('aria-expanded') !== 'true';
+      menuButton.setAttribute('aria-expanded', String(open));
+      navigation?.classList.toggle('is-open', open);
+    });
+    navigation?.addEventListener('click', event => {
+      if (event.target.closest('a')) closeNavigation();
+    });
+    document.addEventListener('click', event => {
+      document.querySelectorAll('.appearance-menu[open]').forEach(menu => {
+        if (!menu.contains(event.target)) menu.open = false;
+      });
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        closeNavigation();
+        document.querySelectorAll('.appearance-menu[open]').forEach(menu => {
+          menu.open = false;
+          menu.querySelector('summary')?.focus();
+        });
+      }
+    });
+
     updateColorTheme();
     document.querySelectorAll('[data-color-theme-toggle]').forEach(button => {
       button.addEventListener('click', () => {

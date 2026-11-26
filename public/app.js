@@ -983,13 +983,11 @@ async function renderHome() {
 
   setRpcState('online', 'Core online');
 
-  const maxTx = Math.max(1, ...blocks.map((block) => Number(block.transactions || 0)));
-
   const telemetry = telemetryRail([
-    { label: 'CHAIN TIP', value: number(status.blocks), note: status.chain || 'mainnet' },
-    { label: 'DIFFICULTY', value: number(status.difficulty, 6), note: 'network target' },
-    { label: 'PEERS', value: number(status.network?.connections), note: 'connected' },
-    { label: 'MEMPOOL', value: number(status.mempool?.transactions), note: bytes(status.mempool?.bytes) },
+    { label: 'Latest block', value: number(status.blocks), note: status.chain || 'mainnet' },
+    { label: 'Difficulty', value: number(status.difficulty, 6), note: 'network target' },
+    { label: 'Connected peers', value: number(status.network?.connections), note: 'connected' },
+    { label: 'Pending transactions', value: number(status.mempool?.transactions), note: bytes(status.mempool?.bytes) },
     { label: 'AVG YERB USDT', renderValue: () => marketAverageValue(market), note: market?.sourceCount ? number(market.sourceCount) + (market.sourceCount === 1 ? ' exchange · USDT' : ' exchanges · USDT') : 'market unavailable' },
     { label: 'MARKET CAP', renderValue: () => marketCapValue(market, false), note: 'USDT estimate' }
   ]);
@@ -1005,31 +1003,14 @@ async function renderHome() {
       : number(confirmations) + ' of 6 confirmations';
 
     return '<a class="chain-tape-row' + tipClass + maturityClass + '" href="/block/' + block.height + '" title="' + esc(maturityTitle) + '">' +
-      '<span class="tape-node" aria-hidden="true">' +
-        '<svg class="tape-block-icon" viewBox="0 0 32 32" focusable="false">' +
-          '<path class="chain-weave weave-back" d="M16 0C7 4 7 10 12 13"></path>' +
-          '<path class="chain-weave weave-back weave-back-bottom" d="M20 19C25 22 25 28 16 32"></path>' +
-          '<path class="block-face block-top" d="M16 6 25 11 16 16 7 11Z"></path>' +
-          '<path class="block-face block-left" d="M7 11 16 16V26L7 21Z"></path>' +
-          '<path class="block-face block-right" d="M25 11 16 16V26l9-5Z"></path>' +
-          '<path class="chain-weave weave-front" d="M12 13C15 15 17 17 20 19"></path>' +
-          '<path class="chain-core-line" d="M16 0V5.3M16 26.7V32"></path>' +
-          '<path class="block-check" d="m11.5 16.5 3 3 6-7"></path>' +
-        '</svg>' +
-      '</span>' +
       '<span class="tape-height">#' + number(block.height) + '</span>' +
-      '<span class="tape-age">' + esc(timeAgo(block.time)) + '<small class="tape-confirmation">' + esc(maturityLabel) + '</small></span>' +
-      '<span class="tape-stat"><small>TX</small><b>' + number(block.transactions) + '</b></span>' +
-      '<span class="tape-stat"><small>SIZE</small><b>' + bytes(block.size) + '</b></span>' +
+      '<span class="tape-age">' + esc(timeAgo(block.time)) + '</span>' +
+      '<span class="block-status ' + (confirmed ? 'complete' : 'pending') + '">' + (confirmed ? 'Confirmed' : esc(confirmations + '/6 confirmations')) + '</span>' +
+      '<span class="tape-stat"><small>Transactions</small><b>' + number(block.transactions) + '</b></span>' +
+      '<span class="tape-stat"><small>Size</small><b>' + bytes(block.size) + '</b></span>' +
       '<code class="tape-hash">' + esc(block.hash) + '</code>' +
       '<span class="tape-open">↗</span>' +
     '</a>';
-  }).join('');
-
-  const rhythm = blocks.slice().reverse().map((block) => {
-    const txCount = Number(block.transactions || 0);
-    return '<i class="rhythm-tick level-' + scaleLevel(txCount, maxTx) + '" title="Block ' +
-      esc(block.height) + ' · ' + number(txCount) + ' transaction' + (txCount === 1 ? '' : 's') + '"></i>';
   }).join('');
 
   const newestHeight = blocks.length ? Number(blocks[0].height) : null;
@@ -1056,13 +1037,9 @@ async function renderHome() {
 
   app.innerHTML =
     telemetry +
-    '<section class="observatory-strip">' +
-      '<div class="observatory-label"><span>TX / BLOCK</span><strong>Transactions per block</strong></div>' +
-      '<div class="rhythm-line" aria-label="Transactions per block on the current chain tape page">' + rhythm + '</div>' +
-      '<div class="observatory-source"><span class="live-dot"></span>MAX ' + number(maxTx) + ' TX</div>' +
-    '</section>' +
     '<section class="ledger-section">' +
-      railHeading('LATEST ACTIVITY', 'Recent blocks', rangeLabel + ' · confirming 1–5 · confirmed 6+') +
+      railHeading('LATEST ACTIVITY', 'Recent blocks', rangeLabel) +
+      '<div class="block-table-labels" aria-hidden="true"><span>Block</span><span>Age</span><span>Status</span><span>Transactions</span><span>Size</span><span>Block hash</span><span></span></div>' +
       '<div class="chain-tape">' + tape + '</div>' +
       pagination +
     '</section>';
@@ -2630,22 +2607,22 @@ async function renderTransaction(txid) {
     return (cards || '<p>No ' + side + ' in this transaction.</p>') + (rows.length > pageSize ? '<nav class="rail-pagination" aria-label="' + side + ' pages"><button data-flow="' + side + '" data-step="-1" ' + (!pages[side] ? 'disabled' : '') + '>Previous</button><span>' + (start + 1) + '–' + Math.min(start + pageSize, rows.length) + ' of ' + rows.length + '</span><button data-flow="' + side + '" data-step="1" ' + (start + pageSize >= rows.length ? 'disabled' : '') + '>Next</button></nav>' : '');
   }
 
-  const actions = '<a href="/">LIVE CHAIN</a>' + copyButton(tx.txid, 'transaction ID') +
+  const actions = '<a href="/transactions">All transactions</a>' + copyButton(tx.txid, 'transaction ID') +
     (tx.blockhash ? '<a href="/block/' + encodeURIComponent(tx.blockhash) + '">BLOCK ↗</a>' : '');
 
   app.innerHTML =
-    ledgerHeader(tx.confirmations ? 'CONFIRMED TRANSACTION' : 'MEMPOOL TRANSACTION', 'Transaction', tx.txid, actions) +
+    ledgerHeader(tx.confirmations ? 'Confirmed' : 'Pending confirmation', kind, tx.txid, actions) +
     '<div class="tx-overview">' + [
-      ['Total output', number(totalOutput, 8) + ' YERB'],
+      ['Total outputs', number(totalOutput, 8) + ' YERB'],
       ['Network fee', tx.feeYerb == null ? '—' : number(tx.feeYerb, 8) + ' YERB'],
       ['Confirmations', number(tx.confirmations)],
       ['Size', bytes(tx.size)]
     ].map(([label, value]) => '<div><span>' + esc(label) + '</span><strong>' + esc(value) + '</strong></div>').join('') + '</div>' +
     '<div class="tx-context"><span class="tx-type">' + esc(kind) + '</span><span>' + (tx.blocktime || tx.time ? esc(new Date((tx.blocktime || tx.time) * 1000).toLocaleString()) : 'Awaiting confirmation') + '</span></div>' +
-    '<section class="tx-flow-grid"><div class="tx-flow-side"><h2>From <small>' + number(inputCount) + ' inputs</small></h2><div id="tx-inputs">' + flowRows('inputs') + '</div></div><span class="tx-flow-arrow" aria-hidden="true">→</span><div class="tx-flow-side"><h2>To <small>' + number(outputs.length) + ' outputs</small></h2><div id="tx-outputs">' + flowRows('outputs') + '</div></div></section>' +
+    '<section class="tx-flow-grid"><div class="tx-flow-side"><h2>Inputs <small>' + number(inputCount) + ' inputs</small></h2><div id="tx-inputs">' + flowRows('inputs') + '</div></div><span class="tx-flow-arrow" aria-hidden="true">→</span><div class="tx-flow-side"><h2>Outputs <small>' + number(outputs.length) + ' outputs</small></h2><div id="tx-outputs">' + flowRows('outputs') + '</div></div></section>' +
     '<p class="tx-flow-note">Outputs can include coins returned to the sender. Follow the transaction links to trace their movement.</p>' +
     (tx.feeReason ? '<p>' + esc(tx.feeReason) + '</p>' : '') +
-    '<details class="raw-ledger"><summary>RAW RPC RESPONSE</summary><pre id="raw-json"></pre></details>';
+    '<details class="raw-ledger"><summary>Technical details</summary><pre id="raw-json"></pre></details>';
 
   app.querySelector('.tx-flow-grid').addEventListener('click', event => {
     const button = event.target.closest('button[data-flow]');
@@ -2738,7 +2715,7 @@ async function route() {
   const activeSection = ({ block: 'blocks', tx: 'transactions', address: 'addresses', asset: 'assets', rewards: 'smartnodes' })[section] || section;
   document.querySelectorAll('.header-link').forEach(link => {
     const target = new URL(link.href).pathname.split('/')[1];
-    if (target === activeSection) link.setAttribute('aria-current', 'page');
+    if (target === (activeSection || 'blocks')) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
   clearNotice();

@@ -24,6 +24,6 @@ test('chain tape uses six-confirmation maturity states', async () => {
   assert.ok(app.includes('confirmations >= 6'));
   assert.ok(app.includes("' is-confirmed'"));
   assert.ok(app.includes("' is-confirming'"));
-  assert.ok(app.includes("confirmed 6+"));
-  assert.ok(app.includes('block-check'));
+  assert.ok(app.includes("confirmed ? 'Confirmed'"));
+  assert.ok(app.includes('block-status'));
 });

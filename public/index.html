@@ -8,8 +8,8 @@
   <title>Yerbas Explorer</title>
   <link rel="icon" type="image/png" href="/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c">
   <link rel="apple-touch-icon" href="/yerbas-logo.png?v=8f08d21881e8eed66110444013d129441e9d799c">
-  <script src="/theme.js?v=yerbas-brand1"></script>
-  <link rel="stylesheet" href="/styles.css?v=theme-group1">
+  <script src="/theme.js?v=modern-explorer1"></script>
+  <link rel="stylesheet" href="/styles.css?v=modern-explorer3">
 </head>
 <body>
   <a class="skip-link" href="#app">Skip to content</a>
@@ -26,7 +26,8 @@
         </span>
       </a>
 
-      <nav class="header-actions" aria-label="Primary navigation">
+      <button type="button" class="navigation-toggle" aria-expanded="false" aria-controls="primary-navigation">Menu</button>
+      <nav id="primary-navigation" class="header-actions" aria-label="Primary navigation">
         <a class="header-link new-nav-link" href="/blocks">Blocks</a>
         <a class="header-link new-nav-link" href="/transactions">Transactions</a>
         <a class="header-link new-nav-link" href="/addresses">Addresses</a>
@@ -49,40 +50,29 @@
         <a class="header-link original-nav-link" href="/node-map">Network</a>
         <a class="header-link original-nav-link" href="/info">API</a>
 
+        <details class="appearance-menu">
+          <summary>Appearance</summary>
+          <div class="appearance-panel">
+            <span class="appearance-label">Layout</span>
         <span class="layout-toggle" role="group" aria-label="Explorer layout theme">
           <button type="button" data-layout-theme-option="new" aria-pressed="true">New</button>
           <button type="button" data-layout-theme-option="original" aria-pressed="false">Original</button>
-          <button type="button" class="color-theme-toggle" data-color-theme-toggle aria-label="Switch to dark theme">Dark</button>
+
         </span>
+            <span class="appearance-label">Color</span>
+            <button type="button" class="color-theme-toggle" data-color-theme-toggle aria-label="Switch to dark theme">Dark</button>
+          </div>
+        </details>
       </nav>
     </div>
   </header>
 
   <main class="shell">
     <section class="observatory-mast">
-      <div class="mast-copy">
-        <div class="signal-line">
-          <span class="signal-pulse" aria-hidden="true"></span>
-          <span>YERBAS MAINNET</span>
-          <span class="signal-separator">/</span>
-          <span>Block explorer</span>
-        </div>
-        <h1 class="mast-title">
-          <strong>Explore Yerbas</strong>
-        </h1>
-
-      </div>
-
-      <div class="mast-telemetry" aria-label="Explorer architecture">
-        <span><small>SOURCE</small><strong>CORE RPC</strong></span>
-        <span><small>DATABASE</small><strong>NONE</strong></span>
-        <span><small>NETWORK</small><strong>MAINNET</strong></span>
-      </div>
-
       <section class="search-zone" aria-label="Blockchain search">
       <div class="search-label">
-        <span>Search blockchain</span>
-        <small>Blocks, transactions, addresses and assets</small>
+        <span>Explore the blockchain</span>
+        <small>Search Yerbas mainnet</small>
       </div>
       <form id="search-form" class="search" role="search">
         <span class="search-icon" aria-hidden="true">⌕</span>
@@ -90,7 +80,7 @@
           id="search-input"
           autocomplete="off"
           spellcheck="false"
-          placeholder="Search the Yerbas blockchain"
+          placeholder="Search by address, transaction, block or asset"
           aria-label="Search Yerbas blockchain"
         >
         <button type="submit">
@@ -129,6 +119,6 @@
     </div>
   </footer>
 
-  <script type="module" src="/app.js?v=header-status-removed1"></script>
+  <script type="module" src="/app.js?v=modern-explorer1"></script>
 </body>
 </html>
