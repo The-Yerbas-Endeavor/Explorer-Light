@@ -10079,3 +10079,28 @@ html[data-layout-theme="new"] #app > * { min-width: 0; max-width: 100%; }
   html[data-layout-theme="new"] .market-matrix-row > * { min-width: 0; grid-column: auto; }
   html[data-layout-theme="new"] .market-matrix-row .market-spark-slot { grid-column: 1 / -1; }
 }
+
+html[data-layout-theme="new"] .observatory-mast {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 24px;
+  margin-top: 24px;
+}
+html[data-layout-theme="new"] .observatory-mast .search-zone {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  min-width: 0;
+}
+html[data-layout-theme="original"] .observatory-mast .search-zone {
+  grid-column: 1 / -1;
+}
+@media (max-width: 640px) {
+  html[data-layout-theme="new"] .observatory-mast { padding: 18px 14px; gap: 16px; margin-top: 16px; }
+}
