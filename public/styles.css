@@ -9941,3 +9941,21 @@ html[data-layout-theme="new"] :focus-visible { outline: 2px solid var(--green-ho
   html[data-layout-theme="new"] .ledger-section { padding: 12px; }
   html[data-layout-theme="new"] .search-zone { padding: 12px; }
 }
+
+/* Block status and identifiers follow the active color palette. */
+html[data-layout-theme="new"] .chain-tape-row .tape-height,
+html[data-layout-theme="new"] .chain-tape-row.is-confirmed .tape-height {
+  color: var(--text);
+  text-shadow: none;
+}
+html[data-layout-theme="new"] .chain-tape-row .tape-hash,
+html[data-layout-theme="new"] .chain-tape-row .tape-age {
+  color: var(--text-soft);
+}
+html[data-layout-theme="new"] .chain-tape-row .tape-confirmation {
+  color: var(--green-hot);
+  text-shadow: none;
+}
+html[data-layout-theme="new"][data-color-theme="light"] .chain-tape-row .tape-block-icon {
+  filter: none;
+}
