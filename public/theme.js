@@ -2,6 +2,23 @@
   const storageKey = 'yerbas-explorer-layout-theme';
   const validThemes = new Set(['new', 'original']);
   const fallbackTheme = 'new';
+  const colorStorageKey = 'yerbas-explorer-color-theme';
+  let colorTheme = 'light';
+  try {
+    if (localStorage.getItem(colorStorageKey) === 'dark') colorTheme = 'dark';
+  } catch { /* Color preferences work without storage. */ }
+
+  function updateColorTheme() {
+    document.documentElement.dataset.colorTheme = colorTheme;
+    document.querySelectorAll('[data-color-theme-toggle]').forEach(button => {
+      const next = colorTheme === 'light' ? 'dark' : 'light';
+      button.textContent = next === 'dark' ? 'Dark' : 'Light';
+      button.setAttribute('aria-label', 'Switch to ' + next + ' theme');
+    });
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = document.documentElement.dataset.layoutTheme === 'original'
+      ? '#303030' : colorTheme === 'dark' ? '#14211b' : '#f5f8f3';
+  }
 
   function storedTheme() {
     try {
@@ -24,10 +41,7 @@
     const theme = validThemes.has(nextTheme) ? nextTheme : fallbackTheme;
     document.documentElement.dataset.layoutTheme = theme;
 
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) {
-      meta.setAttribute('content', theme === 'original' ? '#303030' : '#1a2d26');
-    }
+    updateColorTheme();
 
     if (options.persist !== false) {
       try {
@@ -50,6 +64,7 @@
 
   const initialTheme = storedTheme();
   document.documentElement.dataset.layoutTheme = initialTheme;
+  updateColorTheme();
 
   window.YerbasLayoutTheme = Object.freeze({
     get: () => document.documentElement.dataset.layoutTheme || fallbackTheme,
@@ -57,6 +72,14 @@
   });
 
   function bindControls() {
+    updateColorTheme();
+    document.querySelectorAll('[data-color-theme-toggle]').forEach(button => {
+      button.addEventListener('click', () => {
+        colorTheme = colorTheme === 'light' ? 'dark' : 'light';
+        try { localStorage.setItem(colorStorageKey, colorTheme); } catch { /* Optional preference. */ }
+        updateColorTheme();
+      });
+    });
     updateControls(document.documentElement.dataset.layoutTheme || fallbackTheme);
     document.querySelectorAll('[data-layout-theme-option]').forEach((button) => {
       button.addEventListener('click', () => {
