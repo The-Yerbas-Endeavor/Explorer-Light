@@ -10064,3 +10064,10 @@ html[data-layout-theme="new"] .reference-tooltip { padding: 12px 14px; border-ra
   html[data-layout-theme="new"] .rail-heading small { max-width: 100%; }
 }
 html[data-layout-theme="new"] .header-link.original-nav-link { display: none; }
+html[data-layout-theme="new"] #app,
+html[data-layout-theme="new"] #app > * { min-width: 0; max-width: 100%; }
+@media (max-width: 640px) {
+  html[data-layout-theme="new"] .telemetry-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-layout-theme="new"] .observatory-strip { grid-template-columns: minmax(0, 1fr); }
+  html[data-layout-theme="new"] .observatory-label { min-width: 0; }
+}
