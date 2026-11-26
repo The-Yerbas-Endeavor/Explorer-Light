@@ -10063,3 +10063,4 @@ html[data-layout-theme="new"] .reference-tooltip { padding: 12px 14px; border-ra
   html[data-layout-theme="new"] .chain-tape-row { gap: 8px; }
   html[data-layout-theme="new"] .rail-heading small { max-width: 100%; }
 }
+html[data-layout-theme="new"] .header-link.original-nav-link { display: none; }
