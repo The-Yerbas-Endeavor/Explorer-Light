@@ -10104,3 +10104,6 @@ html[data-layout-theme="original"] .observatory-mast .search-zone {
 @media (max-width: 640px) {
   html[data-layout-theme="new"] .observatory-mast { padding: 18px 14px; gap: 16px; margin-top: 16px; }
 }
+html[data-layout-theme="original"] .observatory-mast { display: block; }
+html[data-layout-theme="original"] .observatory-mast > .mast-copy,
+html[data-layout-theme="original"] .observatory-mast > .mast-telemetry { display: none; }
