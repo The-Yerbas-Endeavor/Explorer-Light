@@ -1056,12 +1056,12 @@ async function renderHome() {
   app.innerHTML =
     telemetry +
     '<section class="observatory-strip">' +
-      '<div class="observatory-label"><span>TX / BLOCK</span><strong>Transaction count on this page</strong></div>' +
+      '<div class="observatory-label"><span>TX / BLOCK</span><strong>Transactions per block</strong></div>' +
       '<div class="rhythm-line" aria-label="Transactions per block on the current chain tape page">' + rhythm + '</div>' +
       '<div class="observatory-source"><span class="live-dot"></span>MAX ' + number(maxTx) + ' TX</div>' +
     '</section>' +
     '<section class="ledger-section">' +
-      railHeading('CHAIN TAPE', 'Recent blocks', rangeLabel + ' · confirming 1–5 · confirmed 6+') +
+      railHeading('LATEST ACTIVITY', 'Recent blocks', rangeLabel + ' · confirming 1–5 · confirmed 6+') +
       '<div class="chain-tape">' + tape + '</div>' +
       pagination +
     '</section>';
@@ -2733,6 +2733,13 @@ async function renderRewards() {
 }
 
 async function route() {
+  const section = location.pathname.split('/')[1];
+  const activeSection = ({ block: 'blocks', tx: 'transactions', address: 'addresses', asset: 'assets', rewards: 'smartnodes' })[section] || section;
+  document.querySelectorAll('.header-link').forEach(link => {
+    const target = new URL(link.href).pathname.split('/')[1];
+    if (target === activeSection) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  });
   clearNotice();
   const parts = location.pathname.split('/').filter(Boolean);
 

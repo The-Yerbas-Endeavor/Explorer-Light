@@ -9959,3 +9959,107 @@ html[data-layout-theme="new"] .chain-tape-row .tape-confirmation {
 html[data-layout-theme="new"][data-color-theme="light"] .chain-tape-row .tape-block-icon {
   filter: none;
 }
+
+/* Comfortable explorer navigation and readable data tables. */
+html[data-layout-theme="new"] { --max: 1280px; }
+html[data-layout-theme="new"] .shell { padding-top: 0; }
+html[data-layout-theme="new"] .header-inner {
+  width: min(var(--max), calc(100% - 48px));
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 16px 0;
+}
+html[data-layout-theme="new"] .header-actions {
+  flex: 1 1 760px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  overflow: visible;
+}
+html[data-layout-theme="new"] .header-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 10px;
+  font-size: 14px;
+  border-radius: 8px;
+}
+html[data-layout-theme="new"] .header-link[aria-current="page"] {
+  background: var(--panel-raised);
+  color: var(--green-hot);
+  box-shadow: inset 0 -2px var(--green-hot);
+}
+html[data-layout-theme="new"] .rpc-state { font-size: 11px; padding: 10px; }
+html[data-layout-theme="new"] .observatory-mast {
+  border: 0;
+  background: none;
+  padding: 28px 0 16px;
+  margin: 0;
+}
+html[data-layout-theme="new"] .mast-title { margin: 8px 0 0; font-size: 32px; }
+html[data-layout-theme="new"] .mast-title strong { font-weight: 700; letter-spacing: -.8px; }
+html[data-layout-theme="new"] .mast-telemetry { display: none; }
+html[data-layout-theme="new"] .signal-line { font: 500 13px system-ui, sans-serif; letter-spacing: .02em; }
+html[data-layout-theme="new"] .search-zone {
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  padding: 20px;
+  gap: 20px;
+}
+html[data-layout-theme="new"] .search-label > span { font: 650 15px system-ui, sans-serif; letter-spacing: 0; }
+html[data-layout-theme="new"] .search-label small { font: 12px/1.5 system-ui, sans-serif; letter-spacing: 0; }
+html[data-layout-theme="new"] .search { min-height: 52px; }
+html[data-layout-theme="new"] .search input { font: 15px system-ui, sans-serif; }
+html[data-layout-theme="new"] .search button { min-height: 44px; padding: 12px 24px; font: 650 14px system-ui, sans-serif; letter-spacing: 0; }
+html[data-layout-theme="new"] .search::before { display: none; }
+html[data-layout-theme="new"] .telemetry-rail { margin: 24px 0; box-shadow: 0 4px 16px rgba(23,45,29,.03); }
+html[data-layout-theme="new"] .telemetry-cell { padding: 18px; gap: 8px; }
+html[data-layout-theme="new"] .telemetry-cell > span,
+html[data-layout-theme="new"] .telemetry-cell > small { font: 12px/1.4 system-ui, sans-serif; letter-spacing: 0; }
+html[data-layout-theme="new"] .telemetry-cell > strong { font: 700 24px/1.2 system-ui, sans-serif; }
+html[data-layout-theme="new"] .observatory-strip { padding: 4px 0 20px; }
+html[data-layout-theme="new"] .observatory-label strong { font: 500 13px/1.5 system-ui, sans-serif; }
+html[data-layout-theme="new"] .ledger-section { padding: 24px; border: 1px solid var(--line); border-radius: 14px; }
+html[data-layout-theme="new"] .rail-heading { gap: 16px; padding-bottom: 18px; align-items: center; flex-wrap: wrap; }
+html[data-layout-theme="new"] .rail-heading h3 { font-size: 22px; letter-spacing: -.4px; }
+html[data-layout-theme="new"] .rail-heading small { font: 12px/1.5 system-ui, sans-serif; letter-spacing: 0; }
+html[data-layout-theme="new"] .chain-tape-row { min-height: 64px; gap: 16px; }
+html[data-layout-theme="new"] .tape-height { font: 650 16px system-ui, sans-serif; }
+html[data-layout-theme="new"] .tape-age { font: 13px/1.5 system-ui, sans-serif; }
+html[data-layout-theme="new"] .tape-confirmation { font: 11px/1.4 system-ui, sans-serif; margin-top: 3px; }
+html[data-layout-theme="new"] .tape-hash { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-layout-theme="new"] .tape-stat small { font: 11px system-ui, sans-serif; }
+html[data-layout-theme="new"] .tape-block-icon { filter: none; }
+html[data-layout-theme="new"] .ledger-header { padding: 28px 0 20px; }
+html[data-layout-theme="new"] .ledger-kind { font: 600 12px system-ui, sans-serif; letter-spacing: .06em; }
+html[data-layout-theme="new"] .ledger-title-row h2 { font-size: clamp(28px, 4vw, 38px); letter-spacing: -.8px; }
+html[data-layout-theme="new"] .ledger-actions a,
+html[data-layout-theme="new"] .reference-range button,
+html[data-layout-theme="new"] .chain-pagination a { min-height: 40px; padding: 9px 14px; font: 500 13px system-ui, sans-serif; letter-spacing: 0; }
+html[data-layout-theme="new"] .reference-inspector label { font-size: 14px; }
+html[data-layout-theme="new"] .reference-inspector select { min-height: 44px; border-radius: 8px; }
+html[data-layout-theme="new"] .market-matrix-row { padding: 16px 0; }
+html[data-layout-theme="new"] .market-matrix-row small { font-size: 11px; letter-spacing: .02em; }
+html[data-layout-theme="new"] .market-trade-link { min-height: 40px; display: inline-flex; align-items: center; }
+html[data-layout-theme="new"] .reference-tooltip { padding: 12px 14px; border-radius: 10px; line-height: 1.6; box-shadow: var(--shadow); }
+.skip-link { position: fixed; top: -80px; left: 16px; z-index: 100; padding: 12px 18px; color: var(--text); background: var(--panel-solid); border: 2px solid var(--green-hot); border-radius: 8px; }
+.skip-link:focus { top: 12px; }
+@media (max-width: 1050px) {
+  html[data-layout-theme="new"] .header-inner { gap: 10px; }
+  html[data-layout-theme="new"] .header-actions { flex-basis: 100%; justify-content: flex-start; }
+  html[data-layout-theme="new"] .brand { margin-bottom: 2px; }
+}
+@media (max-width: 640px) {
+  html[data-layout-theme="new"] .header-inner { width: calc(100% - 28px); padding: 10px 0; }
+  html[data-layout-theme="new"] .site-header { position: relative; }
+  html[data-layout-theme="new"] .header-link { min-height: 44px; padding: 8px; font-size: 13px; }
+  html[data-layout-theme="new"] .observatory-mast { padding-top: 20px; }
+  html[data-layout-theme="new"] .search-zone { display: flex; flex-direction: column; align-items: stretch; padding: 14px; gap: 10px; }
+  html[data-layout-theme="new"] .search-label small { display: none; }
+  html[data-layout-theme="new"] .search button { padding: 10px 14px; }
+  html[data-layout-theme="new"] .telemetry-cell { padding: 14px; }
+  html[data-layout-theme="new"] .telemetry-cell > strong { font-size: 21px; }
+  html[data-layout-theme="new"] .ledger-section { padding: 16px 12px; }
+  html[data-layout-theme="new"] .chain-tape-row { gap: 8px; }
+  html[data-layout-theme="new"] .rail-heading small { max-width: 100%; }
+}
